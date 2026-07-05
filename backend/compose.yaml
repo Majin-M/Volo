@@ -1,0 +1,33 @@
+services:
+  # --- Notre Base de Données MySQL pour VOLO ---
+  volo-db:
+    image: mysql:8.0
+    container_name: volo-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: volo
+      MYSQL_USER: volo_user
+      MYSQL_PASSWORD: volo_password
+    ports:
+      - "3306:3306" # On force le port MySQL standard
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      interval: 10s
+      retries: 5
+
+  # --- Service Mailer (Gardé depuis le fichier d'override) ---
+  mailer:
+    image: axllent/mailpit
+    container_name: volo-mailer
+    ports:
+      - "1025:1025" # Port SMTP pour envoyer
+      - "8025:8025" # Port Web pour voir les boîtes (http://localhost:8025)
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+
+volumes:
+  db_data:

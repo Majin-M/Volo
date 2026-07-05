@@ -1,0 +1,223 @@
+/*===============================================================================
+Feuille de style : RegisterPage — Layout Split-Screen
+===============================================================================
+Design System :
+    - Structure identique à LoginPage pour la cohérence de marque.
+    - Distinction : accent Vert Sage (#9CB997) pour l'action "Créer un compte".
+===============================================================================*/
+
+.splitScreen {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    min-height: calc(100vh - 72px);
+}
+
+/* --- Panneau visuel --- */
+.visualPanel {
+    position: relative;
+    overflow: hidden;
+    background-color: #9CB997;
+}
+
+.visualImage {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.visualOverlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(95, 76, 66, 0.1) 0%, rgba(95, 76, 66, 0.7) 100%);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 60px;
+}
+
+.visualEyebrow {
+    color: #E9D7C3;
+    font-family: 'Lato', sans-serif;
+    font-size: 0.85em;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+}
+
+.visualQuote {
+    font-family: 'Playfair Display', serif;
+    color: #fff;
+    font-size: 2em;
+    font-weight: 400;
+    line-height: 1.35;
+    max-width: 380px;
+    margin: 0;
+}
+
+/* --- Panneau formulaire --- */
+.formPanel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #F8F0E8;
+    padding: 60px 40px;
+}
+
+.formCard {
+    width: 100%;
+    max-width: 420px;
+}
+
+.eyebrow {
+    display: block;
+    color: #9CB997;
+    font-size: 0.8em;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+}
+
+.title {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.2em;
+    color: #5F4C42;
+    margin: 0 0 10px 0;
+}
+
+.subtitle {
+    color: #888;
+    font-size: 0.95em;
+    line-height: 1.5;
+    margin: 0 0 30px 0;
+}
+
+/* --- Formulaire --- */
+.nameRow {
+    display: flex;
+    gap: 15px;
+}
+
+.nameRow .formGroup {
+    flex: 1;
+}
+
+.formGroup {
+    margin-bottom: 18px;
+    text-align: left;
+}
+
+.inputLabel {
+    display: block;
+    color: #5F4C42;
+    font-weight: 600;
+    font-size: 0.8em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+.input {
+    width: 100%;
+    padding: 13px 14px;
+    border: 1px solid #E9D7C3;
+    border-radius: 8px;
+    background-color: #fff;
+    font-size: 1em;
+    font-family: 'Lato', sans-serif;
+    color: #5F4C42;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.input::placeholder {
+    color: #bbb;
+}
+
+.input:focus {
+    outline: none;
+    border-color: #9CB997;
+    box-shadow: 0 0 0 4px rgba(156, 185, 151, 0.18);
+}
+
+/* --- Bouton --- */
+.createButton {
+    width: 100%;
+    padding: 15px;
+    background-color: #9CB997;
+    color: #fff;
+    border: none;
+    border-radius: 25px;
+    font-size: 1.05em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s ease, background-color 0.2s ease;
+    margin-top: 8px;
+}
+
+.createButton:hover:not(:disabled) {
+    transform: translateY(-2px);
+    background-color: #8aa87e;
+}
+
+.createButton:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* --- Erreur --- */
+.errorMsg {
+    color: #d9534f;
+    background-color: #fee2e2;
+    padding: 12px 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 0.9em;
+    text-align: center;
+}
+
+/* --- Lien bas de page --- */
+.switchText {
+    text-align: center;
+    color: #888;
+    font-size: 0.9em;
+    margin-top: 22px;
+}
+
+.switchLink {
+    color: #5F4C42;
+    font-weight: 600;
+    text-decoration: none;
+    margin-left: 4px;
+}
+
+.switchLink:hover {
+    text-decoration: underline;
+}
+
+/* --- RESPONSIVE --- */
+@media (max-width: 900px) {
+    .splitScreen {
+        grid-template-columns: 1fr;
+        min-height: auto;
+    }
+    .visualPanel {
+        height: 200px;
+    }
+    .visualOverlay {
+        padding: 25px;
+    }
+    .visualQuote {
+        font-size: 1.2em;
+        max-width: none;
+    }
+    .formPanel {
+        padding: 40px 20px 60px 20px;
+    }
+    .nameRow {
+        flex-direction: column;
+        gap: 0;
+    }
+}

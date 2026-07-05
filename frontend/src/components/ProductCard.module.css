@@ -1,0 +1,114 @@
+/*===============================================================================
+Feuille de style : ProductCard
+===============================================================================
+Conteneur de styles pour le composant ProductCard.
+
+Classes principales :
+    - .card        : Conteneur principal de la carte.
+    - .card:hover   : Effet visuel au survol (Lévitation).
+    - .imageContainer : Zone d'affichage de l'image ou placeholder.
+    - .productImage : Image du produit (Object-fit cover).
+    - .title        : Nom du produit.
+    - .brand        : Nom de la marque.
+    - .price        : Prix en gras.
+    - .tags         : Conteneur des tags problématiques.
+    - .tag          : Tag individuel.
+    - .button       : Bouton d'action.
+===============================================================================*/
+
+.card {
+    border: 1px solid #E9D7C3; /* Bordure Beige Chaud */
+    border-radius: 8px;
+    padding: 20px;
+    width: 250px;
+    background-color: #fff;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+}
+
+/* --- Zone Image --- */
+.imageContainer {
+    width: 100%;
+    height: 180px;
+    background-color: #F8F0E8; /* Fond Ivoire */
+    border-radius: 4px;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #5F4C42; /* Brun Cacao pour le texte placeholder */
+    font-size: 0.9em;
+    overflow: hidden;
+    border: 1px dashed #5F4C42; /* Bordure pointillée pour le placeholder */
+}
+
+.productImage {
+    width: 100%;
+    height: 180px; /* Même hauteur que .imageContainer pour un alignement cohérent */
+    object-fit: cover; /* Remplit le cadre sans déformer l'image */
+    border-radius: 4px;
+    margin-bottom: 15px;
+    display: block;
+}
+
+/* --- Textes --- */
+.title {
+    margin: 0 0 5px 0;
+    color: #5F4C42;
+    font-size: 1.1em;
+    font-weight: 500;
+}
+
+.brand {
+    margin: 0 0 10px 0;
+    color: #888;
+    font-size: 0.9em;
+}
+
+.price {
+    margin: 0 0 10px 0;
+    color: #5F4C42;
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+/* --- Tags --- */
+.tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.tag {
+    font-size: 0.75em;
+    background: #E9D7C3;
+    padding: 2px 6px;
+    border-radius: 10px;
+    color: #5F4C42;
+}
+
+/* --- Bouton --- */
+.button {
+    background-color: #5F4C42; /* Brun Cacao */
+    color: #fff;
+    border: none;
+    padding: 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 10px;
+    font-weight: bold;
+    transition: background-color 0.2s ease;
+}
+
+.button:hover {
+    background-color: #9CB997; /* Vert Sage */
+}

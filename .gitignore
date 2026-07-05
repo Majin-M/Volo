@@ -1,0 +1,43 @@
+# ==============================================================================
+# Racine du monorepo VOLO — couvre backend (Symfony) et frontend (Vite/React)
+# ==============================================================================
+
+# --- Secrets (jamais commités, quel que soit le dossier) ---
+# Ignore TOUT fichier .env ou .env.xxx, ou qu'il se trouve dans le repo.
+# Le pattern precedent (*.local uniquement) laissait passer .env.dev, .env.prod, etc.
+.env
+.env.*
+!.env.example
+!*/.env.example
+
+###> symfony/framework-bundle ###
+backend/var/
+backend/vendor/
+backend/public/bundles/
+backend/config/secrets/prod/prod.decrypt.private.php
+###< symfony/framework-bundle ###
+
+###> lexik/jwt-authentication-bundle ###
+backend/config/jwt/*.pem
+###< lexik/jwt-authentication-bundle ###
+
+###> phpunit/phpunit ###
+backend/phpunit.xml
+backend/.phpunit.cache/
+###< phpunit/phpunit ###
+
+###> symfony/asset-mapper ###
+backend/public/assets/
+backend/assets/vendor/
+###< symfony/asset-mapper ###
+
+# --- Frontend (Vite / Node) ---
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# --- Editeurs / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

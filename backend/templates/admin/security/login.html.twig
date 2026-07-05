@@ -1,0 +1,107 @@
+{# ==============================================================================
+   Template : admin/security/login.html.twig
+   ==============================================================================
+   Objectif :
+       Formulaire de connexion du back-office. Autonome (n'etend aucun layout
+       existant) pour ne dependre d'aucune structure Twig deja en place.
+
+   Point important :
+       Le champ cache _csrf_token est obligatoire ici car security.yaml
+       declare enable_csrf: true sur le firewall 'admin'. Sans ce champ,
+       Symfony refuse la connexion avec une erreur CSRF invisible a l'oeil nu.
+   ============================================================================== #}
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Connexion — Administration VOLO</title>
+    <meta name="robots" content="noindex, nofollow">
+    <style>
+        body {
+            font-family: 'Lato', Arial, sans-serif;
+            background-color: #F8F0E8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .login-card {
+            background-color: #fff;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+            width: 100%;
+            max-width: 360px;
+        }
+        h1 {
+            font-family: 'Playfair Display', serif;
+            color: #5F4C42;
+            font-size: 1.5em;
+            margin: 0 0 25px 0;
+            text-align: center;
+        }
+        label {
+            display: block;
+            color: #5F4C42;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        input[type="email"],
+        input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #E9D7C3;
+            border-radius: 6px;
+            box-sizing: border-box;
+            margin-bottom: 18px;
+            font-size: 1em;
+        }
+        button {
+            width: 100%;
+            padding: 13px;
+            background-color: #5F4C42;
+            color: #fff;
+            border: none;
+            border-radius: 25px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #463325;
+        }
+        .error {
+            background-color: #fee2e2;
+            color: #d9534f;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.9em;
+            margin-bottom: 18px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <h1>Administration VOLO</h1>
+
+        {% if error %}
+            <div class="error">{{ error.messageKey|trans(error.messageData, 'security') }}</div>
+        {% endif %}
+
+        <form method="post">
+            <label for="username">Email</label>
+            <input type="email" value="{{ last_username }}" name="_username" id="username" autocomplete="email" required autofocus>
+
+            <label for="password">Mot de passe</label>
+            <input type="password" name="_password" id="password" autocomplete="current-password" required>
+
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
+
+            <button type="submit">Se connecter</button>
+        </form>
+    </div>
+</body>
+</html>

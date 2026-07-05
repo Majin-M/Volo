@@ -1,0 +1,121 @@
+<?php
+
+/*
+===============================================================================
+Service : OrderService
+===============================================================================
+Objectif :
+    Gérer la logique de création et de gestion des commandes.
+
+Responsabilités :
+    - Créer une commande à partir d'une liste de produits.
+    - Enregistrer l'adresse de livraison fournie.
+    - Calculer le montant total de la commande.
+    - Créer les lignes de commande (OrderItem).
+    - Associer la commande à l'utilisateur connecté.
+
+Dépendances :
+    - EntityManagerInterface : Pour persister les données.
+    - ProductRepository : Pour vérifier l'existence et le prix des produits.
+===============================================================================
+*/
+
+namespace App\Service;
+
+use App\Entity\Order;
+use App\Entity\OrderItem;
+use App\Entity\Product;
+use App\Repository\ProductRepository;
+use Doctrine\ORM\EntityManagerInterface;
+
+class OrderService
+{
+    private EntityManagerInterface $entityManager;
+    private ProductRepository $productRepository;
+
+    public function __construct(
+        EntityManagerInterface $entityManager,
+        ProductRepository $productRepository
+    ) {
+        $this->entityManager = $entityManager;
+        $this->productRepository = $productRepository;
+    }
+
+    /**
+     * Crée une commande et ses items.
+     *
+     * @param array $orderData Données JSON reçues (items, shippingAddress)
+     * @param object $user L'utilisateur connecté (User)
+     * @return Order L'entité Order créée
+     * @throws \InvalidArgumentException Si un produit n'existe pas
+     */
+    public function createOrder(array $orderData, object $user): Order
+    {
+        $order = new Order();
+        $order->setUser($user);
+        $order->setStatus(\App\Enum\OrderStatus::PENDING);
+
+        // 1. Traitement de l'adresse de livraison
+        if (isset($orderData['shippingAddress'])) {
+            $addr = $orderData['shippingAddress'];
+            $order->setStreet($addr['street'] ?? '');
+            $order->setCity($addr['city'] ?? '');
+            $order->setPostalCode($addr['postalCode'] ?? '');
+            $order->setCountry($addr['country'] ?? 'France'); // Valeur par défaut
+        }
+
+        $totalAmount = 0;
+
+        // 2. Traitement des items (produits)
+        if (isset($orderData['items']) && is_array($orderData['items'])) {
+            foreach ($orderData['items'] as $itemData) {
+                $productId = $itemData['productId'];
+                $quantity = $itemData['quantity'];
+
+                // Vérifier si le produit existe
+                $product = $this->productRepository->find($productId);
+
+                if (!$product) {
+                    throw new \InvalidArgumentException("Le produit avec l'ID $productId n'existe pas.");
+                }
+
+                // Vérifier si le produit est disponible (Optionnel, recommandé)
+                if (!$product->isAvailable()) {
+                    // On peut soit lever une erreur, soit juste l'ignorer.
+                    // Ici on lève une erreur pour être strict.
+                    throw new \InvalidArgumentException("Le produit {$product->getName()} n'est pas disponible.");
+                }
+
+                // Calcul du prix de la ligne
+                $unitPrice = (float) $product->getPrice();
+                $lineTotal = $unitPrice * $quantity;
+                $totalAmount += $lineTotal;
+
+                // Création de l'OrderItem
+                $orderItem = new OrderItem();
+                $orderItem->setOrderEntity($order);
+                $orderItem->setProduct($product);
+                $orderItem->setQuantity($quantity);
+                $orderItem->setUnitPrice(number_format($unitPrice, 2, '.', ''));
+                $orderItem->setProductName($product->getName());
+
+                $order->addItem($orderItem);
+            }
+        } else {
+            throw new \InvalidArgumentException("La liste des items est manquante ou invalide.");
+        }
+
+        // 3. Définir le total de la commande
+        if ($totalAmount == 0) {
+            throw new \InvalidArgumentException("Le montant total de la commande ne peut pas être de zéro.");
+        }
+        
+        $order->setTotal(number_format($totalAmount, 2, '.', ''));
+
+        // 4. Persistance
+        $this->entityManager->persist($order);
+        $this->entityManager->flush();
+
+        return $order;
+    }
+}

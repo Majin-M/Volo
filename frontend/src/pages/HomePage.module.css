@@ -1,0 +1,290 @@
+/*
+===============================================================================
+Feuille de style : HomePage (Refonte The Ordinary)
+===============================================================================
+Structure :
+    - Hero banner full-width avec image de fond réelle.
+    - Sections empilées verticalement, pleine largeur, fonds alternés.
+    - Problématiques en bande horizontale, photos rondes.
+    - Routines en marquee horizontal infini (auto-scroll, pause au survol).
+    - Conseils lifestyle en grille de cartes.
+===============================================================================*/
+
+/* --- HERO (full-width, vraie image) --- */
+.hero {
+    position: relative;
+    width: 100%;
+    height: 65vh;
+    min-height: 400px;
+    overflow: hidden;
+}
+
+.heroImage {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.heroOverlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 20px;
+}
+
+.heroTitle {
+    font-family: 'Playfair Display', serif;
+    font-size: 4em;
+    margin: 0 0 15px 0;
+    letter-spacing: 4px;
+    color: #fff;
+}
+
+.heroSlogan {
+    font-family: 'Lato', sans-serif;
+    font-size: 1.6em;
+    color: #fff;
+    font-weight: 300;
+    line-height: 1.4;
+    margin: 0;
+    max-width: 600px;
+}
+
+/* --- SECTIONS GÉNÉRIQUES (pleine largeur, empilées) --- */
+.section {
+    width: 100%;
+    padding: 80px 20px;
+    background-color: #F8F0E8;
+}
+
+.sectionAlt {
+    background-color: #fff;
+}
+
+/* Variante sans padding horizontal, pour laisser le marquee toucher les bords */
+.noPadX {
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.sectionTitle {
+    text-align: center;
+    color: #5F4C42;
+    font-family: 'Playfair Display', serif;
+    font-size: 2.2em;
+    margin: 0 0 10px 0;
+    padding: 0 20px;
+}
+
+.sectionSubtitle {
+    text-align: center;
+    color: #888;
+    font-size: 1em;
+    margin: 0 0 50px 0;
+    padding: 0 20px;
+}
+
+/* --- PROBLÉMATIQUES (bande horizontale, photos rondes) --- */
+.concernsRow {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 30px;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+.concernItem {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    width: 130px;
+    transition: transform 0.2s ease;
+}
+
+.concernItem:hover {
+    transform: translateY(-5px);
+}
+
+.concernImageWrapper {
+    width: 110px;
+    height: 110px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 2px solid #E9D7C3;
+    margin-bottom: 12px;
+}
+
+.concernImage {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.concernLabel {
+    text-align: center;
+    color: #5F4C42;
+    font-weight: 600;
+    font-size: 0.95em;
+}
+
+/* --- ROUTINES (marquee horizontal infini) --- */
+.marqueeWrapper {
+    width: 100%;
+    overflow: hidden;
+    /* Effet de fondu sur les bords gauche/droite */
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 60px, #000 calc(100% - 60px), transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, #000 60px, #000 calc(100% - 60px), transparent 100%);
+}
+
+.marqueeTrack {
+    display: flex;
+    gap: 25px;
+    width: max-content;
+    animation: scrollMarquee 35s linear infinite;
+}
+
+.marqueeWrapper:hover .marqueeTrack {
+    animation-play-state: paused;
+}
+
+@keyframes scrollMarquee {
+    from {
+        transform: translateX(0);
+    }
+    to {
+        /* On fait défiler exactement la moitié de la piste (1 set complet),
+           puisque loopedRoutines duplique la liste -> boucle invisible */
+        transform: translateX(-50%);
+    }
+}
+
+.routineCard {
+    flex: 0 0 auto;
+    width: 280px;
+    background-color: #F8F0E8;
+    border: 1px solid #E9D7C3;
+    border-radius: 10px;
+    padding: 25px;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.routineCard:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.08);
+}
+
+.routineTag {
+    display: inline-block;
+    background-color: #9CB997;
+    color: #fff;
+    font-size: 0.75em;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 12px;
+    margin-bottom: 12px;
+}
+
+.routineName {
+    font-family: 'Playfair Display', serif;
+    color: #5F4C42;
+    margin: 0 0 12px 0;
+    font-size: 1.3em;
+}
+
+.routineSteps {
+    margin: 0;
+    padding-left: 18px;
+    color: #5F4C42;
+}
+
+.routineSteps li {
+    margin-bottom: 6px;
+    font-size: 0.9em;
+}
+
+/* --- BONNES HABITUDES DE VIE --- */
+.tipsGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 25px;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+.tipCard {
+    text-align: center;
+    background-color: #fff;
+    border: 1px solid #E9D7C3;
+    border-radius: 10px;
+    padding: 30px 20px;
+    transition: transform 0.2s ease;
+}
+
+.tipCard:hover {
+    transform: translateY(-5px);
+    border-color: #9CB997;
+}
+
+.tipIcon {
+    font-size: 2.5em;
+    margin-bottom: 15px;
+}
+
+.tipTitle {
+    font-family: 'Playfair Display', serif;
+    color: #5F4C42;
+    margin: 0 0 10px 0;
+    font-size: 1.1em;
+}
+
+.tipDesc {
+    color: #888;
+    font-size: 0.9em;
+    line-height: 1.5;
+    margin: 0;
+}
+
+/* --- RESPONSIVE --- */
+@media (max-width: 768px) {
+    .hero {
+        height: 45vh;
+        min-height: 300px;
+    }
+    .heroTitle {
+        font-size: 2.5em;
+    }
+    .heroSlogan {
+        font-size: 1.2em;
+    }
+    .section {
+        padding: 50px 0;
+    }
+    .sectionTitle,
+    .sectionSubtitle {
+        padding: 0 20px;
+    }
+    .concernsRow {
+        gap: 20px;
+        padding: 0 20px;
+    }
+    .concernItem {
+        width: 90px;
+    }
+    .concernImageWrapper {
+        width: 80px;
+        height: 80px;
+    }
+    .routineCard {
+        width: 240px;
+    }
+}

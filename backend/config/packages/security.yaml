@@ -1,0 +1,62 @@
+security:
+    password_hashers:
+        Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface: 'auto'
+
+    providers:
+        app_user_provider:
+            entity:
+                class: App\Entity\User
+                property: email
+
+    firewalls:
+        # Necessaire pour ne pas bloquer les assets, la barre de debug, etc.
+        dev:
+            pattern: ^/(_(profiler|wdt)|css|images|js)/
+            security: false
+
+        # --- Back-office EasyAdmin : authentification classique par session ---
+        # A adapter si ton DashboardController EasyAdmin n'est pas monte sur /admin.
+        admin:
+            pattern: ^/admin
+            lazy: true
+            provider: app_user_provider
+            form_login:
+                login_path: admin_login
+                check_path: admin_login
+                default_target_path: admin
+                enable_csrf: true
+            logout:
+                path: admin_logout
+                target: admin_login
+
+        # --- API : authentification stateless par JWT (cookie HttpOnly) ---
+        api:
+            pattern: ^/api
+            stateless: true
+            provider: app_user_provider
+            jwt: ~
+
+        main:
+            lazy: true
+            provider: app_user_provider
+
+    access_control:
+        # --- Back-office : la page de login reste publique, le reste exige ROLE_ADMIN ---
+        - { path: ^/admin/login, roles: PUBLIC_ACCESS }
+        - { path: ^/admin, roles: ROLE_ADMIN }
+
+        # --- API publique (lecture seule / formulaires publics) ---
+        - { path: ^/api/auth/(login|register), roles: PUBLIC_ACCESS }
+        - { path: ^/api/contact, roles: PUBLIC_ACCESS }
+        - { path: ^/api/products, roles: PUBLIC_ACCESS, methods: [GET] }
+        - { path: ^/api/brands, roles: PUBLIC_ACCESS, methods: [GET] }
+        - { path: ^/api/skin-concerns, roles: PUBLIC_ACCESS, methods: [GET] }
+        - { path: ^/api/routines, roles: PUBLIC_ACCESS, methods: [GET] }
+
+        # --- API admin (CRUD produits/marques, gestion commandes/utilisateurs) ---
+        - { path: ^/api/admin, roles: ROLE_ADMIN }
+        - { path: ^/api/products, roles: ROLE_ADMIN, methods: [POST, PUT, DELETE] }
+        - { path: ^/api/brands, roles: ROLE_ADMIN, methods: [POST, PUT, DELETE] }
+
+        # --- Le reste de l'API exige un compte connecte ---
+        - { path: ^/api, roles: ROLE_USER }

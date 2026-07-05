@@ -1,0 +1,55 @@
+/* ==============================================================================
+   Reset global
+   ==============================================================================
+   Corrige le rendu "encadré" du site : le body a une marge par défaut de 8px
+   dans tous les navigateurs, ce qui empêche la NavBar et le Footer d'atteindre
+   réellement les bords de l'écran.
+   ============================================================================== */
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    min-height: 100vh;
+}
+
+h1, h2, h3 {
+    font-family: 'Playfair Display', serif;
+    color: #5F4C42;
+}
+body {
+    font-family: 'Lato', sans-serif;
+    background-color: #F8F0E8; /* Fond global ivoire */
+}
+
+/* Mobile : 1 colonne par défaut */
+.product-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+/* Tablette : 2 colonnes */
+@media (min-width: 768px) {
+    .product-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Desktop : 3 colonnes */
+@media (min-width: 1024px) {
+    .product-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}

@@ -1,0 +1,142 @@
+/*===============================================================================
+Feuille de style : CheckoutPage (Design Premium & Sécurisante)
+===============================================================================
+Design System :
+    - "Glassmorphism" : Carte blanche avec ombre douce (Trust).
+    - Grid Layout : 2 colonnes (Adresse à gauche, Paiement à droite) sur desktop.
+    - Inputs : Stylisés proprement (bordures douces, focus states).
+
+Responsabilités :
+    - Séparer visuellement la livraison (Admin de données) du paiement (Transaction).
+    - Mettre en valeur l'étape en cours (1. Adresse -> 2. Paiement).
+===============================================================================*/
+
+/* --- CONTENEUR PRINCIPAL --- */
+.container {
+    display: flex;
+    justify-content: center;
+    padding: 60px 20px;
+    min-height: 80vh; /* Prend au moins toute la hauteur de l'écran */
+}
+
+/* La carte centrale contenant le formulaire */
+.checkoutCard {
+    background-color: #fff;
+    border-radius: 20px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.06);
+    width: 100%;
+    max-width: 900px;
+    padding: 40px;
+    overflow: hidden; /* Arrondir le contenu */
+    border: 1px solid #E9D7C3; /* Bordure Beige subtile */
+    box-sizing: border-box;
+}
+
+/* Grille interne (Adresse | Paiement) */
+.formGrid {
+    display: grid;
+    grid-template-columns: 1fr; /* Mobile : Empilé */
+    gap: 40px;
+}
+
+/* Pour Desktop : 2 colonnes */
+@media (min-width: 768px) {
+    .formGrid {
+        grid-template-columns: 1.2fr 1fr; /* 1200px total : ~500px pour l'adresse, ~700px pour le paiement */
+    }
+}
+
+/* --- SECTION TITRES --- */
+.sectionTitle {
+    text-align: center;
+    color: #5F4C42;
+    font-family: 'Playfair Display', serif;
+    font-size: 2em;
+    margin-bottom: 30px;
+    margin-top: 20px;
+}
+
+.sectionLabel {
+    color: #5F4C42;
+    font-weight: 400;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 8px;
+    font-size: 0.85em;
+}
+
+/* --- FORMULAIRE INPUTS --- */
+.inputField {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #E9D7C3; /* Beige Doux */
+    border-radius: 6px;
+    background-color: #F8F0E8; /* Ivoire léger pour le fond du champ */
+    box-sizing: border-box;
+    font-size: 1em;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    color: #5F4C42;
+    margin-bottom: 20px;
+}
+
+.inputField:focus {
+    outline: none;
+    border-color: #5F4C42; /* Focus sur le Brun Cacao */
+    background-color: #fff;
+    box-shadow: 0 0 0 5px rgba(95, 76, 66, 0.2);
+}
+
+.formGroup {
+    margin-bottom: 0;
+}
+
+/* --- BOUTONS & ÉTATS --- */
+.primaryButton {
+    background-color: #5F4C42;
+    color: #fff;
+    border: none;
+    padding: 15px;
+    border-radius: 25px; /* Forme pille épaisse */
+    font-size: 1.1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    width: 100%;
+    margin-top: 10px;
+}
+
+.primaryButton:hover {
+    background-color: #463325;
+    transform: translateY(-2px);
+}
+
+.primaryButton:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background-color: #9CB997; /* Vert Sage pour "Inactif" */
+    transform: none;
+}
+
+.errorMsg {
+    text-align: center;
+    color: #d9534f;
+    background-color: #fee2e2;
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    font-size: 0.9em;
+}
+
+/* --- ZONE INFO TOTAL --- */
+.totalStyle {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 1.5em;
+    font-weight: bold;
+    color: #5F4C42;
+    margin: 0 0 20px 0;
+    padding-bottom: 20px;
+    font-family: 'Playfair Display', serif;
+    border-bottom: 1px solid #E9D7C3;
+}
