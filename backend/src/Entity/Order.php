@@ -9,22 +9,40 @@ Objectif :
 
 Responsabilités :
     - Lier un utilisateur à un panier validé.
-    - Stocker l'adresse de livraison.
-    - Suivre le statut du paiement et de la livraison via l'Enum OrderStatus.
-    - Calculer et stocker le montant total de la commande.
+    - Stocker l'adresse de livraison (copiée, pas référencée).
+    - Suivre le statut de traitement de la commande via l'Enum OrderStatus.
+    - Stocker le montant total de la commande.
     - Contenir la liste des produits achetés (OrderItems).
 
 Propriétés principales :
     - id              : Identifiant unique de la commande.
-    - status          : Statut actuel (Enum OrderStatus).
-    - total           : Montant total payé.
+    - status          : Statut de traitement (Enum OrderStatus).
+    - total           : Montant total.
     - user            : Client ayant passé la commande.
     - items           : Liste des articles (Lignes de commande).
     - shippingAddress : Détails de l'adresse de livraison.
+    - payment         : Le paiement associé (0 ou 1).
 
 Note Technique :
     Le nom de la table en base de données est 'shop_order' car 'order'
     est un mot réservé en SQL.
+
+Note Technique — LE STATUT DE PAIEMENT N'EST PLUS STOCKÉ ICI :
+    Cette entité portait auparavant deux colonnes payment_status et
+    payment_method, alors que l'entité Payment — déjà liée en OneToOne —
+    portait exactement la même information. Deux colonnes pour une seule
+    réalité, sans aucun mécanisme garantissant leur cohérence.
+
+    Le constat qui a tranché : PaymentService n'écrivait QUE sur Payment.
+    Les colonnes de Order n'étaient alimentées que par EasyAdmin, à la main.
+    Elles étaient donc déjà fausses dès qu'un paiement passait par l'API.
+
+    Désormais : Payment fait autorité, Order dérive.
+
+    getPaymentStatus() et getPaymentMethod() sont conservés en lecture seule
+    et restent exposés au groupe de sérialisation 'order:read' : le JSON
+    renvoyé par l'API est INCHANGÉ (clés paymentStatus / paymentMethod
+    toujours présentes). Aucune adaptation du front n'est nécessaire.
 ===============================================================================
 */
 
@@ -37,7 +55,8 @@ use App\Repository\OrderRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
-use Symfony\Component\Serializer\Annotation\Groups; 
+use Symfony\Component\Serializer\Annotation\Groups;
+
 #[ORM\Entity(repositoryClass: OrderRepository::class)]
 #[ORM\Table(name: 'shop_order')]
 #[ORM\HasLifecycleCallbacks]
@@ -59,7 +78,7 @@ class Order
 
     #[ORM\ManyToOne(inversedBy: 'orders')]
     #[ORM\JoinColumn(nullable: false)]
-    #[Groups('order:read')] 
+    #[Groups('order:read')]
     private ?User $user = null;
 
     #[ORM\Column(type: 'text', nullable: true)]
@@ -88,23 +107,24 @@ class Order
     #[Groups('order:read')]
     private Collection $items;
 
+    /**
+     * Côté inverse de la relation : la colonne order_id vit dans `payment`.
+     *
+     * Volontairement PAS exposé au groupe 'order:read' : sérialiser l'objet
+     * Payment complet créerait une référence circulaire (Order → Payment →
+     * Order) et exposerait clientSecret dans la réponse d'API. Seules les
+     * deux valeurs utiles sont exposées, via les getters dérivés plus bas.
+     */
+    #[ORM\OneToOne(targetEntity: Payment::class, mappedBy: 'orderEntity')]
+    private ?Payment $payment = null;
+
     #[ORM\Column(type: 'datetime')]
     #[Groups('order:read')]
     private \DateTimeInterface $createdAt;
 
     #[ORM\Column(type: 'datetime')]
-    #[Groups('order:read')] // Ajout pour cohérence
+    #[Groups('order:read')]
     private \DateTimeInterface $updatedAt;
-
-    // --- Champs Enums Paiement ---
-    
-    #[ORM\Column(type: 'string', length: 50, nullable: true)] // length=50 est souvent suffisant pour les Enums
-    #[Groups('order:read')] // IMPORTANT pour l'API
-    private ?PaymentStatus $paymentStatus = null;
-
-    #[ORM\Column(type: 'string', length: 50, nullable: true)]
-    #[Groups('order:read')] // IMPORTANT pour l'API
-    private ?PaymentMethod $paymentMethod = null;
 
     public function __construct()
     {
@@ -112,7 +132,7 @@ class Order
         $this->createdAt = new \DateTime();
         $this->updatedAt = new \DateTime();
     }
-    
+
     // --- Getters & Setters ---
 
     public function getId(): ?int { return $this->id; }
@@ -139,7 +159,7 @@ class Order
     public function getCountry(): ?string { return $this->country; }
     public function setCountry(string $country): self { $this->country = $country; return $this; }
 
-     public function getNotes(): ?string
+    public function getNotes(): ?string
     {
         return $this->notes;
     }
@@ -150,28 +170,51 @@ class Order
         return $this;
     }
 
-    // --- Getters & Setters Enums Paiement ---
-    
+    // --- Paiement ---
+
+    public function getPayment(): ?Payment
+    {
+        return $this->payment;
+    }
+
+    /**
+     * Appelé par Payment::setOrderEntity() pour maintenir le côté inverse.
+     * Ne pose pas la clé étrangère : celle-ci vit côté Payment (propriétaire).
+     */
+    public function setPayment(?Payment $payment): self
+    {
+        $this->payment = $payment;
+        return $this;
+    }
+
+    /**
+     * Statut de paiement, DÉRIVÉ de l'entité Payment — lecture seule.
+     *
+     * Retourne null tant qu'aucun paiement n'a été initié : c'est exactement
+     * le comportement de l'ancienne colonne nullable, donc le contrat d'API
+     * est préservé.
+     */
+    #[Groups('order:read')]
     public function getPaymentStatus(): ?PaymentStatus
     {
-        return $this->paymentStatus;
+        return $this->payment?->getStatus();
     }
 
-    public function setPaymentStatus(?PaymentStatus $paymentStatus): static
-    {
-        $this->paymentStatus = $paymentStatus;
-        return $this;
-    }
-
+    /**
+     * Moyen de paiement, DÉRIVÉ de l'entité Payment — lecture seule.
+     */
+    #[Groups('order:read')]
     public function getPaymentMethod(): ?PaymentMethod
     {
-        return $this->paymentMethod;
+        return $this->payment?->getMethod();
     }
 
-    public function setPaymentMethod(?PaymentMethod $paymentMethod): static
+    /**
+     * Raccourci de lecture, utile en Twig / EasyAdmin.
+     */
+    public function isPaid(): bool
     {
-        $this->paymentMethod = $paymentMethod;
-        return $this;
+        return $this->payment?->getStatus() === PaymentStatus::CAPTURED;
     }
 
     // --- Items ---

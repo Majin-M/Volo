@@ -24,15 +24,25 @@ Used By :
 namespace App\Service\PaymentGateway;
 
 use App\Enum\PaymentMethod;
-use Symfony\Component\DependencyInjection\Attribute\TaggedIterator;
+use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 
 class PaymentGatewayResolver
 {
     /**
+     * AutowireIterator et non TaggedIterator : ce dernier est deprecie depuis
+     * symfony/dependency-injection 7.1. Le comportement est identique, seul le
+     * nom change.
+     *
+     * Ce n'etait pas cosmetique : la depreciation n'est levee qu'a la
+     * compilation du conteneur, donc uniquement a cache froid. PHPUnit 13
+     * comptant les depreciations comme des echecs, la suite sortait en exit 1
+     * au premier lancement et en exit 0 aux suivants — verte ou rouge selon
+     * l'etat du cache, et rouge en permanence sur une CI qui part de zero.
+     *
      * @param iterable<PaymentGatewayInterface> $gateways Passerelles disponibles, injectees automatiquement.
      */
     public function __construct(
-        #[TaggedIterator('app.payment_gateway')] private iterable $gateways
+        #[AutowireIterator('app.payment_gateway')] private iterable $gateways
     ) {
     }
 

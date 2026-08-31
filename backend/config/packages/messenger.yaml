@@ -18,7 +18,29 @@ framework:
             messenger.bus.default: []
 
         routing:
-            Symfony\Component\Mailer\Messenger\SendEmailMessage: async
+            # SendEmailMessage n'est PAS route vers 'async', volontairement.
+            #
+            # Le reglage par defaut de Symfony envoie les emails en file
+            # d'attente, ce qui est le bon choix EN PRODUCTION : la requete HTTP
+            # ne doit pas attendre un aller-retour SMTP. Mais cela suppose qu'un
+            # worker consomme la file :
+            #
+            #     php bin/console messenger:consume async
+            #
+            # Or aucun worker ne tourne sur ce projet, et aucun n'est declare
+            # nulle part (ni supervisor, ni cron, ni docker). Avec le routage
+            # async, un email serait donc ecrit dans la table
+            # messenger_messages... et n'en sortirait jamais. La notification de
+            # contact n'arriverait pas — le meme trou noir que celui qu'on
+            # cherche a combler, deplace d'une table.
+            #
+            # En l'absence de worker, l'envoi synchrone est le seul qui
+            # fonctionne reellement. Le cout est assume : la requete attend le
+            # SMTP (quelques centaines de ms sur un formulaire de contact).
+            #
+            # A REBASCULER vers async le jour ou un worker existera — ce qui est
+            # un prerequis de la tache 4.2 (emails de confirmation de commande),
+            # ou le volume justifiera l'asynchrone.
             Symfony\Component\Notifier\Message\ChatMessage: async
             Symfony\Component\Notifier\Message\SmsMessage: async
 

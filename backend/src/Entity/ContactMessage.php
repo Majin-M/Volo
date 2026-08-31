@@ -5,25 +5,29 @@
 Entité : ContactMessage
 ===============================================================================
 Objectif :
-    Stocker les messages envoyés via le formulaire de contact public.
+    Archiver les messages envoyés via le formulaire de contact public.
+
+    ARCHIVE, pas outil de travail. Depuis le 17/07/2026, ContactService
+    persiste le message ET notifie l'administrateur par email : la base
+    garantit qu'un envoi raté ne perd rien, mais le traitement se fait dans la
+    boite mail (etat lu/non-lu, reponses, archives), pas ici. Voir
+    docs/MODELE_DONNEES.md 6.5.
 
 Responsabilités :
-    - Sauvegarder les coordonnées et le message du client.
-    - Permettre aux administrateurs de marquer le message comme "traité".
+    - Conserver une trace durable de chaque message recu.
 
 Propriétés principales :
     - id          : Identifiant unique.
     - firstName   : Prénom de l'expéditeur.
-    - email       : Email de réponse.
+    - email       : Email du visiteur (va dans le Reply-To de la notification).
     - subject     : Sujet du message.
-    - message     : Contenu du message.
-    - isProcessed : Booléen indiquant si l'admin a répondu/traité le message.
+    - message     : Contenu du message (assaini par strip_tags a l'entree).
+    - isProcessed : VESTIGE. Plus lu par personne depuis le passage a la
+                    notification email. A retirer lors d'un prochain nettoyage.
 
 Relations :
-    - Aucune relation directe avec d'autres entités métier (isolée).
-
-Note Technique :
-    Utile pour le support client et le back-office.
+    - Aucune. L'association TRAITE vers User (RG12) a ete abandonnee avec le
+      passage a la notification email — cf. docs/MODELE_DONNEES.md 6.5.
 ===============================================================================
 */
 

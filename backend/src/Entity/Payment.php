@@ -14,17 +14,38 @@ Responsabilités :
 
 Propriétés principales :
     - id            : Identifiant unique.
-    - status        : Statut du paiement (Enum: pending, captured, failed).
+    - status        : Statut du paiement (Enum: pending, captured, failed, refunded).
     - method        : Moyen de paiement utilisé (Enum: card, paypal).
     - clientSecret  : Secret client fourni par la passerelle de paiement (Stripe).
     - amount        : Montant payé.
 
 Relations :
     - orderEntity   : OneToOne (Un paiement est lié à une unique commande).
+                      Côté propriétaire : la colonne order_id vit dans cette table.
 
-Note Technique :
-    La relation OneToOne avec l'ordre permet de garantir l'intégrité
-    transactionnelle.
+Note Technique — SOURCE DE VÉRITÉ DU PAIEMENT :
+    Cette entité est la SEULE source de vérité pour le statut et le moyen de
+    paiement. Order ne stocke plus ces informations : Order::getPaymentStatus()
+    et Order::getPaymentMethod() les dérivent d'ici.
+
+    Auparavant, Order portait ses propres colonnes payment_status /
+    payment_method, dupliquant cette information sans aucun mécanisme de
+    cohérence entre les deux. Le futur webhook Stripe aurait dû penser à
+    mettre les deux à jour ; en oublier une aurait fait diverger l'API et le
+    back-office en silence.
+
+Note Technique — CASCADE :
+    Cette relation ne porte VOLONTAIREMENT aucun cascade.
+
+    Elle déclarait auparavant cascade: ['persist', 'remove'], ce qui signifiait
+    « supprimer un paiement supprime la commande » — et, par cascade en chaîne
+    depuis Order::$items, ses lignes de commande. Un administrateur supprimant
+    une ligne de paiement dans EasyAdmin effaçait l'historique d'achat du client.
+
+    Le cascade était à l'envers : un paiement est un détail d'une commande,
+    jamais son propriétaire. Un enregistrement financier ne doit de toute façon
+    jamais être supprimé (cf. docs/DIAGRAMME_ETATS.md section 2) : un échec
+    crée un nouveau Payment, il n'écrase pas le précédent.
 ===============================================================================
 */
 
@@ -57,8 +78,14 @@ class Payment
     #[ORM\Column(type: 'decimal', precision: 10, scale: 2)]
     private ?string $amount = null;
 
-    #[ORM\OneToOne(targetEntity: Order::class, cascade: ['persist', 'remove'])]
-    #[ORM\JoinColumn(nullable: false)]
+    /**
+     * Côté propriétaire de la relation : la colonne order_id est dans `payment`.
+     *
+     * Aucun cascade (cf. note d'en-tête). inversedBy permet à Order d'exposer
+     * Order::getPayment() et donc de dériver son statut de paiement.
+     */
+    #[ORM\OneToOne(targetEntity: Order::class, inversedBy: 'payment')]
+    #[ORM\JoinColumn(name: 'order_id', nullable: false, onDelete: 'CASCADE')]
     private ?Order $orderEntity = null;
 
     #[ORM\Column(type: 'datetime')]
@@ -90,7 +117,22 @@ class Payment
     public function setAmount(string $amount): self { $this->amount = $amount; return $this; }
 
     public function getOrderEntity(): ?Order { return $this->orderEntity; }
-    public function setOrderEntity(Order $orderEntity): self { $this->orderEntity = $orderEntity; return $this; }
+
+    /**
+     * Maintient le côté inverse à jour : sans cela, $order->getPayment()
+     * retournerait null tant que l'EntityManager n'a pas été vidé/rechargé,
+     * alors même que le Payment référence bien la commande.
+     */
+    public function setOrderEntity(Order $orderEntity): self
+    {
+        $this->orderEntity = $orderEntity;
+
+        if ($orderEntity->getPayment() !== $this) {
+            $orderEntity->setPayment($this);
+        }
+
+        return $this;
+    }
 
     public function getCreatedAt(): \DateTimeInterface { return $this->createdAt; }
     public function getUpdatedAt(): \DateTimeInterface { return $this->updatedAt; }

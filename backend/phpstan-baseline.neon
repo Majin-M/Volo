@@ -337,12 +337,6 @@ parameters:
 			path: src/Entity/User.php
 
 		-
-			message: '#^Class App\\Form\\UserType extends generic class Symfony\\Component\\Form\\AbstractType but does not specify its types\: TData$#'
-			identifier: missingType.generics
-			count: 1
-			path: src/Form/UserType.php
-
-		-
 			message: '#^Method App\\Repository\\BrandRepository\:\:findAllSortedByName\(\) should return array\<App\\Entity\\Brand\> but returns mixed\.$#'
 			identifier: return.type
 			count: 1

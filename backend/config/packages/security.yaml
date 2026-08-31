@@ -60,3 +60,11 @@ security:
 
         # --- Le reste de l'API exige un compte connecte ---
         - { path: ^/api, roles: ROLE_USER }
+
+        # --- Filet de securite : aucune route ne repond ici aujourd'hui ---
+        # Un `make:crud User` genere un CRUD Twig sur /user, hors des patterns
+        # ^/admin et ^/api : il serait donc accessible anonymement, avec `roles`
+        # et `password` en champs libres. C'est exactement ce qui s'est produit.
+        # Cette regle rend la regeneration inoffensive. Ne pas retirer au motif
+        # qu'elle ne matche rien : c'est precisement son role.
+        - { path: ^/user, roles: ROLE_ADMIN }

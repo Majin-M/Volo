@@ -1,36 +1,84 @@
 <?php
 
+/*
+===============================================================================
+OrderCrudController — back-office des commandes
+===============================================================================
+Note Technique — LES CHAMPS DE PAIEMENT SONT DEVENUS DES DÉRIVÉS :
+    Order::$paymentStatus et Order::$paymentMethod ont été supprimés : ils
+    dupliquaient Payment::$status et Payment::$method (cf. l'en-tête de
+    Order.php et docs/MODELE_DONNEES.md section 6.1).
+
+    Conséquence directe ici : ces deux champs n'ont plus de setter, ils ne
+    peuvent donc plus apparaître dans le formulaire NEW/EDIT — EasyAdmin
+    lèverait une exception en tentant d'écrire dessus. Ils restent affichés
+    en INDEX et DETAIL, en lecture seule, via les getters dérivés.
+
+    Pour MODIFIER un statut de paiement, l'administrateur passe désormais par
+    PaymentCrudController (menu « Ventes › Paiements »), c'est-à-dire au bon
+    endroit : là où la donnée vit réellement.
+
+Note Technique — RECHERCHE :
+    setSearchFields() référençait 'paymentStatus', qui n'est plus une colonne
+    Doctrine. La recherche traverse maintenant l'association : 'payment.status'
+    — même notation que 'user.email', déjà utilisée ici.
+===============================================================================
+*/
+
 namespace App\Controller\Admin;
 
 use App\Entity\Order;
-use App\Enum\OrderStatus;
-use App\Enum\PaymentStatus;
-use App\Enum\PaymentMethod;
-use Symfony\Component\Form\Extension\Core\Type\EnumType;
 use App\Entity\User;
-use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
+use App\Enum\OrderStatus;
+use App\Enum\PaymentMethod;
+use App\Enum\PaymentStatus;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
-use EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
-use EasyCorp\Bundle\EasyAdminBundle\Field\ChoiceField;
-use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
-use EasyCorp\Bundle\EasyAdminBundle\Field\DateTimeField;
-use EasyCorp\Bundle\EasyAdminBundle\Field\MoneyField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\ChoiceField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\DateTimeField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IdField;
-use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\MoneyField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
 
 final class OrderCrudController extends AbstractCrudController
 {
+    /**
+     * Couleurs de badge par statut de commande.
+     * Les clés DOIVENT correspondre aux valeurs de OrderStatus — une clé
+     * inexistante n'affiche simplement aucun badge, sans erreur : c'est
+     * pourquoi 'refunded' (qui n'existe pas dans OrderStatus) traînait ici
+     * sans que personne ne le remarque, tandis que 'delivered' manquait.
+     */
+    private const ORDER_STATUS_BADGES = [
+        'pending'   => 'warning',
+        'paid'      => 'success',
+        'shipped'   => 'info',
+        'delivered' => 'primary',
+        'cancelled' => 'danger',
+    ];
+
+    /** Clés = valeurs de PaymentStatus (pending, captured, failed, refunded). */
+    private const PAYMENT_STATUS_BADGES = [
+        'pending'  => 'warning',
+        'captured' => 'success',
+        'failed'   => 'danger',
+        'refunded' => 'secondary',
+    ];
+
+    /** Clés = valeurs de PaymentMethod (card, paypal). */
+    private const PAYMENT_METHOD_BADGES = [
+        'card'   => 'primary',
+        'paypal' => 'info',
+    ];
+
     public static function getEntityFqcn(): string
     {
         return Order::class;
     }
 
-    /**
-     * Configuration globale du CRUD (titres, tris, pagination, etc.)
-     */
     public function configureCrud(Crud $crud): Crud
     {
         return $crud
@@ -38,17 +86,13 @@ final class OrderCrudController extends AbstractCrudController
             ->setPageTitle(Crud::PAGE_NEW, 'Nouvelle Commande')
             ->setPageTitle(Crud::PAGE_EDIT, 'Modifier la Commande')
             ->setPageTitle(Crud::PAGE_DETAIL, 'Détail de la Commande')
-            ->setSearchFields(['id', 'total', 'user.email', 'status', 'paymentStatus'])
-            ->setDefaultSort(['createdAt' => 'DESC', 'total' => 'DESC'])
-            ->setPaginatorPageSize(15)
-            // Désactive la traduction automatique des champs si non désirée, 
-            // mais notre méthode configureFields gère déjà le problème des Enums.
-        ;
+            // 'payment.status' traverse l'association — 'paymentStatus' n'est
+            // plus une colonne et ferait échouer la requête de recherche.
+            ->setSearchFields(['id', 'total', 'user.email', 'status', 'payment.status'])
+            ->setDefaultSort(['createdAt' => 'DESC'])
+            ->setPaginatorPageSize(15);
     }
 
-    /**
-     * Configuration des actions (boutons)
-     */
     public function configureActions(Actions $actions): Actions
     {
         return $actions
@@ -65,157 +109,93 @@ final class OrderCrudController extends AbstractCrudController
             });
     }
 
-    /**
-     * Configuration des champs selon la page demandée.
-     * C'est ici que nous résolvons le problème des Enums :
-     * - En PAGE_NEW/EDIT : On utilise ChoiceField pour permettre la sélection.
-     * - En PAGE_INDEX/DETAIL : On utilise TextField pour forcer l'affichage en chaîne et éviter l'erreur de traduction Twig.
-     */
     public function configureFields(string $pageName): iterable
     {
-        // -----------------------------------------------------------------------
+        // -------------------------------------------------------------------
         // SECTION 1 : Formulaire (Création et Modification)
-        // -----------------------------------------------------------------------
-        // Ici, nous avons besoin de listes déroulantes (ChoiceField) pour que l'admin
-        // puisse sélectionner un statut, un moyen de paiement, etc.
+        // -------------------------------------------------------------------
+        // Les champs de paiement N'APPARAISSENT PLUS ICI : ce sont désormais
+        // des dérivés en lecture seule de l'entité Payment. Les afficher
+        // ferait planter EasyAdmin (aucun setter à appeler).
         if ($pageName === Crud::PAGE_NEW || $pageName === Crud::PAGE_EDIT) {
             return [
-                // Identifiant (seulement en lecture ou caché, selon besoin)
                 IdField::new('id', 'ID')->hideOnForm(),
 
-                // Client (Association)
                 AssociationField::new('user', 'Client')
                     ->setRequired(true)
                     ->setFormTypeOption('class', User::class),
 
-                // Statut de la commande (Enum: OrderStatus)
                 ChoiceField::new('status', 'Statut')
                     ->setChoices(OrderStatus::cases())
-                    // Force l'utilisation de EnumType avec la classe explicite
                     ->setFormTypeOption('class', OrderStatus::class)
                     ->setRequired(true)
-                    ->renderAsBadges([ // Optionnel : pour l'affichage visuel
-                        'pending' => 'warning',
-                        'paid' => 'success',
-                        'shipped' => 'info',
-                        'cancelled' => 'danger',
-                        'refunded' => 'secondary',
-                    ]),
+                    ->renderAsBadges(self::ORDER_STATUS_BADGES),
 
-                // ✅ CORRECTION STATUT PAIEMENT
-                ChoiceField::new('paymentStatus', 'Statut Paiement')
-                    ->setChoices(PaymentStatus::cases())
-                    ->setFormTypeOption('class', PaymentStatus::class) // <--- L'astuce magique
-                    ->renderAsBadges([
-                        'pending' => 'warning',
-                        'paid' => 'success',
-                        'failed' => 'danger',
-                    ]),
-
-                // ✅ CORRECTION MOYEN DE PAIEMENT
-                ChoiceField::new('paymentMethod', 'Moyen de Paiement')
-                    ->setChoices(PaymentMethod::cases())
-                    ->setFormTypeOption('class', PaymentMethod::class) // <--- L'astuce magique
-                    ->renderAsBadges([
-                        'card' => 'primary',
-                        'paypal' => 'info',
-                        'bank_transfer' => 'secondary',
-                    ]),
-
-                // Montant total
                 MoneyField::new('total', 'Montant Total')
                     ->setCurrency('EUR')
-                    ->setStoredAsCents(false) // Si votre DB stocke en décimal, sinon false
+                    ->setStoredAsCents(false)
                     ->setRequired(true),
 
-                // Date de création (souvent auto-générée, mais visible)
                 DateTimeField::new('createdAt', 'Date de Commande')
                     ->setFormat('dd/MM/yyyy HH:mm')
-                    ->hideOnForm(), // On cache souvent la date de création sur le formulaire si elle est auto
+                    ->hideOnForm(),
 
-                // Date de mise à jour
                 DateTimeField::new('updatedAt', 'Dernière Modification')
                     ->setFormat('dd/MM/yyyy HH:mm')
                     ->hideOnForm(),
 
-                // Ajoutez ici d'autres champs spécifiques à votre entité (adresse, notes, etc.)
                 TextField::new('notes', 'Notes internes')
                     ->setRequired(false)
-                    ->hideOnIndex(), // Optionnel : cacher dans la liste
+                    ->hideOnIndex(),
             ];
         }
 
-        // -----------------------------------------------------------------------
+        // -------------------------------------------------------------------
         // SECTION 2 : Liste (Index) et Détail (Show)
-        // -----------------------------------------------------------------------
-        // Ici, on utilise TextField pour éviter que le template 'choice.html.twig'
-        // ne tente de traduire l'objet Enum, ce qui causait l'erreur.
-        // Le formatValue retourne explicitement une chaîne de caractères.
+        // -------------------------------------------------------------------
+        // formatValue() force une chaîne : sans lui, le template de choix
+        // tente de traduire l'objet Enum et lève une erreur Twig.
         return [
-            // Identifiant
             IdField::new('id', 'ID')
-                ->formatValue(fn($value) => (string) $value),
+                ->formatValue(fn ($value) => (string) $value),
 
-            // Client
             AssociationField::new('user', 'Client')
-                ->formatValue(fn($value) => $value ? $value->getEmail() : 'Inconnu'),
+                ->formatValue(fn ($value) => $value ? $value->getEmail() : 'Inconnu'),
 
-            // Statut de la commande (TRÈS IMPORTANT : Formatage explicite)
             ChoiceField::new('status', 'Statut')
                 ->setChoices(OrderStatus::cases())
-                ->formatValue(function ($value) {
-                    if (!$value) return 'Non défini';
-                    // ChoiceField gère l'objet Enum nativement, mais on force l'affichage du 'value'
-                    return $value instanceof \UnitEnum ? $value->value : (string) $value;
-                })
-                // Optionnel : Affichage sous forme de badge coloré
-                ->renderAsBadges([
-                    'pending' => 'warning',
-                    'paid' => 'success',
-                    'shipped' => 'info',
-                    'cancelled' => 'danger',
-                    'refunded' => 'secondary',
-                ]),
+                ->formatValue(fn ($value) => $value instanceof \UnitEnum ? $value->value : 'Non défini')
+                ->renderAsBadges(self::ORDER_STATUS_BADGES),
 
-            // ✅ CORRECTION ENUM PAYMENT STATUS
+            // Dérivé de Payment — lecture seule. 'Non initié' plutôt que
+            // 'Non défini' : une commande sans paiement n'est pas une donnée
+            // manquante, c'est un panier validé dont le paiement n'a pas
+            // encore commencé.
             ChoiceField::new('paymentStatus', 'Statut Paiement')
                 ->setChoices(PaymentStatus::cases())
-                ->formatValue(function ($value) {
-                    if (!$value) return 'Non défini';
-                    return $value instanceof \UnitEnum ? $value->value : (string) $value;
-                })
-                ->renderAsBadges([
-                    'pending' => 'warning',
-                    'paid' => 'success',
-                    'failed' => 'danger',
-                ]),
+                ->formatValue(fn ($value) => $value instanceof \UnitEnum ? $value->value : 'Non initié')
+                ->renderAsBadges(self::PAYMENT_STATUS_BADGES),
 
-            // ✅ CORRECTION ENUM PAYMENT METHOD
+            // Dérivé de Payment — lecture seule.
             ChoiceField::new('paymentMethod', 'Moyen de Paiement')
                 ->setChoices(PaymentMethod::cases())
-                ->formatValue(function ($value) {
-                    if (!$value) return 'Non défini';
-                    return $value instanceof \UnitEnum ? $value->value : (string) $value;
-                }),
-            // Montant Total (Formatage monétaire pour l'affichage)
+                ->formatValue(fn ($value) => $value instanceof \UnitEnum ? $value->value : 'Non initié')
+                ->renderAsBadges(self::PAYMENT_METHOD_BADGES),
+
             MoneyField::new('total', 'Montant Total')
                 ->setCurrency('EUR')
                 ->setStoredAsCents(false),
 
-
-            // Dates
             DateTimeField::new('createdAt', 'Date')
                 ->setFormat('dd/MM/yyyy HH:mm')
-                ->hideOnDetail(), // Optionnel : cacher sur la page détail si redondant
+                ->hideOnDetail(),
 
             DateTimeField::new('updatedAt', 'Mis à jour le')
                 ->setFormat('dd/MM/yyyy HH:mm')
                 ->hideOnIndex(),
 
-            // Notes (si nécessaire dans la liste)
             TextField::new('notes', 'Notes')
-                ->hideOnIndex() // Souvent trop long pour la liste
-                ->hideOnDetail(), // Ou le montrait ici si utile
+                ->hideOnIndex(),
         ];
     }
 }

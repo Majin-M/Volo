@@ -1,5 +1,38 @@
 # Spécification API — Projet VOLO
 
+> ⚠️ **Plus de la moitié de ce document décrit une cible, pas l'API.** Confronté aux routes réelles (`php bin/console debug:router`) le 17/07/2026 : sur ~20 endpoints documentés, **11 existent**.
+>
+> Chaque section porte désormais ✅ **implémenté** ou ⬜ **prévu**. Un ⬜ signifie que la route renvoie **404** — pas qu'elle est incomplète.
+>
+> C'est exactement la dérive annoncée en [CONTRAT_API.md](CONTRAT_API.md) §8 : « `api_specification.md` peut mentir sans que rien ne le signale ». L'exemple qui y était donné (l'enveloppe d'erreur) était de loin le plus petit des écarts.
+
+## Ce qui existe réellement — vue d'ensemble
+
+| Endpoint | État |
+|---|---|
+| `POST /api/auth/register` · `login` · `logout` | ✅ |
+| `GET /api/auth/me` | ✅ — **et non `/api/users/me`** (§9) |
+| `GET /api/products` · `GET /api/products/{id}` | ✅ |
+| `GET /api/brands` | ✅ |
+| `GET /api/skin-concerns` | ✅ |
+| `GET /api/orders` · `POST /api/orders` | ✅ |
+| `POST /api/payments` | ✅ |
+| `POST /api/contact` | ✅ |
+| `GET /sitemap.xml` | ✅ (hors contrat d'API — [CONTRAT_API.md](CONTRAT_API.md) §7) |
+| `POST` · `PUT` · `DELETE /api/products` | ⬜ roadmap 2.6 🔴 |
+| `POST` · `PUT` · `DELETE /api/brands` | ⬜ |
+| `GET /api/products/{id}` détaillé, `GET /api/brands/{id}/products` | ⬜ |
+| `GET /api/skin-concerns/{slug}/products` | ⬜ |
+| `GET /api/routines` | ⬜ roadmap 2.9 — aucun `RoutineController` |
+| `GET /api/orders/{id}` · `PATCH /api/orders/{id}` | ⬜ |
+| `GET` · `PATCH /api/users/me` | ⬜ |
+| **Tout le §11 Administration** (`/api/admin/*`) | ⬜ — **aucune** de ces routes n'existe |
+
+Deux pièges que cette liste rend visibles :
+
+- **`security.yaml` protège des routes inexistantes** (`^/api/routines`, `POST /api/products`). Une règle d'`access_control` sur une route absente ne protège rien — elle fait croire que la route existe.
+- **Le back-office n'est pas une API.** Produits, marques et commandes se gèrent aujourd'hui par EasyAdmin (Twig, `/admin/*`), pas par `/api/admin/*`. Le §11 n'a jamais été construit parce qu'EasyAdmin l'a rendu inutile.
+
 ## Table des matières
 
 1. [Conventions générales](#1-conventions-générales)
@@ -86,6 +119,14 @@ Authorization: Bearer <jwt_token>
 ---
 
 ## 2. Authentification
+
+> ⚠️ **Les exemples de cette section sont périmés sur un point central : le jeton n'est pas dans le corps de la réponse.**
+>
+> Ils montrent `{"data": {"token": "eyJ0eXAi...", "user": {...}}}`. La réponse réelle est `{"data": {"user": {...}}}` : le JWT est posé dans un cookie `HttpOnly` `volo_token`, accompagné d'un cookie `volo_csrf` lisible en JS. C'est le choix documenté en [CONTRAT_API.md](CONTRAT_API.md) §1, et **suivre ces exemples reviendrait à rendre le jeton lisible par le JavaScript** — précisément ce qu'on a voulu éviter.
+>
+> `AuthControllerTest::testRegister_Success` vérifie désormais l'absence de `token` dans le corps et la présence des deux cookies avec les bons drapeaux. La forme réelle est donc tenue par un test, plus seulement par ce document.
+>
+> Le champ `"role"` des exemples n'est pas renvoyé par `register` (il l'est par `GET /api/auth/me`, sous la clé `role`, et vaut un **tableau**).
 
 ### POST /api/auth/register
 
@@ -255,7 +296,9 @@ Détail d'un produit.
 
 ---
 
-### POST /api/products
+### POST /api/products — ⬜ N'EXISTE PAS
+
+> Renvoie **404**. Aucun contrôleur ne l'implémente (roadmap 2.6 🔴). `security.yaml` déclare pourtant une règle `ROLE_ADMIN` pour cette méthode. Les produits se créent uniquement via EasyAdmin (`/admin/product/new`).
 
 Création d'un produit.
 
@@ -277,7 +320,9 @@ Création d'un produit.
 
 ---
 
-### PUT /api/products/{id}
+### PUT /api/products/{id} — ⬜ N'EXISTE PAS
+
+> Renvoie **404**. Même situation que `POST` ci-dessus.
 
 Remplacement complet d'un produit.
 
@@ -289,7 +334,9 @@ Remplacement complet d'un produit.
 
 ---
 
-### DELETE /api/products/{id}
+### DELETE /api/products/{id} — ⬜ N'EXISTE PAS
+
+> Renvoie **404**. Même situation que `POST` et `PUT` ci-dessus.
 
 Suppression d'un produit.
 
@@ -319,7 +366,9 @@ Liste de toutes les marques.
 
 ---
 
-### GET /api/brands/{id}/products
+### GET /api/brands/{id}/products — ⬜ N'EXISTE PAS
+
+> Renvoie **404**. Le filtrage par marque passe aujourd'hui par `GET /api/products?brand={id}`, qui est implémenté.
 
 Produits d'une marque donnée.
 
@@ -349,7 +398,9 @@ Liste de toutes les problématiques.
 
 ---
 
-### GET /api/skin-concerns/{slug}/products
+### GET /api/skin-concerns/{slug}/products — ⬜ N'EXISTE PAS
+
+> Renvoie **404**. Le filtrage passe par `GET /api/products?skin_concern={slug}`, qui est implémenté. C'est cet usage que sert le `slug` de RG9.
 
 Produits recommandés pour une problématique.
 
@@ -359,7 +410,11 @@ Produits recommandés pour une problématique.
 
 ---
 
-## 6. Routines
+## 6. Routines — ⬜ SECTION ENTIÈREMENT NON IMPLÉMENTÉE
+
+> Renvoie **404** : il n'existe aucun `RoutineController` (roadmap 2.9 ⬜ 🟡). L'entité `Routine` et la table `routine_product` existent en base, mais rien ne les expose. `security.yaml` déclare une règle `PUBLIC_ACCESS` pour `^/api/routines` — une règle sur une route absente.
+>
+> L'exemple ci-dessous montre par ailleurs une clé `skinConcern` sur une routine : **cette relation n'existe pas** au modèle. `Routine` est liée aux produits (N-N), pas aux problématiques ([MODELE_DONNEES.md](MODELE_DONNEES.md) §3).
 
 ### GET /api/routines
 
@@ -458,7 +513,9 @@ Historique des commandes de l'utilisateur connecté.
 
 ---
 
-### GET /api/orders/{id}
+### GET /api/orders/{id} — ⬜ N'EXISTE PAS
+
+> Renvoie **404**. À noter pour qui lit [STRATEGIE_TESTS.md](STRATEGIE_TESTS.md) : §1 et §10 désignent cette route comme la fuite de données la plus probable (« un client lit la commande d'un autre ») et proposent d'écrire le test qui la révélerait. **Ce test ne peut pas échouer : la route n'existe pas.** Le risque décrit est réel, mais il ne se matérialise pas ici. `GET /api/orders` ne renvoie que les commandes de l'utilisateur courant (`findByUser`).
 
 Détail d'une commande.
 
@@ -468,7 +525,9 @@ Détail d'une commande.
 
 ---
 
-### PATCH /api/orders/{id}
+### PATCH /api/orders/{id} — ⬜ N'EXISTE PAS
+
+> Renvoie **404**. Le statut d'une commande se change uniquement par EasyAdmin. C'est aussi ce qui limite la portée du défaut décrit en [DIAGRAMME_ETATS.md](DIAGRAMME_ETATS.md) §4 (aucune transition contrainte) : il n'y a pas d'endpoint HTTP par lequel forcer un statut arbitraire.
 
 Modification partielle du statut d'une commande.
 
@@ -516,7 +575,11 @@ Initiation d'un paiement pour une commande.
 
 ## 9. Compte utilisateur
 
-### GET /api/users/me
+> ⚠️ **La route s'appelle `GET /api/auth/me`, pas `/api/users/me`.** C'est un piège concret : un développeur front qui suit ce document reçoit un 404 sans comprendre pourquoi. `AuthContext` l'utilise pour restaurer la session au montage ([CONTRAT_API.md](CONTRAT_API.md) §1).
+>
+> `PATCH /api/users/me` **n'existe pas** (roadmap 2.11 ⬜ 🟠) : le profil n'est pas modifiable par l'API.
+
+### GET /api/users/me → en réalité `GET /api/auth/me`
 
 Profil de l'utilisateur connecté.
 
@@ -537,7 +600,9 @@ Profil de l'utilisateur connecté.
 
 ---
 
-### PATCH /api/users/me
+### PATCH /api/users/me — ⬜ N'EXISTE PAS
+
+> Renvoie **404** (roadmap 2.11).
 
 Mise à jour du profil.
 
@@ -584,19 +649,36 @@ Envoi d'un message de contact.
 
 ---
 
-## 11. Administration
+## 11. Administration — ⬜ SECTION ENTIÈREMENT NON IMPLÉMENTÉE
 
-Toutes les routes d'administration nécessitent `ROLE_ADMIN`.
+> ⚠️ **Aucune des dix routes ci-dessous n'existe.** Toutes renvoient **404**. C'est la section la plus trompeuse de ce document : elle décrit une API d'administration qui n'a jamais été écrite.
+>
+> **Et elle ne le sera probablement pas.** L'administration passe par **EasyAdmin** — du Twig rendu serveur sous `/admin/*`, hors du contrat d'API par construction ([CONTRAT_API.md](CONTRAT_API.md) §7). Les écrans existent déjà : produits, marques, problématiques, commandes, paiements, utilisateurs. Construire `/api/admin/*` en plus serait une seconde implémentation du même besoin.
+>
+> Ce qu'il faut trancher : **retirer cette section** (l'administration est un choix d'architecture assumé, pas une dette), ou la conserver comme cible explicite pour un futur client d'administration découplé. La garder telle quelle est le pire des trois — elle laisse croire que ces routes répondent.
 
-| Méthode | Route | Description |
-|---|---|---|
-| `GET` | `/api/admin/orders` | Toutes les commandes (paginées, filtrables) |
-| `GET` | `/api/admin/users` | Tous les utilisateurs |
-| `PATCH` | `/api/admin/orders/{id}` | Modifier le statut d'une commande |
-| `POST` | `/api/products` | Créer un produit |
-| `PUT` | `/api/products/{id}` | Modifier un produit |
-| `DELETE` | `/api/products/{id}` | Supprimer un produit |
-| `POST` | `/api/brands` | Créer une marque |
-| `PUT` | `/api/brands/{id}` | Modifier une marque |
-| `DELETE` | `/api/brands/{id}` | Supprimer une marque |
-| `GET` | `/api/admin/contact-messages` | Messages de contact non traités |
+| Méthode | Route | Description | État |
+|---|---|---|---|
+| `GET` | `/api/admin/orders` | Toutes les commandes | ⬜ → `/admin/order` (EasyAdmin) |
+| `GET` | `/api/admin/users` | Tous les utilisateurs | ⬜ → `/admin/user` |
+| `PATCH` | `/api/admin/orders/{id}` | Modifier le statut | ⬜ → `/admin/order/{id}/edit` |
+| `POST` | `/api/products` | Créer un produit | ⬜ roadmap 2.6 🔴 |
+| `PUT` | `/api/products/{id}` | Modifier un produit | ⬜ |
+| `DELETE` | `/api/products/{id}` | Supprimer un produit | ⬜ |
+| `POST` | `/api/brands` | Créer une marque | ⬜ |
+| `PUT` | `/api/brands/{id}` | Modifier une marque | ⬜ |
+| `DELETE` | `/api/brands/{id}` | Supprimer une marque | ⬜ |
+| `GET` | `/api/admin/contact-messages` | Messages non traités | ⬜ — aucun écran EasyAdmin non plus |
+
+La dernière ligne (`GET /api/admin/contact-messages`) **ne sera pas implémentée**, et c'est délibéré.
+
+> ✅ **Le formulaire de contact fonctionne depuis le 17/07/2026** — il était cassé des deux bouts :
+>
+> 1. **Rien n'entrait** : `POST /api/contact` est `PUBLIC_ACCESS` mais n'était pas exempté du contrôle CSRF, or le cookie `volo_csrf` n'est posé qu'au login. Tout visiteur anonyme recevait **403**.
+> 2. **Rien n'était lu** : aucun endpoint, aucun écran d'administration, aucune notification. Les messages s'empilaient en base.
+>
+> Les deux sont corrigés. `ContactService` **persiste le message et notifie l'administrateur par email** : la base est la trace durable (un envoi raté ne perd rien), l'email est ce qui fait arriver le message à un humain.
+>
+> **C'est pourquoi cette route d'administration n'a plus d'objet** : l'administrateur traite dans sa boîte mail, où il a déjà « lu / non lu », archives et réponses. RG12 et `processed_by_user_id` sont abandonnés pour la même raison — voir [MODELE_DONNEES.md](MODELE_DONNEES.md) §6.5. `ContactMessage` est une **archive**, pas un outil de travail.
+>
+> Couvert par `tests/Service/ContactNotificationTest.php` (6 tests) et `tests/Security/CsrfProtectionTest.php`.

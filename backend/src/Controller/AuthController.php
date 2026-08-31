@@ -135,7 +135,7 @@ class AuthController extends AbstractController
     {
         $limiter = $this->registerAttemptsLimiter->create($request->getClientIp());
         if (!$limiter->consume(1)->isAccepted()) {
-            return new JsonResponse(['error' => 'Trop de tentatives. Veuillez reessayer plus tard.'], 429);
+            return new JsonResponse(['error' => 'Trop de tentatives. Veuillez réessayer plus tard.'], 429);
         }
 
         $data = json_decode($request->getContent(), true);
@@ -159,7 +159,7 @@ class AuthController extends AbstractController
         }
 
         if ($this->userRepository->findOneBy(['email' => $email])) {
-            return new JsonResponse(['error' => 'Cet email est deja utilise.'], 400);
+            return new JsonResponse(['error' => 'Cet email est déjà utilisé.'], 400);
         }
 
         $user = new User();
@@ -202,7 +202,7 @@ class AuthController extends AbstractController
     {
         $limiter = $this->loginAttemptsLimiter->create($request->getClientIp());
         if (!$limiter->consume(1)->isAccepted()) {
-            return new JsonResponse(['error' => 'Trop de tentatives. Veuillez reessayer dans quelques minutes.'], 429);
+            return new JsonResponse(['error' => 'Trop de tentatives. Veuillez réessayer dans quelques minutes.'], 429);
         }
 
         $data = json_decode($request->getContent(), true);
@@ -289,7 +289,7 @@ class AuthController extends AbstractController
         $user = $this->getUser();
 
         if (!$user) {
-            return new JsonResponse(['error' => 'Non authentifie.'], 401);
+            return new JsonResponse(['error' => 'Non authentifié.'], 401);
         }
 
         return new JsonResponse([
