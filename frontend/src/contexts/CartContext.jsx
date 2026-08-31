@@ -31,7 +31,7 @@ Exemple d'utilisation :
 ===============================================================================
 */
 
-import React, { createContext, use, useState, useEffect } from 'react';
+import { createContext, use, useState, useEffect, useMemo } from 'react';
 
 const CART_STORAGE_KEY = 'volo_cart:v1';
 
@@ -41,6 +41,7 @@ const CartContext = createContext();
  * Hook personnalise pour acceder au contexte du panier.
  * @returns {object} L'etat et les methodes du panier.
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export const useCart = () => {
     const context = use(CartContext);
     if (!context) {
@@ -148,7 +149,7 @@ export const CartProvider = ({ children }) => {
         0
     );
 
-    const value = {
+    const value = useMemo(() => ({
         cartItems,
         addToCart,
         removeFromCart,
@@ -156,7 +157,8 @@ export const CartProvider = ({ children }) => {
         clearCart,
         cartCount,
         cartTotal,
-    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }), [cartItems, cartCount, cartTotal]);
 
     return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 };

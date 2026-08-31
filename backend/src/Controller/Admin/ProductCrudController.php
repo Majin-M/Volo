@@ -1,5 +1,28 @@
 <?php
 
+/*
+===============================================================================
+Controleur : ProductCrudController (Admin CRUD)
+===============================================================================
+Objectif :
+    Gerer les operations CRUD sur les produits depuis le panneau
+    d'administration EasyAdmin.
+
+Responsabilites :
+    - Lister les produits (nom, image, prix, marque, disponibilite).
+    - Permettre la creation et l'edition d'un produit avec upload
+      d'image via VichUploaderBundle.
+    - Gerer les relations ManyToMany avec SkinConcern (by_reference
+      false pour garantir la synchronisation bidirectionnelle).
+    - Gerer la relation ManyToOne avec Brand.
+
+Dependances :
+    - EasyAdmin : AbstractCrudController et champs (TextField,
+      NumberField, ImageField, AssociationField, TextareaField).
+    - VichUploaderBundle : VichImageType pour l'upload d'image.
+===============================================================================
+*/
+
 namespace App\Controller\Admin;
 
 use App\Entity\Product;

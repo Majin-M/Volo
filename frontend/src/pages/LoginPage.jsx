@@ -18,16 +18,19 @@ Exemple d'utilisation :
 ===============================================================================
 */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { apiCall } from '../api/api';
 import { useAuth } from '../contexts/AuthContext';
 import { validateEmail, isRequired } from '../utils/validators';
+import FormField from '../components/FormField';
+import { useToast } from '../contexts/ToastContext';
 import styles from './LoginPage.module.css';
 
 const LoginPage = () => {
     const navigate = useNavigate();
     const { login } = useAuth();
+    const { addToast } = useToast();
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -72,6 +75,7 @@ const LoginPage = () => {
 
             if (response.data?.user) {
                 login(response.data.user);
+                addToast('Connexion reussie', 'success');
                 navigate('/panier');
             } else {
                 setError("Une erreur est survenue.");
@@ -116,33 +120,35 @@ const LoginPage = () => {
                     {error && <div className={styles.errorMsg}>{error}</div>}
 
                     <form onSubmit={handleLogin} noValidate>
-                        <div className={styles.formGroup}>
-                            <label className={styles.inputLabel} htmlFor="login-email">Email</label>
-                            <input
-                                id="login-email"
-                                type="email"
-                                placeholder="client@volo.fr"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                required
-                                autoComplete="email"
-                                className={styles.input}
-                            />
-                        </div>
+                        <FormField
+                            label="Email"
+                            id="login-email"
+                            type="email"
+                            placeholder="client@volo.fr"
+                            value={email}
+                            onChange={setEmail}
+                            validate={(v) => {
+                                if (!isRequired(v)) return 'L\'email est requis.';
+                                if (!validateEmail(v)) return 'Adresse email invalide.';
+                                return null;
+                            }}
+                            required
+                            autoComplete="email"
+                            className={styles.input}
+                        />
 
-                        <div className={styles.formGroup}>
-                            <label className={styles.inputLabel} htmlFor="login-password">Mot de passe</label>
-                            <input
-                                id="login-password"
-                                type="password"
-                                placeholder="••••••••"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
-                                autoComplete="current-password"
-                                className={styles.input}
-                            />
-                        </div>
+                        <FormField
+                            label="Mot de passe"
+                            id="login-password"
+                            type="password"
+                            placeholder="••••••••"
+                            value={password}
+                            onChange={setPassword}
+                            validate={(v) => !isRequired(v) ? 'Le mot de passe est requis.' : null}
+                            required
+                            autoComplete="current-password"
+                            className={styles.input}
+                        />
 
                         <button type="submit" className={styles.primaryButton} disabled={loading}>
                             {loading ? 'Connexion...' : 'Se connecter'}

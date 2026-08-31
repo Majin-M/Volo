@@ -1,8 +1,6 @@
 # Stratégie de tests
 
-> ⚠️ **Ce document décrit très majoritairement une cible.** Mais son affirmation d'ouverture — « VOLO n'a aucun test automatisé » — **était fausse** : `backend/tests/Controller/AuthControllerTest.php` existait déjà, tout comme `phpunit.dist.xml`. La tâche 2.15 de [roadmap.md](roadmap.md) est ⬜ 🟠, à raison : 3 tests sur un seul contrôleur.
->
-> **État au 17/07/2026** : PHPUnit 13, **26 tests, 88 assertions**, verts à cache chaud comme à froid. Répartis sur quatre fichiers : `AuthControllerTest` (inscription, cookies), `OrderPaymentTest` (dérivation du statut, contrat d'API, cascade), `CsrfProtectionTest` (double-submit), `ContactNotificationTest` (persistance + notification email). Aucun test front (Vitest absent). PHPStan `level: max` présent, mais aucune CI ne l'exécute.
+> **État au 30/08/2026** : PHPUnit 13, **26 tests, 88 assertions**, verts. Répartis sur quatre fichiers : `AuthControllerTest` (inscription, cookies), `OrderPaymentTest` (dérivation du statut, contrat d'API, cascade), `CsrfProtectionTest` (double-submit), `ContactNotificationTest` (persistance + notification email). Aucun test front (Vitest absent). PHPStan `level: max` à 0 erreur, ESLint à 0 erreur, mais aucune CI ne les exécute automatiquement.
 >
 > Ce document existe pour deux raisons : dire quoi écrire quand on s'y mettra, et **nommer précisément ce qui est aujourd'hui non vérifié** — parce que « ça marche quand je clique » n'est pas une vérification.
 >

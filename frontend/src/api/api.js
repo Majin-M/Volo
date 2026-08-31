@@ -79,7 +79,7 @@ export async function apiCall(endpoint, options = {}) {
                 } else if (errorData.message) {
                     errorMessage = errorData.message;
                 }
-            } catch (parseErr) {
+            } catch {
                 if (text) {
                     errorMessage = text;
                 }

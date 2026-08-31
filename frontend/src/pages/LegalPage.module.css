@@ -1,0 +1,93 @@
+/*===============================================================================
+Feuille de style : LegalPage (partagee)
+===============================================================================
+Design System :
+    - Mise en page texte longue, lisible, centree.
+    - Utilisee par MentionsLegalesPage, PolitiqueConfidentialitePage, CGVPage.
+    - Palette et typographie coherentes avec le reste du site
+      (brun cacao, ivoire, beige / Playfair Display + Lato).
+===============================================================================*/
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 50px 20px 80px 20px;
+}
+
+.pageTitle {
+    font-family: 'Playfair Display', serif;
+    color: #5F4C42;
+    font-size: 2.2em;
+    margin: 0 0 10px 0;
+}
+
+.lastUpdated {
+    color: #999;
+    font-size: 0.85em;
+    margin: 0 0 40px 0;
+}
+
+.content {
+    background-color: #fff;
+    border: 1px solid #E9D7C3;
+    border-radius: 10px;
+    padding: 35px 30px;
+    line-height: 1.8;
+    color: #5F4C42;
+    font-size: 0.95em;
+}
+
+.content h2 {
+    font-family: 'Playfair Display', serif;
+    color: #5F4C42;
+    font-size: 1.3em;
+    margin: 35px 0 12px 0;
+}
+
+.content h2:first-child {
+    margin-top: 0;
+}
+
+.content h3 {
+    color: #5F4C42;
+    font-size: 1.05em;
+    font-weight: 600;
+    margin: 20px 0 8px 0;
+}
+
+.content p {
+    margin: 0 0 14px 0;
+}
+
+.content ul {
+    margin: 0 0 14px 0;
+    padding-left: 24px;
+}
+
+.content li {
+    margin-bottom: 6px;
+}
+
+.content a {
+    color: #5F4C42;
+    text-decoration: underline;
+}
+
+.content a:hover {
+    color: #463325;
+}
+
+.content strong {
+    font-weight: 600;
+}
+
+/* --- RESPONSIVE --- */
+@media (max-width: 768px) {
+    .content {
+        padding: 25px 20px;
+    }
+
+    .pageTitle {
+        font-size: 1.8em;
+    }
+}

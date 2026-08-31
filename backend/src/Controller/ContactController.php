@@ -24,17 +24,21 @@ namespace App\Controller;
 
 use App\Service\ContactService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\Routing\Attribute\Route;
 
 class ContactController extends AbstractController
 {
     /**
      * @param ContactService $contactService Valide et persiste le message de contact.
+     * @param RateLimiterFactory $contactAttemptsLimiter Limiteur de tentatives de contact.
      */
     public function __construct(
         private ContactService $contactService,
+        #[Autowire(service: 'limiter.contact_attempts')] private RateLimiterFactory $contactAttemptsLimiter,
     ) {
     }
 
@@ -47,6 +51,11 @@ class ContactController extends AbstractController
     #[Route('/api/contact', name: 'api_contact_create', methods: ['POST'])]
     public function create(Request $request): JsonResponse
     {
+        $limiter = $this->contactAttemptsLimiter->create($request->getClientIp());
+        if (!$limiter->consume(1)->isAccepted()) {
+            return new JsonResponse(['error' => 'Trop de tentatives. Veuillez reessayer plus tard.'], 429);
+        }
+
         $data = json_decode($request->getContent(), true);
 
         if (!$data) {

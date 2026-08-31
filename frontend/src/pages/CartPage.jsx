@@ -23,10 +23,12 @@ Exemple d'utilisation :
 ===============================================================================
 */
 
-import React from 'react';
+import { useState } from 'react';
 import { useCart } from '../contexts/CartContext';
+import { useToast } from '../contexts/ToastContext';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
+import ConfirmDialog from '../components/ConfirmDialog';
 import styles from './CartPage.module.css';
 
 // JSX statique (ne depend d'aucune prop/etat) : construit une seule fois.
@@ -38,12 +40,22 @@ const noindexTag = (
 
 const CartPage = () => {
     const { cartItems, removeFromCart, updateQuantity, cartTotal } = useCart();
+    const { addToast } = useToast();
+    const [itemToRemove, setItemToRemove] = useState(null);
 
     const handleDecrease = (item) => {
         if (item.quantity <= 1) {
-            removeFromCart(item.id);
+            setItemToRemove(item);
         } else {
             updateQuantity(item.id, item.quantity - 1);
+        }
+    };
+
+    const handleConfirmRemove = () => {
+        if (itemToRemove) {
+            removeFromCart(itemToRemove.id);
+            addToast(`${itemToRemove.name} retire du panier`, 'info');
+            setItemToRemove(null);
         }
     };
 
@@ -57,7 +69,13 @@ const CartPage = () => {
             <>
                 {noindexTag}
                 <div className={styles.emptyContainer}>
-                    <div className={styles.emptyIcon}>🛒</div>
+                    <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style={{ marginBottom: '20px', opacity: 0.7 }}>
+                        <circle cx="60" cy="60" r="55" fill="#F8F0E8" stroke="#E9D7C3" strokeWidth="2" />
+                        <path d="M35 45h6l8 30h22l8-22H50" stroke="#5F4C42" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                        <circle cx="55" cy="85" r="4" fill="#5F4C42" />
+                        <circle cx="75" cy="85" r="4" fill="#5F4C42" />
+                        <line x1="50" y1="58" x2="78" y2="58" stroke="#E9D7C3" strokeWidth="2" strokeLinecap="round" strokeDasharray="4 4" />
+                    </svg>
                     <h2 className={styles.emptyTitle}>Votre panier est vide</h2>
                     <p className={styles.emptyText}>
                         Decouvrez nos soins et trouvez la routine qui vous correspond.
@@ -85,7 +103,7 @@ const CartPage = () => {
                                 <div className={styles.itemImageWrapper}>
                                     {item.imageUrl ? (
                                         <img
-                                            src={`http://127.0.0.1:8000/images/products/${item.imageUrl}`}
+                                            src={`/images/products/${item.imageUrl}`}
                                             alt={item.name}
                                             className={styles.itemImage}
                                         />
@@ -128,7 +146,7 @@ const CartPage = () => {
                                 <button
                                     type="button"
                                     className={styles.removeButton}
-                                    onClick={() => removeFromCart(item.id)}
+                                    onClick={() => setItemToRemove(item)}
                                     aria-label="Supprimer l'article"
                                 >
                                     ✕
@@ -164,6 +182,16 @@ const CartPage = () => {
                     </div>
                 </div>
             </div>
+
+            <ConfirmDialog
+                open={!!itemToRemove}
+                title="Retirer du panier ?"
+                message={itemToRemove ? `"${itemToRemove.name}" sera supprime de votre panier.` : ''}
+                confirmLabel="Retirer"
+                onConfirm={handleConfirmRemove}
+                onCancel={() => setItemToRemove(null)}
+                danger
+            />
         </>
     );
 };

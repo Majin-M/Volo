@@ -1,0 +1,9 @@
+var/
+vendor/
+.env.local
+.env.*.local
+config/jwt/*.pem
+.phpunit.cache/
+phpunit.xml
+docker-compose.yml
+compose.yaml

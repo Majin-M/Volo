@@ -22,7 +22,7 @@ Exemple d'utilisation :
 ===============================================================================
 */
 
-import React, { useReducer } from 'react';
+import { useReducer } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { submitContactMessage } from '../api/contactApi';
 import { validateEmail, isRequired } from '../utils/validators';

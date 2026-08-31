@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
@@ -14,6 +14,23 @@ export default defineConfig({
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
       },
+      // Seuls les chemins VichUploader (produits/marques) sont proxifies
+      // vers Symfony. Les images statiques (hero, logo, auth) restent
+      // servies depuis frontend/public/images/.
+      '/images/products': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+      '/images/brands': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
     },
+  },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.js'],
+    pool: 'threads',
   },
 })

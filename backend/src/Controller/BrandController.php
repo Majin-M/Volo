@@ -20,7 +20,7 @@ namespace App\Controller;
 use App\Repository\BrandRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Routing\Attribute\Route;
 
 class BrandController extends AbstractController
 {
@@ -31,6 +31,11 @@ class BrandController extends AbstractController
         $this->brandRepository = $brandRepository;
     }
 
+    /**
+     * Retourne la liste de toutes les marques triees par nom.
+     *
+     * @return JsonResponse Liste des marques serializees (groupe product:read).
+     */
     #[Route('/api/brands', name: 'api_brands_list', methods: ['GET'])]
     public function index(): JsonResponse
     {

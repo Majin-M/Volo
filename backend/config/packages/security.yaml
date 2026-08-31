@@ -25,6 +25,9 @@ security:
                 check_path: admin_login
                 default_target_path: admin
                 enable_csrf: true
+            login_throttling:
+                max_attempts: 5
+                interval: '15 minutes'
             logout:
                 path: admin_logout
                 target: admin_login
@@ -48,6 +51,7 @@ security:
         # --- API publique (lecture seule / formulaires publics) ---
         - { path: ^/api/auth/(login|register), roles: PUBLIC_ACCESS }
         - { path: ^/api/contact, roles: PUBLIC_ACCESS }
+        - { path: ^/api/webhooks/stripe$, roles: PUBLIC_ACCESS, methods: [POST] }
         - { path: ^/api/products, roles: PUBLIC_ACCESS, methods: [GET] }
         - { path: ^/api/brands, roles: PUBLIC_ACCESS, methods: [GET] }
         - { path: ^/api/skin-concerns, roles: PUBLIC_ACCESS, methods: [GET] }

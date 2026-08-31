@@ -17,11 +17,12 @@ Exemple d'utilisation :
 ===============================================================================
 */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { fetchProducts } from '../api/productApi';
 import { useCart } from '../contexts/CartContext';
+import { useToast } from '../contexts/ToastContext';
 import ProductCard from '../components/ProductCard';
 import Skeleton from '../components/Skeleton';
 
@@ -31,10 +32,13 @@ const ProductListPage = () => {
     const [error, setError] = useState(null);
 
     const { addToCart } = useCart();
+    const { addToast } = useToast();
     const [searchParams] = useSearchParams();
     const concernSlug = searchParams.get('skin_concern');
 
     useEffect(() => {
+        let cancelled = false;
+
         const loadProducts = async () => {
             try {
                 const slugFromUrl = searchParams.get('skin_concern');
@@ -44,15 +48,22 @@ const ProductListPage = () => {
                 }
 
                 const response = await fetchProducts(params);
-                setProducts(response.data);
+                if (!cancelled) {
+                    setProducts(response.data);
+                }
             } catch (err) {
-                setError(err.message);
+                if (!cancelled) {
+                    setError(err.message);
+                }
             } finally {
-                setLoading(false);
+                if (!cancelled) {
+                    setLoading(false);
+                }
             }
         };
 
         loadProducts();
+        return () => { cancelled = true; };
     }, [searchParams]);
 
     const pageTitle = concernSlug
@@ -105,13 +116,26 @@ const ProductListPage = () => {
                     <ProductCard
                         key={product.id}
                         product={product}
-                        onAddToCart={addToCart}
+                        onAddToCart={(p) => {
+                            addToCart(p);
+                            addToast(`${p.name} ajoute au panier`, 'success');
+                        }}
                     />
                 ))}
                 {products.length === 0 && !loading && (
-                    <p style={{ width: '100%', textAlign: 'center', color: '#888' }}>
-                        Aucun produit ne correspond a cette recherche.
-                    </p>
+                    <div style={{ width: '100%', textAlign: 'center', padding: '40px 0' }}>
+                        <svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style={{ marginBottom: '15px', opacity: 0.6 }}>
+                            <circle cx="42" cy="42" r="28" stroke="#5F4C42" strokeWidth="3" fill="#F8F0E8" />
+                            <line x1="62" y1="62" x2="82" y2="82" stroke="#5F4C42" strokeWidth="3" strokeLinecap="round" />
+                            <line x1="32" y1="42" x2="52" y2="42" stroke="#E9D7C3" strokeWidth="2" strokeLinecap="round" />
+                        </svg>
+                        <p style={{ color: '#888', fontSize: '1.1em', margin: '0 0 8px 0' }}>
+                            Aucun produit ne correspond a cette recherche.
+                        </p>
+                        <p style={{ color: '#aaa', fontSize: '0.9em' }}>
+                            Essayez avec d'autres filtres ou explorez tout le catalogue.
+                        </p>
+                    </div>
                 )}
 
             </div>

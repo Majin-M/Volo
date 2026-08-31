@@ -18,7 +18,6 @@ Note Technique :
 ===============================================================================
 */
 
-import React from 'react';
 
 const Skeleton = ({ height = '100%', width = '100%', borderRadius = '4px', style }) => {
     // Style par défaut avec l'effet de pulsation

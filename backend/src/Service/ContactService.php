@@ -65,8 +65,8 @@ class ContactService
         private EntityManagerInterface $entityManager,
         private MailerInterface $mailer,
         private LoggerInterface $logger,
-        #[Autowire('%env(ADMIN_EMAIL)%')] private string $adminEmail,
-        #[Autowire('%env(MAILER_FROM)%')] private string $expediteur,
+        #[Autowire(env: 'ADMIN_EMAIL')] private string $adminEmail,
+        #[Autowire(env: 'MAILER_FROM')] private string $expediteur,
     ) {
     }
 

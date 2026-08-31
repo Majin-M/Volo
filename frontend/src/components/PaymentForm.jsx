@@ -26,12 +26,13 @@ Exemple d'utilisation :
 ===============================================================================
 */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
 
 // Styles statiques (ne dependent d'aucune prop/etat) : definis en portee
 // module pour ne pas etre reconstruits a chaque rendu.
 const cardOptions = {
+    hidePostalCode: true,
     style: {
         base: {
             color: '#32325d',
@@ -70,27 +71,29 @@ const PaymentForm = ({ clientSecret, onSuccess }) => {
 
         const cardElement = elements.getElement(CardElement);
 
-        const { error: paymentError, paymentIntent } = await stripe.confirmCardPayment(
-            clientSecret,
-            {
-                payment_method: {
-                    card: cardElement,
-                    billing_details: {
-                        name: 'Client VOLO',
+        try {
+            const { error: paymentError, paymentIntent } = await stripe.confirmCardPayment(
+                clientSecret,
+                {
+                    payment_method: {
+                        card: cardElement,
+                        billing_details: {
+                            name: 'Client VOLO',
+                        },
                     },
-                },
-            }
-        );
+                }
+            );
 
-        if (paymentError) {
-            setError("Le paiement a echoue. Verifiez vos coordonnees.");
-            setProcessing(false);
-        } else if (paymentIntent) {
-            setError(null);
-            setProcessing(false);
-            if (onSuccess) {
-                onSuccess(paymentIntent);
+            if (paymentError) {
+                setError("Le paiement a echoue. Verifiez vos coordonnees.");
+            } else if (paymentIntent) {
+                setError(null);
+                if (onSuccess) {
+                    onSuccess(paymentIntent);
+                }
             }
+        } finally {
+            setProcessing(false);
         }
     };
 

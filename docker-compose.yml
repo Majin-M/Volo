@@ -1,0 +1,103 @@
+# =============================================================================
+# Docker Compose — VOLO (monorepo Symfony + React)
+# =============================================================================
+# Usage :
+#   docker compose up -d          # Lancer tous les services
+#   docker compose up -d --build  # Reconstruire les images
+#   docker compose logs -f        # Suivre les logs
+#   docker compose down -v        # Tout arreter et supprimer les volumes
+#
+# Architecture :
+#   nginx (port 80)  ->  frontend (SPA React, port interne 80)
+#                    ->  backend  (PHP-FPM, port interne 9000)
+#                    ->  db       (MySQL 8.0, port interne 3306)
+#                    ->  mailer   (Mailpit, UI sur port 8025)
+# =============================================================================
+
+services:
+
+  # --- Reverse proxy : point d'entree unique ---
+  nginx:
+    image: nginx:alpine
+    container_name: volo-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - backend_public:/app/public:ro
+    depends_on:
+      backend:
+        condition: service_started
+      frontend:
+        condition: service_started
+    restart: unless-stopped
+
+  # --- Backend Symfony (PHP-FPM) ---
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: volo-backend
+    volumes:
+      - backend_public:/app/public
+    environment:
+      APP_ENV: prod
+      APP_SECRET: ${APP_SECRET:-change-me-in-production}
+      DATABASE_URL: mysql://volo_user:volo_password@db:3306/volo?serverVersion=8.0&charset=utf8mb4
+      MAILER_DSN: smtp://mailer:1025
+      MESSENGER_TRANSPORT_DSN: doctrine://default?auto_setup=0
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-contact@volo.fr}
+      MAILER_FROM: ${MAILER_FROM:-no-reply@volo.fr}
+      JWT_PASSPHRASE: ${JWT_PASSPHRASE:-VoLoJwT2026!}
+      CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN:-'^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$$'}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-fausse_valeur}
+      STRIPE_PUBLIC_KEY: ${STRIPE_PUBLIC_KEY:-fausse_valeur}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # --- Frontend React (Vite build + Nginx) ---
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: volo-frontend
+    restart: unless-stopped
+
+  # --- Base de donnees ---
+  db:
+    image: mysql:8.0
+    container_name: volo-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: volo
+      MYSQL_USER: volo_user
+      MYSQL_PASSWORD: volo_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # --- Mailer (dev/staging : capture tous les emails) ---
+  mailer:
+    image: axllent/mailpit
+    container_name: volo-mailer
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    restart: unless-stopped
+
+volumes:
+  db_data:
+  backend_public:

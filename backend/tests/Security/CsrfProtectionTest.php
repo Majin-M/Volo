@@ -71,7 +71,7 @@ class CsrfProtectionTest extends WebTestCase
 
         // Les limiteurs comptent par IP et sont partagés entre exécutions :
         // sans reset, ces tests virent au 429 dès le second passage.
-        foreach (['limiter.login_attempts', 'limiter.register_attempts'] as $limiterId) {
+        foreach (['limiter.login_attempts', 'limiter.register_attempts', 'limiter.contact_attempts'] as $limiterId) {
             $container->get($limiterId)->create(self::CLIENT_IP)->reset();
         }
 

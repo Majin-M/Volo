@@ -56,12 +56,25 @@ class OrderService
         $order->setStatus(\App\Enum\OrderStatus::PENDING);
 
         // 1. Traitement de l'adresse de livraison
-        if (isset($orderData['shippingAddress'])) {
+        if (isset($orderData['shippingAddress']) && is_array($orderData['shippingAddress'])) {
+            /** @var array<string, mixed> $addr */
             $addr = $orderData['shippingAddress'];
-            $order->setStreet($addr['street'] ?? '');
-            $order->setCity($addr['city'] ?? '');
-            $order->setPostalCode($addr['postalCode'] ?? '');
-            $order->setCountry($addr['country'] ?? 'France'); // Valeur par défaut
+            $street = strip_tags(trim(is_string($addr['street'] ?? null) ? $addr['street'] : ''));
+            $city = strip_tags(trim(is_string($addr['city'] ?? null) ? $addr['city'] : ''));
+            $postalCode = strip_tags(trim(is_string($addr['postalCode'] ?? null) ? $addr['postalCode'] : ''));
+            $country = strip_tags(trim(is_string($addr['country'] ?? null) ? $addr['country'] : 'France'));
+
+            if ($street === '' || $city === '' || $postalCode === '') {
+                throw new \InvalidArgumentException('L\'adresse de livraison est incomplete (rue, ville et code postal requis).');
+            }
+            if (mb_strlen($street) > 255 || mb_strlen($city) > 100 || mb_strlen($postalCode) > 20 || mb_strlen($country) > 100) {
+                throw new \InvalidArgumentException('Un champ de l\'adresse depasse la longueur maximale autorisee.');
+            }
+
+            $order->setStreet($street);
+            $order->setCity($city);
+            $order->setPostalCode($postalCode);
+            $order->setCountry($country);
         }
 
         $totalAmount = 0;
@@ -69,8 +82,18 @@ class OrderService
         // 2. Traitement des items (produits)
         if (isset($orderData['items']) && is_array($orderData['items'])) {
             foreach ($orderData['items'] as $itemData) {
-                $productId = $itemData['productId'];
-                $quantity = $itemData['quantity'];
+                if (!is_array($itemData)) {
+                    throw new \InvalidArgumentException('Format d\'item invalide.');
+                }
+                $productId = isset($itemData['productId']) ? (int) $itemData['productId'] : 0;
+                $quantity = isset($itemData['quantity']) ? (int) $itemData['quantity'] : 0;
+
+                if ($productId <= 0) {
+                    throw new \InvalidArgumentException('Identifiant produit invalide.');
+                }
+                if ($quantity <= 0 || $quantity > 1000) {
+                    throw new \InvalidArgumentException('La quantite doit etre comprise entre 1 et 1000.');
+                }
 
                 // Vérifier si le produit existe
                 $product = $this->productRepository->find($productId);

@@ -1,0 +1,135 @@
+.container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 60px 20px;
+    min-height: 70vh;
+}
+
+.card {
+    background-color: #fff;
+    border-radius: 20px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.06);
+    width: 100%;
+    max-width: 560px;
+    padding: 50px 40px;
+    text-align: center;
+    border: 1px solid #E9D7C3;
+}
+
+.iconWrapper {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background-color: #e8f5e9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 24px;
+}
+
+.checkIcon {
+    width: 36px;
+    height: 36px;
+    color: #4caf50;
+}
+
+.title {
+    font-family: 'Playfair Display', serif;
+    color: #5F4C42;
+    font-size: 2em;
+    margin: 0 0 10px;
+}
+
+.subtitle {
+    color: #7a6a60;
+    font-size: 1.05em;
+    margin: 0 0 32px;
+    line-height: 1.5;
+}
+
+.details {
+    background-color: #F8F0E8;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.detailRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+}
+
+.detailRow + .detailRow {
+    border-top: 1px solid #E9D7C3;
+}
+
+.detailLabel {
+    color: #7a6a60;
+    font-size: 0.9em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.detailValue {
+    color: #5F4C42;
+    font-weight: 600;
+    font-size: 1.05em;
+}
+
+.statusBadge {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: 600;
+}
+
+.info {
+    color: #999;
+    font-size: 0.88em;
+    margin-bottom: 32px;
+}
+
+.actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.primaryButton {
+    background-color: #5F4C42;
+    color: #fff;
+    border: none;
+    padding: 15px;
+    border-radius: 25px;
+    font-size: 1.05em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.primaryButton:hover {
+    background-color: #463325;
+    transform: translateY(-2px);
+}
+
+.secondaryButton {
+    background-color: transparent;
+    color: #5F4C42;
+    border: 2px solid #E9D7C3;
+    padding: 13px;
+    border-radius: 25px;
+    font-size: 1.05em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.secondaryButton:hover {
+    border-color: #5F4C42;
+    background-color: #F8F0E8;
+}

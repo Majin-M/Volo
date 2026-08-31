@@ -109,7 +109,7 @@ class UserCrudController extends AbstractCrudController
                 ->setFormType(PasswordType::class)
                 ->setFormTypeOption('required', true)
                 ->setFormTypeOption('constraints', [
-                    new NotBlank(['message' => 'Le mot de passe est requis à la création.']),
+                    new NotBlank(message: 'Le mot de passe est requis à la création.'),
                     new Callback([$this, 'validatePasswordComplexity']),
                 ])
                 ->onlyOnForms();

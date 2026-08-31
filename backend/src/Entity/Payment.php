@@ -75,6 +75,9 @@ class Payment
     #[ORM\Column(type: 'string', length: 255, nullable: true)]
     private ?string $clientSecret = null;
 
+    #[ORM\Column(type: 'string', length: 255, nullable: true, unique: true)]
+    private ?string $stripePaymentIntentId = null;
+
     #[ORM\Column(type: 'decimal', precision: 10, scale: 2)]
     private ?string $amount = null;
 
@@ -115,6 +118,9 @@ class Payment
 
     public function getAmount(): ?string { return $this->amount; }
     public function setAmount(string $amount): self { $this->amount = $amount; return $this; }
+
+    public function getStripePaymentIntentId(): ?string { return $this->stripePaymentIntentId; }
+    public function setStripePaymentIntentId(?string $id): self { $this->stripePaymentIntentId = $id; return $this; }
 
     public function getOrderEntity(): ?Order { return $this->orderEntity; }
 

@@ -25,11 +25,12 @@ Dépendances :
 namespace App\Controller;
 
 use App\Repository\OrderRepository;
+use App\Security\OrderVoter;
 use App\Service\OrderService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Routing\Attribute\Route;
 
 class OrderController extends AbstractController
 {
@@ -45,8 +46,10 @@ class OrderController extends AbstractController
     }
 
     /**
-     * Liste l'historique des commandes de l'utilisateur connecté.
-     * Route: GET /api/orders
+     * Liste l'historique des commandes de l'utilisateur connecte.
+     *
+     * @param Request $request Requete HTTP (query params : page, limit).
+     * @return JsonResponse    Liste paginee des commandes avec meta.
      */
     #[Route('/api/orders', name: 'api_orders_list', methods: ['GET'])]
     public function index(Request $request): JsonResponse
@@ -57,8 +60,8 @@ class OrderController extends AbstractController
             return $this->json(['error' => 'Utilisateur non authentifié.'], 401);
         }
 
-        $page = $request->query->getInt('page', 1);
-        $limit = $request->query->getInt('limit', 20);
+        $page = max(1, $request->query->getInt('page', 1));
+        $limit = min($request->query->getInt('limit', 20), 100);
 
         $orders = $this->orderRepository->findByUser($user, $page, $limit);
         $total = $this->orderRepository->countByUser($user);
@@ -74,8 +77,10 @@ class OrderController extends AbstractController
     }
 
     /**
-     * Création d'une commande.
-     * Route: POST /api/orders
+     * Creation d'une commande.
+     *
+     * @param Request $request Corps JSON avec items et shippingAddress.
+     * @return JsonResponse    Commande creee (201) ou erreur (400/500).
      */
     #[Route('/api/orders', name: 'api_orders_create', methods: ['POST'])]
     public function create(Request $request): JsonResponse
@@ -85,6 +90,8 @@ class OrderController extends AbstractController
         if (!$user) {
             return $this->json(['error' => 'Utilisateur non authentifié.'], 401);
         }
+
+        $this->denyAccessUnlessGranted(OrderVoter::CREATE);
 
         $data = json_decode($request->getContent(), true);
 

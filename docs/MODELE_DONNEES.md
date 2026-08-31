@@ -91,6 +91,7 @@ Décrit les données de VOLO du dictionnaire jusqu'au schéma physique MySQL. Le
 | `status` | enum | NOT NULL, défaut `pending` | [DIAGRAMME_ETATS.md](DIAGRAMME_ETATS.md) §2 |
 | `method` | enum | NOT NULL | `card` / `paypal` |
 | `clientSecret` | string(255) | NULL | Jeton Stripe — ⚠️ cf. §6 |
+| `stripePaymentIntentId` | string(255) | NULL, UNIQUE | Identifiant `pi_...` de l'intention Stripe — clé de lookup pour le webhook |
 | `amount` | decimal(10,2) | NOT NULL | |
 | `createdAt` / `updatedAt` | datetime | NOT NULL | |
 

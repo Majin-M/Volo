@@ -10,14 +10,14 @@
 > |---|---|---|
 > | 1.1 | `docker-compose.yml` complet | 🟠 Partiel — `backend/compose.yaml` n'a que db + mailer |
 > | 1.2 | Nginx reverse proxy | ⬜ Jamais exécuté — le proxy Vite tient ce rôle en dev |
-> | 2.5 | Voters (`ProductVoter`, `OrderVoter`) | ⬜ `src/Security/` est vide |
-> | 2.6 | API REST produits | 🟠 `GET` seulement — pas de `POST`/`PUT`/`DELETE` |
+> | 2.5 | Voters (`ProductVoter`, `OrderVoter`) | ✅ `src/Security/ProductVoter.php` + `OrderVoter.php` |
+> | 2.6 | API REST produits | ✅ `GET` + `POST` + `PUT` + `DELETE` (Voters) |
 > | 2.9 | API REST routines | ⬜ Aucun `RoutineController` |
-> | 2.11 | API REST compte utilisateur | 🟠 `GET /api/auth/me` seul — pas de `PATCH` |
+> | 2.11 | API REST compte utilisateur | ✅ `GET /api/auth/me` + `PATCH /api/auth/me` (rate limited) |
 > | 2.15 | Tests unitaires et fonctionnels | 🟠 26 tests / 88 assertions (`AuthController`, `Order`↔`Payment`, CSRF, contact), verts — **pas zéro** |
-> | 3.13 | `OrderConfirmationPage` | ⬜ Le parcours s'arrête sur une `alert()` |
-> | 4.1 | Stripe + **webhook** | 🟠 Intention de paiement OK, **webhook absent** — aucune commande ne passe à `paid` |
-> | 4.2 | Email de confirmation | ⬜ `src/Event/` est vide, aucun email envoyé |
+> | 3.13 | `OrderConfirmationPage` | ✅ Page de confirmation fonctionnelle (`OrderConfirmationPage.jsx`) |
+> | 4.1 | Stripe + **webhook** | ✅ `WebhookController` implémenté — `payment_intent.succeeded` → CAPTURED/PAID, `payment_intent.payment_failed` → FAILED |
+> | 4.2 | Email de confirmation | ✅ `OrderConfirmationService` — email envoyé après capture webhook (best-effort) |
 > | 5.5 | CI/CD | ⬜ Absent — PHPStan et PHPUnit existent mais rien ne les exécute |
 >
 > **Tâches à ajouter**, issues des révisions de juillet 2026 :

@@ -24,17 +24,19 @@ Exemple d'utilisation :
 ===============================================================================
 */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { fetchProductById } from '../api/productApi';
 import { useCart } from '../contexts/CartContext';
+import { useToast } from '../contexts/ToastContext';
 import Skeleton from '../components/Skeleton';
 import styles from './ProductDetailPage.module.css';
 
 const ProductDetailPage = () => {
     const { id } = useParams();
     const { addToCart } = useCart();
+    const { addToast } = useToast();
 
     const [product, setProduct] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -43,6 +45,8 @@ const ProductDetailPage = () => {
     const [added, setAdded] = useState(false);
 
     useEffect(() => {
+        let cancelled = false;
+
         const loadProduct = async () => {
             setLoading(true);
             setError(null);
@@ -50,15 +54,22 @@ const ProductDetailPage = () => {
 
             try {
                 const response = await fetchProductById(id);
-                setProduct(response.data);
+                if (!cancelled) {
+                    setProduct(response.data);
+                }
             } catch (err) {
-                setError(err.message);
+                if (!cancelled) {
+                    setError(err.message);
+                }
             } finally {
-                setLoading(false);
+                if (!cancelled) {
+                    setLoading(false);
+                }
             }
         };
 
         loadProduct();
+        return () => { cancelled = true; };
     }, [id]);
 
     /**
@@ -72,6 +83,7 @@ const ProductDetailPage = () => {
             addToCart(product);
         }
         setAdded(true);
+        addToast(`${product.name} ajoute au panier`, 'success');
     };
 
     if (loading) {
@@ -132,7 +144,7 @@ const ProductDetailPage = () => {
                 <div className={styles.imageWrapper}>
                     {product.imageUrl ? (
                         <img
-                            src={`http://127.0.0.1:8000/images/products/${product.imageUrl}`}
+                            src={`/images/products/${product.imageUrl}`}
                             alt={product.name}
                             className={styles.image}
                         />

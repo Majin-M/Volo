@@ -33,7 +33,7 @@ use App\Repository\SkinConcernRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Routing\Attribute\Route;
 
 class SitemapController extends AbstractController
 {
@@ -55,6 +55,9 @@ class SitemapController extends AbstractController
         $urls[] = ['loc' => $baseUrl . '/', 'changefreq' => 'daily', 'priority' => '1.0'];
         $urls[] = ['loc' => $baseUrl . '/soins', 'changefreq' => 'daily', 'priority' => '0.9'];
         $urls[] = ['loc' => $baseUrl . '/contact', 'changefreq' => 'monthly', 'priority' => '0.5'];
+        $urls[] = ['loc' => $baseUrl . '/mentions-legales', 'changefreq' => 'yearly', 'priority' => '0.3'];
+        $urls[] = ['loc' => $baseUrl . '/politique-confidentialite', 'changefreq' => 'yearly', 'priority' => '0.3'];
+        $urls[] = ['loc' => $baseUrl . '/cgv', 'changefreq' => 'yearly', 'priority' => '0.3'];
 
         foreach ($productRepository->findBy(['isAvailable' => true]) as $product) {
             $urls[] = [

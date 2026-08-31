@@ -18,7 +18,7 @@ Design System :
 .visualPanel {
     position: relative;
     overflow: hidden;
-    background-color: #5F4C42; /* fond de secours pendant le chargement de l'image */
+    background-color: #5F4C42;
 }
 
 .visualImage {

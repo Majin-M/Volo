@@ -1,10 +1,8 @@
 # Spécification API — Projet VOLO
 
-> ⚠️ **Plus de la moitié de ce document décrit une cible, pas l'API.** Confronté aux routes réelles (`php bin/console debug:router`) le 17/07/2026 : sur ~20 endpoints documentés, **11 existent**.
+> ⚠️ **Mise à jour du 30/08/2026** : plusieurs routes auparavant marquées ⬜ sont désormais implémentées — `POST`/`PUT`/`DELETE /api/products` (via `ProductVoter`), `PATCH /api/auth/me`, `POST /api/webhooks/stripe`. Les marqueurs ✅/⬜ ont été recalés sur l'état réel du code.
 >
-> Chaque section porte désormais ✅ **implémenté** ou ⬜ **prévu**. Un ⬜ signifie que la route renvoie **404** — pas qu'elle est incomplète.
->
-> C'est exactement la dérive annoncée en [CONTRAT_API.md](CONTRAT_API.md) §8 : « `api_specification.md` peut mentir sans que rien ne le signale ». L'exemple qui y était donné (l'enveloppe d'erreur) était de loin le plus petit des écarts.
+> Chaque section porte ✅ **implémenté** ou ⬜ **prévu**. Un ⬜ signifie que la route renvoie **404** — pas qu'elle est incomplète.
 
 ## Ce qui existe réellement — vue d'ensemble
 
@@ -18,14 +16,15 @@
 | `GET /api/orders` · `POST /api/orders` | ✅ |
 | `POST /api/payments` | ✅ |
 | `POST /api/contact` | ✅ |
+| `POST /api/webhooks/stripe` | ✅ — webhook Stripe (signature HMAC) |
 | `GET /sitemap.xml` | ✅ (hors contrat d'API — [CONTRAT_API.md](CONTRAT_API.md) §7) |
-| `POST` · `PUT` · `DELETE /api/products` | ⬜ roadmap 2.6 🔴 |
+| `POST` · `PUT` · `DELETE /api/products` | ✅ — `ROLE_ADMIN` via `ProductVoter` |
 | `POST` · `PUT` · `DELETE /api/brands` | ⬜ |
 | `GET /api/products/{id}` détaillé, `GET /api/brands/{id}/products` | ⬜ |
 | `GET /api/skin-concerns/{slug}/products` | ⬜ |
 | `GET /api/routines` | ⬜ roadmap 2.9 — aucun `RoutineController` |
 | `GET /api/orders/{id}` · `PATCH /api/orders/{id}` | ⬜ |
-| `GET` · `PATCH /api/users/me` | ⬜ |
+| `GET /api/auth/me` · `PATCH /api/auth/me` | ✅ — profil + mise à jour (rate limited) |
 | **Tout le §11 Administration** (`/api/admin/*`) | ⬜ — **aucune** de ces routes n'existe |
 
 Deux pièges que cette liste rend visibles :
@@ -231,7 +230,7 @@ Liste paginée des produits.
       "id": 1,
       "name": "Hydrating Cleanser",
       "price": 24.90,
-      "imageUrl": "/media/products/hydrating-cleanser.webp",
+      "imageUrl": "hydrating-cleanser.webp",
       "isAvailable": true,
       "brand": {
         "id": 2,
@@ -266,12 +265,12 @@ Détail d'un produit.
     "name": "Hydrating Cleanser",
     "description": "Nettoyant doux pour peaux sèches...",
     "price": 24.90,
-    "imageUrl": "/media/products/hydrating-cleanser.webp",
+    "imageUrl": "hydrating-cleanser.webp",
     "isAvailable": true,
     "brand": {
       "id": 2,
       "name": "CeraVe",
-      "logoUrl": "/media/brands/cerave-logo.svg"
+      "logoUrl": "cerave-logo.svg"
     },
     "skinConcerns": [
       { "id": 1, "name": "Sécheresse", "slug": "secheresse" }
@@ -296,11 +295,9 @@ Détail d'un produit.
 
 ---
 
-### POST /api/products — ⬜ N'EXISTE PAS
+### POST /api/products — ✅ IMPLÉMENTÉ
 
-> Renvoie **404**. Aucun contrôleur ne l'implémente (roadmap 2.6 🔴). `security.yaml` déclare pourtant une règle `ROLE_ADMIN` pour cette méthode. Les produits se créent uniquement via EasyAdmin (`/admin/product/new`).
-
-Création d'un produit.
+Création d'un produit. Protégé par `ProductVoter::CREATE` (`ROLE_ADMIN`).
 
 **Accès :** `ROLE_ADMIN`
 
@@ -320,11 +317,9 @@ Création d'un produit.
 
 ---
 
-### PUT /api/products/{id} — ⬜ N'EXISTE PAS
+### PUT /api/products/{id} — ✅ IMPLÉMENTÉ
 
-> Renvoie **404**. Même situation que `POST` ci-dessus.
-
-Remplacement complet d'un produit.
+Mise à jour d'un produit. Protégé par `ProductVoter::EDIT` (`ROLE_ADMIN`).
 
 **Accès :** `ROLE_ADMIN`
 
@@ -334,11 +329,9 @@ Remplacement complet d'un produit.
 
 ---
 
-### DELETE /api/products/{id} — ⬜ N'EXISTE PAS
+### DELETE /api/products/{id} — ✅ IMPLÉMENTÉ
 
-> Renvoie **404**. Même situation que `POST` et `PUT` ci-dessus.
-
-Suppression d'un produit.
+Suppression d'un produit. Protégé par `ProductVoter::DELETE` (`ROLE_ADMIN`).
 
 **Accès :** `ROLE_ADMIN`
 
@@ -359,7 +352,7 @@ Liste de toutes les marques.
 {
   "data": [
     { "id": 1, "name": "La Roche-Posay", "logoUrl": "/media/brands/lrp-logo.svg" },
-    { "id": 2, "name": "CeraVe", "logoUrl": "/media/brands/cerave-logo.svg" }
+    { "id": 2, "name": "CeraVe", "logoUrl": "cerave-logo.svg" }
   ]
 }
 ```
@@ -600,11 +593,9 @@ Profil de l'utilisateur connecté.
 
 ---
 
-### PATCH /api/users/me — ⬜ N'EXISTE PAS
+### PATCH /api/auth/me — ✅ IMPLÉMENTÉ
 
-> Renvoie **404** (roadmap 2.11).
-
-Mise à jour du profil.
+Mise à jour du profil (prénom, nom, mot de passe). Rate limited (10 tentatives / 15 min).
 
 **Accès :** `ROLE_USER`
 
@@ -612,11 +603,28 @@ Mise à jour du profil.
 ```json
 {
   "firstName": "Sophie",
-  "lastName": "Dupont"
+  "lastName": "Dupont",
+  "currentPassword": "AncienMdp123!",
+  "newPassword": "NouveauMdp456!"
 }
 ```
 
-**Réponse 200 :** profil mis à jour
+Tous les champs sont optionnels. `currentPassword` est requis uniquement si `newPassword` est fourni.
+
+**Réponse 200 :**
+```json
+{
+  "data": {
+    "user": {
+      "id": 12,
+      "email": "user@example.com",
+      "firstName": "Sophie",
+      "lastName": "Dupont",
+      "role": ["ROLE_USER"]
+    }
+  }
+}
+```
 
 ---
 
@@ -662,9 +670,9 @@ Envoi d'un message de contact.
 | `GET` | `/api/admin/orders` | Toutes les commandes | ⬜ → `/admin/order` (EasyAdmin) |
 | `GET` | `/api/admin/users` | Tous les utilisateurs | ⬜ → `/admin/user` |
 | `PATCH` | `/api/admin/orders/{id}` | Modifier le statut | ⬜ → `/admin/order/{id}/edit` |
-| `POST` | `/api/products` | Créer un produit | ⬜ roadmap 2.6 🔴 |
-| `PUT` | `/api/products/{id}` | Modifier un produit | ⬜ |
-| `DELETE` | `/api/products/{id}` | Supprimer un produit | ⬜ |
+| `POST` | `/api/products` | Créer un produit | ✅ `ProductController` + `ProductVoter::CREATE` |
+| `PUT` | `/api/products/{id}` | Modifier un produit | ✅ `ProductController` + `ProductVoter::EDIT` |
+| `DELETE` | `/api/products/{id}` | Supprimer un produit | ✅ `ProductController` + `ProductVoter::DELETE` |
 | `POST` | `/api/brands` | Créer une marque | ⬜ |
 | `PUT` | `/api/brands/{id}` | Modifier une marque | ⬜ |
 | `DELETE` | `/api/brands/{id}` | Supprimer une marque | ⬜ |

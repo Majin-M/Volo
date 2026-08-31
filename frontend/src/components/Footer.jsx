@@ -82,6 +82,16 @@ const Footer = () => {
                         contact@volo-skin.fr
                     </a>
                 </div>
+
+                {/* Colonne 4 : Informations legales */}
+                <div>
+                    <h3 style={headingStyle}>Informations legales</h3>
+                    <ul style={{ listStyle: 'none', padding: 0, lineHeight: 2 }}>
+                        <li><a href="/mentions-legales" style={linkStyle}>Mentions legales</a></li>
+                        <li><a href="/politique-confidentialite" style={linkStyle}>Politique de confidentialite</a></li>
+                        <li><a href="/cgv" style={linkStyle}>Conditions generales de vente</a></li>
+                    </ul>
+                </div>
             </div>
 
             {/* Copyright Bas */}

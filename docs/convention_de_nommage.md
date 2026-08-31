@@ -74,7 +74,7 @@ Convention : `PascalCase`, nom singulier, correspondant à la table BDD.
 // GOOD
 Product
 Brand
-Problematic
+SkinConcern
 Order
 OrderItem
 Payment
@@ -97,7 +97,7 @@ ProductController
 BrandController
 OrderController
 PaymentController
-ProblematicController
+SkinConcernController
 AuthController
 ```
 
@@ -127,7 +127,7 @@ ProductService
 CartService
 PaymentService
 OrderService
-ProblematicService
+SkinConcernService
 AuthService
 ```
 
@@ -140,7 +140,7 @@ Générés automatiquement par Doctrine, ne contiennent que des requêtes BDD.
 ProductRepository
 OrderRepository
 UserRepository
-ProblematicRepository
+SkinConcernRepository
 ```
 
 ### DTO
@@ -190,7 +190,7 @@ Un composant par fichier, nom identique au fichier.
 ProductCard.jsx
 ProductGrid.jsx
 CheckoutForm.jsx
-ProblematicBadge.jsx
+SkinConcernBadge.jsx
 CartItem.jsx
 
 // BAD
@@ -213,7 +213,7 @@ CheckoutPage.jsx
 OrderConfirmationPage.jsx
 AccountPage.jsx
 OrderHistoryPage.jsx
-ProblematicPage.jsx
+SkinConcernPage.jsx
 LoginPage.jsx
 RegisterPage.jsx
 ```
@@ -287,7 +287,7 @@ Convention : `snake_case`, **singulier**, anglais.
 -- GOOD
 product
 brand
-problematic
+skin_concern
 shop_order       -- "order" est réservé en SQL
 order_item
 payment
@@ -338,7 +338,7 @@ id   INT UNSIGNED AUTO_INCREMENT PRIMARY KEY
 brand_id
 user_id
 order_id
-problematic_id
+skin_concern_id
 routine_id
 
 -- GOOD
@@ -369,8 +369,8 @@ POST   /api/products
 PUT    /api/products/{id}
 DELETE /api/products/{id}
 
-GET    /api/problematics
-GET    /api/problematics/{slug}/products
+GET    /api/skin-concerns
+GET    /api/skin-concerns/{slug}/products
 
 GET    /api/orders
 POST   /api/orders
@@ -430,7 +430,7 @@ chore/*    — tâche technique sans impact fonctionnel (deps, config)
 feature/product-crud
 feature/cart-system
 feature/payment-stripe
-feature/problematic-filter
+feature/skin-concern-filter
 feature/auth-jwt
 
 fix/order-validation
@@ -463,7 +463,7 @@ chore     — configuration, dépendances, CI/CD
 perf      — amélioration de performance
 
 // Exemples GOOD
-feat(product): add filter by problematic
+feat(product): add filter by skin concern
 feat(auth): implement JWT login endpoint
 fix(cart): correct quantity update on item removal
 refactor(order): extract payment logic to PaymentService
@@ -599,7 +599,7 @@ Purpose:
 Responsibilities:
     - Store product information (name, description, price, availability).
     - Define the relationship with Brand (many-to-one).
-    - Define the relationship with Problematic (many-to-many).
+    - Define the relationship with SkinConcern (many-to-many).
     - Define the relationship with OrderItem (one-to-many).
     - Be persisted and managed by Doctrine ORM.
 
@@ -610,12 +610,12 @@ Main Properties:
     price
     isAvailable
     brand         (ManyToOne -> Brand)
-    problematics  (ManyToMany -> Problematic)
+    skinConcerns  (ManyToMany -> SkinConcern)
     createdAt
     updatedAt
 
 Related Entities:
-    Brand, Problematic, OrderItem, Routine
+    Brand, SkinConcern, OrderItem, Routine
 ===============================================================================
 */
 
@@ -637,7 +637,7 @@ Purpose:
 Responsibilities:
     - Create, update, and delete products.
     - Validate business constraints (price > 0, name not empty…).
-    - Filter products by problematic, brand, availability.
+    - Filter products by skin concern, brand, availability.
     - Prepare paginated data for API responses.
 
 Dependencies:
@@ -676,7 +676,7 @@ Available Endpoints:
     DELETE  /api/products/{id}               Delete a product
 
 Query Parameters (GET /api/products):
-    ?problematic={slug}    Filter by problematic slug
+    ?skin_concern={slug}   Filter by skin concern slug
     ?brand={id}            Filter by brand id
     ?page={n}              Pagination (default: 1)
     ?limit={n}             Items per page (default: 20)
@@ -713,7 +713,7 @@ namespace App\Controller;
  *   @param {Function} onAddToCart       - Callback triggered on CTA click
  *
  * Used By:
- *   ProductGrid, ProblematicPage, SearchResultsPage
+ *   ProductGrid, SkinConcernPage, SearchResultsPage
  *
  * Notes:
  *   - Displays an "unavailable" badge when isAvailable is false.

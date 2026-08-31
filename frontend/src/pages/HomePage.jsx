@@ -18,20 +18,18 @@ Exemple d'utilisation :
 ===============================================================================
 */
 
-import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import styles from './HomePage.module.css';
-import Footer from '../components/Footer';
 
-// Problematiques de peau (image ronde + slug pour filtrer le catalogue)
+// Problematiques de peau (icone + slug pour filtrer le catalogue)
 const concerns = [
-    { title: "Vieillissement", slug: "vieillissement", image: "/images/concerns/vieillissement.jpg" },
-    { title: "Acné & Imperfections", slug: "acne", image: "/images/concerns/acne.jpg" },
-    { title: "Hyperpigmentation", slug: "hyperpigmentation", image: "/images/concerns/hyperpigmentation.jpg" },
-    { title: "Sécheresse", slug: "secheresse", image: "/images/concerns/secheresse.jpg" },
-    { title: "Sensibilité", slug: "sensibilite", image: "/images/concerns/sensibilite.jpg" },
-    { title: "Teint terne & Éclat", slug: "eclat", image: "/images/concerns/eclat.jpg" },
+    { title: "Vieillissement", slug: "vieillissement", icon: "🕰️" },
+    { title: "Acné & Imperfections", slug: "acne", icon: "✨" },
+    { title: "Hyperpigmentation", slug: "hyperpigmentation", icon: "🌗" },
+    { title: "Sécheresse", slug: "secheresse", icon: "💧" },
+    { title: "Sensibilité", slug: "sensibilite", icon: "🌸" },
+    { title: "Teint terne & Éclat", slug: "eclat", icon: "☀️" },
 ];
 
 // Routines organisees PAR PROBLEMATIQUE (et non par niveau debutant/expert)
@@ -148,11 +146,7 @@ export const HomePage = () => {
                             onClick={() => handleConcernClick(concern.slug)}
                         >
                             <div className={styles.concernImageWrapper}>
-                                <img
-                                    src={concern.image}
-                                    alt={concern.title}
-                                    className={styles.concernImage}
-                                />
+                                <span className={styles.concernIcon}>{concern.icon}</span>
                             </div>
                             <span className={styles.concernLabel}>{concern.title}</span>
                         </button>
@@ -179,8 +173,8 @@ export const HomePage = () => {
                                 <span className={styles.routineTag}>{routine.concern}</span>
                                 <h3 className={styles.routineName}>{routine.name}</h3>
                                 <ul className={styles.routineSteps}>
-                                    {routine.steps.map((step, j) => (
-                                        <li key={j}>{step}</li>
+                                    {routine.steps.map((step) => (
+                                        <li key={step}>{step}</li>
                                     ))}
                                 </ul>
                             </button>

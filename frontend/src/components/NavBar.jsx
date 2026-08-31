@@ -23,10 +23,10 @@ Exemple d'utilisation :
 ===============================================================================
 */
 
-import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 
 // Styles statiques (ne dependent d'aucune prop/etat) : definis en portee
 // module pour ne pas etre reconstruits a chaque rendu.
@@ -95,6 +95,7 @@ const NavBar = () => {
     const navigate = useNavigate();
     const { cartCount } = useCart();
     const { isAuthenticated, user, logout } = useAuth();
+    const { addToast } = useToast();
 
     /**
      * Deconnecte l'utilisateur (supprime le cookie cote serveur) puis
@@ -104,6 +105,7 @@ const NavBar = () => {
      */
     const handleLogout = async () => {
         await logout();
+        addToast('Deconnexion reussie', 'info');
         navigate('/');
     };
 
@@ -141,9 +143,9 @@ const NavBar = () => {
                     <Link to="/connexion" style={linkStyle}>Connexion</Link>
                 ) : (
                     <div style={{ display: 'flex', alignItems: 'center', marginLeft: '15px' }}>
-                        <span style={{ marginRight: '10px', color: '#5F4C42', fontSize: '0.9em' }}>
-                            Bonjour, {user?.firstName}
-                        </span>
+                        <Link to="/mon-compte" style={{ ...linkStyle, fontSize: '0.9em' }}>
+                            {user?.firstName}
+                        </Link>
                         <button type="button" onClick={handleLogout} style={logoutButtonStyle}>
                             Deconnexion
                         </button>

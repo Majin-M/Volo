@@ -1,0 +1,201 @@
+.container {
+    max-width: 520px;
+    margin: 0 auto;
+    padding: 60px 20px;
+}
+
+.title {
+    font-family: 'Playfair Display', serif;
+    color: #5F4C42;
+    font-size: 2em;
+    text-align: center;
+    margin-bottom: 32px;
+}
+
+.card {
+    background-color: #fff;
+    border-radius: 20px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.06);
+    padding: 40px;
+    border: 1px solid #E9D7C3;
+    text-align: center;
+}
+
+.avatarWrapper {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background-color: #5F4C42;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 28px;
+}
+
+.avatarInitial {
+    color: #fff;
+    font-family: 'Playfair Display', serif;
+    font-size: 2em;
+    font-weight: 700;
+}
+
+.infoGrid {
+    text-align: left;
+}
+
+.infoRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 0;
+}
+
+.infoRow + .infoRow {
+    border-top: 1px solid #f0e8df;
+}
+
+.infoLabel {
+    color: #7a6a60;
+    font-size: 0.88em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.infoValue {
+    color: #5F4C42;
+    font-weight: 600;
+    font-size: 1em;
+}
+
+.actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.primaryButton {
+    background-color: #5F4C42;
+    color: #fff;
+    border: none;
+    padding: 15px;
+    border-radius: 25px;
+    font-size: 1.05em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.primaryButton:hover {
+    background-color: #463325;
+    transform: translateY(-2px);
+}
+
+.dangerButton {
+    background-color: transparent;
+    color: #c62828;
+    border: 2px solid #fce4ec;
+    padding: 13px;
+    border-radius: 25px;
+    font-size: 1.05em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.dangerButton:hover {
+    background-color: #fce4ec;
+    border-color: #c62828;
+}
+
+.secondaryButton {
+    background-color: transparent;
+    color: #5F4C42;
+    border: 2px solid #E9D7C3;
+    padding: 13px;
+    border-radius: 25px;
+    font-size: 1.05em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.secondaryButton:hover {
+    background-color: #f5ebe0;
+    border-color: #5F4C42;
+}
+
+.formGroup {
+    margin-bottom: 16px;
+    text-align: left;
+}
+
+.formLabel {
+    display: block;
+    color: #7a6a60;
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+
+.formInput {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid #E9D7C3;
+    border-radius: 12px;
+    font-size: 1em;
+    color: #5F4C42;
+    background-color: #faf6f1;
+    transition: border-color 0.2s ease;
+    box-sizing: border-box;
+}
+
+.formInput:focus {
+    outline: none;
+    border-color: #5F4C42;
+}
+
+.linkButton {
+    background: none;
+    border: none;
+    color: #5F4C42;
+    font-size: 0.92em;
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 8px 0;
+    margin-top: 4px;
+}
+
+.linkButton:hover {
+    color: #463325;
+}
+
+.passwordSection {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #f0e8df;
+}
+
+.message {
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 0.92em;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.success {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+}
+
+.error {
+    background-color: #fce4ec;
+    color: #c62828;
+}
+
+.info {
+    background-color: #fff3e0;
+    color: #e65100;
+}

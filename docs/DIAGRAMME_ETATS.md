@@ -32,12 +32,11 @@ stateDiagram-v2
     cancelled --> [*]
 
     note right of paid
-        Seule transition qui ne devrait PAS être
-        déclenchée par un humain : elle vient du
-        webhook Stripe. Ce webhook n'existe pas
-        encore (cf. section 2) — en attendant,
-        un admin pose le statut à la main via
-        PaymentCrudController.
+        Transition déclenchée automatiquement par
+        le webhook Stripe (WebhookController),
+        jamais par un humain. L'admin peut aussi
+        modifier le statut via PaymentCrudController
+        en cas de besoin.
     end note
 ```
 
@@ -76,14 +75,13 @@ stateDiagram-v2
 
 Un enregistrement financier n'est **jamais remis à `pending`** après avoir atteint un état terminal. C'est ce qui garantit que l'historique affiché au client et le back-office restent une trace fidèle des tentatives réelles.
 
-> ⚠️ **Écart d'implémentation majeur, non résolu** : **le webhook Stripe n'existe pas.** `PaymentService` crée l'intention de paiement et retourne le `clientSecret` au front, mais aucun `WebhookController` n'écoute `POST /api/webhooks/stripe`. En conséquence :
-> - aucun `Payment` ne quitte jamais `pending` ;
-> - aucune `Order` ne passe jamais à `paid` ;
-> - la transition `pending → captured` ci-dessus est **purement théorique**.
+> ✅ **Résolu.** `WebhookController` (`src/Controller/WebhookController.php`) écoute `POST /api/webhooks/stripe`. Il vérifie la signature HMAC via `Stripe\Webhook::constructEvent()` et traite :
+> - `payment_intent.succeeded` → `Payment` passe à `CAPTURED`, `Order` passe à `PAID` (si encore `PENDING`)
+> - `payment_intent.payment_failed` → `Payment` passe à `FAILED`
 >
-> C'est le point 4.1 🟠 de [roadmap.md](roadmap.md) — la tâche mentionne explicitement « + webhook confirmation paiement », qui n'a jamais été fait. Tant qu'il manque, le parcours d'achat est fonctionnellement incomplet : le client paie réellement chez Stripe, et VOLO ne le sait pas.
+> Le webhook est idempotent (un événement déjà traité retourne 200 sans modification) et envoie un email de confirmation via `OrderConfirmationService` (best-effort). Il est exempté du firewall (`PUBLIC_ACCESS`) et du CSRF (signature HMAC à la place).
 >
-> **Ne pas contourner en posant `paid` depuis le front** après un `stripe.confirmPayment()` réussi : le front est contrôlé par le client, un `POST /api/orders/{id}` avec `{status: "paid"}` deviendrait une commande gratuite. Seul le webhook, signé par Stripe et vérifié côté serveur, fait foi.
+> Le parcours d'achat est désormais complet : le client paie chez Stripe, le webhook fait transiter la commande automatiquement.
 
 ---
 
@@ -184,7 +182,7 @@ L'absence de statut de compte est une **simplification assumée** pour la v1. El
 
 | Trouvaille | Gravité | Statut |
 |---|---|---|
-| Webhook Stripe absent → aucune commande ne passe à `paid` | 🔴 Bloquant fonctionnel | Connu (roadmap 4.1), non fait |
+| Webhook Stripe absent → aucune commande ne passe à `paid` | 🔴 Bloquant fonctionnel | ✅ **Résolu** — `WebhookController` implémenté |
 | Statut de paiement dupliqué `Order` / `Payment` | 🔴 Dette de conception | ✅ **Corrigé, appliqué et testé** |
 | Aucune transition contrainte dans le code | 🟠 Risque d'incohérence | Non résolu — portée limitée (voir ci-dessous) |
 | `REFUNDED` / `CANCELLED` jamais posés | 🟡 Énumérations trompeuses | À trancher |

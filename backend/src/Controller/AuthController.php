@@ -28,11 +28,13 @@ Routes disponibles :
     - POST   /api/auth/login    (Public, limite en tentatives)
     - POST   /api/auth/logout   (Protege : ROLE_USER)
     - GET    /api/auth/me       (Protege : ROLE_USER)
+    - PATCH  /api/auth/me       (Protege : ROLE_USER, limite en tentatives)
 
 Dependances :
     - UserRepository, UserPasswordHasherInterface, JWTTokenManagerInterface
     - PasswordValidator : Pour verifier la complexite du mot de passe.
-    - RateLimiterFactory (limiter.login_attempts, limiter.register_attempts)
+    - RateLimiterFactory (limiter.login_attempts, limiter.register_attempts,
+      limiter.profile_update_attempts)
     - LoggerInterface : Pour journaliser les echecs de connexion.
 
 Configuration requise :
@@ -56,7 +58,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
-use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Routing\Attribute\Route;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 
 class AuthController extends AbstractController
@@ -84,8 +86,9 @@ class AuthController extends AbstractController
         private PasswordValidator $passwordValidator,
         #[Autowire(service: 'limiter.login_attempts')] private RateLimiterFactory $loginAttemptsLimiter,
         #[Autowire(service: 'limiter.register_attempts')] private RateLimiterFactory $registerAttemptsLimiter,
+        #[Autowire(service: 'limiter.profile_update_attempts')] private RateLimiterFactory $profileUpdateLimiter,
         private LoggerInterface $logger,
-        #[Autowire('%kernel.environment%')] private string $environment,
+        #[Autowire(param: 'kernel.environment')] private string $environment,
     ) {
     }
 
@@ -148,6 +151,14 @@ class AuthController extends AbstractController
         $password = $data['password'];
         $firstName = strip_tags(trim($data['firstName'] ?? ''));
         $lastName = strip_tags(trim($data['lastName'] ?? ''));
+
+        if (mb_strlen($firstName) > 255) {
+            return new JsonResponse(['error' => 'Le prenom est trop long (max 255 caracteres).'], 400);
+        }
+
+        if (mb_strlen($lastName) > 255) {
+            return new JsonResponse(['error' => 'Le nom est trop long (max 255 caracteres).'], 400);
+        }
 
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             return new JsonResponse(['error' => 'L\'adresse email est invalide.'], 400);
@@ -291,6 +302,94 @@ class AuthController extends AbstractController
         if (!$user) {
             return new JsonResponse(['error' => 'Non authentifié.'], 401);
         }
+
+        return new JsonResponse([
+            'data' => [
+                'user' => [
+                    'id' => $user->getId(),
+                    'email' => $user->getEmail(),
+                    'firstName' => $user->getFirstName(),
+                    'lastName' => $user->getLastName(),
+                    'role' => $user->getRoles(),
+                ]
+            ]
+        ]);
+    }
+
+    /**
+     * Met a jour le profil de l'utilisateur connecte.
+     * Route: PATCH /api/auth/me
+     *
+     * Champs modifiables : firstName, lastName, password (avec currentPassword).
+     *
+     * @param Request $request Corps JSON avec les champs a modifier.
+     * @return JsonResponse 200 avec le profil mis a jour.
+     */
+    #[Route('/api/auth/me', name: 'api_me_update', methods: ['PATCH'])]
+    public function updateProfile(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        if (!$user) {
+            return new JsonResponse(['error' => 'Non authentifié.'], 401);
+        }
+
+        // Rate limiting : empeche les modifications de profil trop frequentes
+        $limiter = $this->profileUpdateLimiter->create($request->getClientIp());
+        if (!$limiter->consume(1)->isAccepted()) {
+            return new JsonResponse(['error' => 'Trop de tentatives. Veuillez reessayer plus tard.'], 429);
+        }
+
+        $data = json_decode($request->getContent(), true);
+
+        if (!$data) {
+            return new JsonResponse(['error' => 'Format JSON invalide.'], 400);
+        }
+
+        // Mise a jour du prenom
+        if (isset($data['firstName'])) {
+            $firstName = strip_tags(trim($data['firstName']));
+            if ($firstName === '') {
+                return new JsonResponse(['error' => 'Le prénom ne peut pas être vide.'], 400);
+            }
+            if (mb_strlen($firstName) > 255) {
+                return new JsonResponse(['error' => 'Le prenom est trop long (max 255 caracteres).'], 400);
+            }
+            $user->setFirstName($firstName);
+        }
+
+        // Mise a jour du nom
+        if (isset($data['lastName'])) {
+            $lastName = strip_tags(trim($data['lastName']));
+            if ($lastName === '') {
+                return new JsonResponse(['error' => 'Le nom ne peut pas être vide.'], 400);
+            }
+            if (mb_strlen($lastName) > 255) {
+                return new JsonResponse(['error' => 'Le nom est trop long (max 255 caracteres).'], 400);
+            }
+            $user->setLastName($lastName);
+        }
+
+        // Changement de mot de passe (necessite le mot de passe actuel)
+        if (isset($data['newPassword'])) {
+            if (empty($data['currentPassword'])) {
+                return new JsonResponse(['error' => 'Le mot de passe actuel est requis pour en définir un nouveau.'], 400);
+            }
+
+            if (!$this->passwordHasher->isPasswordValid($user, $data['currentPassword'])) {
+                return new JsonResponse(['error' => 'Mot de passe actuel incorrect.'], 400);
+            }
+
+            $passwordErrors = $this->passwordValidator->validate($data['newPassword']);
+            if (!empty($passwordErrors)) {
+                return new JsonResponse(['error' => implode(' ', $passwordErrors)], 400);
+            }
+
+            $user->setPassword($this->passwordHasher->hashPassword($user, $data['newPassword']));
+        }
+
+        $this->entityManager->flush();
 
         return new JsonResponse([
             'data' => [

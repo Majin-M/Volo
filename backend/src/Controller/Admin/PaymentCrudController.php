@@ -122,7 +122,8 @@ final class PaymentCrudController extends AbstractCrudController
 
         yield TextField::new('clientSecret', 'Client secret (Stripe)')
             ->onlyOnDetail()
-            ->setDisabled();
+            ->setDisabled()
+            ->formatValue(fn (?string $value) => $value ? '••••••••' . substr($value, -8) : '—');
 
         yield DateTimeField::new('createdAt', 'Créé le')
             ->setFormat('dd/MM/yyyy HH:mm')

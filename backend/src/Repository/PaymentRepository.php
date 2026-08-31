@@ -45,4 +45,13 @@ class PaymentRepository extends ServiceEntityRepository
             ->getQuery()
             ->getOneOrNullResult();
     }
+
+    public function findOneByStripePaymentIntentId(string $intentId): ?Payment
+    {
+        return $this->createQueryBuilder('p')
+            ->where('p.stripePaymentIntentId = :intentId')
+            ->setParameter('intentId', $intentId)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
 }

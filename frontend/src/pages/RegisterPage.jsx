@@ -19,16 +19,20 @@ Exemple d'utilisation :
 ===============================================================================
 */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { apiCall } from '../api/api';
 import { useAuth } from '../contexts/AuthContext';
 import { validateEmail, validatePassword, isRequired } from '../utils/validators';
+import FormField from '../components/FormField';
+import PasswordStrength from '../components/PasswordStrength';
+import { useToast } from '../contexts/ToastContext';
 import styles from './RegisterPage.module.css';
 
 const RegisterPage = () => {
     const navigate = useNavigate();
     const { login } = useAuth();
+    const { addToast } = useToast();
 
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
@@ -80,6 +84,7 @@ const RegisterPage = () => {
 
             if (response.data?.user) {
                 login(response.data.user);
+                addToast('Compte cree avec succes !', 'success');
                 navigate('/'); // Auto-login
             } else {
                 navigate('/connexion');
@@ -122,73 +127,77 @@ const RegisterPage = () => {
 
                     <form onSubmit={handleRegister} noValidate>
                         <div className={styles.nameRow}>
-                            <div className={styles.formGroup}>
-                                <label className={styles.inputLabel} htmlFor="register-firstName">Prenom</label>
-                                <input
-                                    id="register-firstName"
-                                    type="text"
-                                    placeholder="Sophie"
-                                    value={firstName}
-                                    onChange={(e) => setFirstName(e.target.value)}
-                                    required
-                                    className={styles.input}
-                                />
-                            </div>
-
-                            <div className={styles.formGroup}>
-                                <label className={styles.inputLabel} htmlFor="register-lastName">Nom</label>
-                                <input
-                                    id="register-lastName"
-                                    type="text"
-                                    placeholder="Martin"
-                                    value={lastName}
-                                    onChange={(e) => setLastName(e.target.value)}
-                                    required
-                                    className={styles.input}
-                                />
-                            </div>
-                        </div>
-
-                        <div className={styles.formGroup}>
-                            <label className={styles.inputLabel} htmlFor="register-email">Email</label>
-                            <input
-                                id="register-email"
-                                type="email"
-                                placeholder="sophie@example.com"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                            <FormField
+                                label="Prenom"
+                                id="register-firstName"
+                                placeholder="Sophie"
+                                value={firstName}
+                                onChange={setFirstName}
+                                validate={(v) => !isRequired(v) ? 'Le prenom est requis.' : null}
+                                required
+                                className={styles.input}
+                            />
+                            <FormField
+                                label="Nom"
+                                id="register-lastName"
+                                placeholder="Martin"
+                                value={lastName}
+                                onChange={setLastName}
+                                validate={(v) => !isRequired(v) ? 'Le nom est requis.' : null}
                                 required
                                 className={styles.input}
                             />
                         </div>
 
-                        <div className={styles.formGroup}>
-                            <label className={styles.inputLabel} htmlFor="register-password">Mot de passe</label>
-                            <input
-                                id="register-password"
-                                type="password"
-                                placeholder="8 caracteres min., 1 chiffre, 1 caractere special"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
-                                minLength={8}
-                                className={styles.input}
-                            />
-                        </div>
+                        <FormField
+                            label="Email"
+                            id="register-email"
+                            type="email"
+                            placeholder="sophie@example.com"
+                            value={email}
+                            onChange={setEmail}
+                            validate={(v) => {
+                                if (!isRequired(v)) return 'L\'email est requis.';
+                                if (!validateEmail(v)) return 'Adresse email invalide.';
+                                return null;
+                            }}
+                            required
+                            className={styles.input}
+                        />
 
-                        <div className={styles.formGroup}>
-                            <label className={styles.inputLabel} htmlFor="register-confirmPassword">Confirmer le mot de passe</label>
-                            <input
-                                id="register-confirmPassword"
-                                type="password"
-                                placeholder="••••••••"
-                                value={confirmPassword}
-                                onChange={(e) => setConfirmPassword(e.target.value)}
-                                required
-                                minLength={8}
-                                className={styles.input}
-                            />
-                        </div>
+                        <FormField
+                            label="Mot de passe"
+                            id="register-password"
+                            type="password"
+                            placeholder="8 caracteres min., 1 chiffre, 1 caractere special"
+                            value={password}
+                            onChange={setPassword}
+                            validate={(v) => {
+                                const errors = validatePassword(v);
+                                return errors.length > 0 ? errors[0] : null;
+                            }}
+                            required
+                            minLength={8}
+                            className={styles.input}
+                        />
+                        <PasswordStrength password={password} />
+
+                        <FormField
+                            label="Confirmer le mot de passe"
+                            id="register-confirmPassword"
+                            type="password"
+                            placeholder="••••••••"
+                            value={confirmPassword}
+                            onChange={setConfirmPassword}
+                            validate={(v) => {
+                                if (!isRequired(v)) return 'La confirmation est requise.';
+                                if (v !== password) return 'Les mots de passe ne correspondent pas.';
+                                return null;
+                            }}
+                            required
+                            minLength={8}
+                            className={styles.input}
+                        />
 
                         <button type="submit" className={styles.createButton} disabled={loading}>
                             {loading ? 'Creation...' : "S'inscrire"}

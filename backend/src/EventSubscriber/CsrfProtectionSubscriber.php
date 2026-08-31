@@ -83,7 +83,7 @@ class CsrfProtectionSubscriber implements EventSubscriberInterface
      * Ce qui protege cette route est le rate limiter, et un CAPTCHA le jour ou
      * le spam deviendrait reel (cf. docs/TECHNOLOGIES.md section 3).
      */
-    private const EXEMPT_PATHS = ['/api/auth/login', '/api/auth/register', '/api/contact'];
+    private const EXEMPT_PATHS = ['/api/auth/login', '/api/auth/register', '/api/contact', '/api/webhooks/stripe'];
 
     public static function getSubscribedEvents(): array
     {

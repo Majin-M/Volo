@@ -41,7 +41,7 @@ Un cookie est envoyé **automatiquement** par le navigateur, y compris quand la 
 
 Pourquoi ça marche : un site tiers peut *faire envoyer* le cookie par le navigateur, mais il ne peut pas le *lire* (politique d'origine identique) — donc il ne peut pas fabriquer l'en-tête correspondant.
 
-Exemptions : `/api/auth/login`, `/api/auth/register` et `/api/contact` — aucun cookie CSRF n'existe encore au moment où ces routes sont appelées.
+Exemptions : `/api/auth/login`, `/api/auth/register`, `/api/contact` et `/api/webhooks/stripe` — les trois premières parce qu'aucun cookie CSRF n'existe encore au moment de l'appel, la dernière parce que Stripe est un appel serveur-a-serveur (la verification de signature HMAC remplace le CSRF).
 
 > ✅ **Vérifié le 17/07/2026** — `tests/Security/CsrfProtectionTest.php`, 8 tests. La protection est réelle : `POST /api/orders` sans en-tête → 403, en-tête ≠ cookie → 403, bon jeton → passe. Éprouvé en neutralisant la comparaison du subscriber : 4 tests virent au rouge.
 >
@@ -65,7 +65,11 @@ Le formulaire public était inutilisable pour exactement le public auquel il ét
 
 Le contrôle CSRF arrive donc **en dernier**. Ce n'est pas un défaut — une route inexistante ne fait rien, une requête non authentifiée est déjà rejetée. Mais il faut le savoir pour tester la bonne chose : un test non authentifié prouverait que le *firewall* fonctionne, pas le CSRF.
 
-> À noter : **l'API n'expose aucune route `PUT`/`PATCH`/`DELETE`.** Les trois verbes figurent dans `UNSAFE_METHODS` du subscriber, mais c'est une garantie prospective — il n'y a rien à protéger avec aujourd'hui.
+> À noter : l'API expose désormais des routes `PUT`, `PATCH` et `DELETE` :
+> - `PUT /api/products/{id}` et `DELETE /api/products/{id}` — `ROLE_ADMIN` via `ProductVoter`
+> - `PATCH /api/auth/me` — `ROLE_USER`, modification du profil (avec rate limiting)
+>
+> Ces trois verbes sont protégés par le CSRF (double-submit cookie) via `UNSAFE_METHODS` dans le subscriber.
 
 ---
 
@@ -99,9 +103,7 @@ L'`access_control` de `security.yaml` couvre le gros grain :
 
 Il ne couvre **pas** le grain fin : « seulement le propriétaire de la ressource ». `GET /api/orders/{id}` avec `ROLE_USER` passe l'`access_control` — rien à ce niveau ne dit que la commande 42 appartient à l'utilisateur qui la demande.
 
-> ⚠️ **Les Voters ne sont pas implémentés** (roadmap 2.5 ⬜ 🟠). Chaque contrôleur doit donc vérifier la propriété à la main. Toute route oubliée est une fuite de données : un client peut lire la commande d'un autre en changeant l'ID dans l'URL.
->
-> Un menu masqué côté React n'est **jamais** une protection : c'est du code livré au client, il fait ce que le client veut.
+> ✅ **Les Voters sont implémentés** : `ProductVoter` (VIEW, CREATE, EDIT, DELETE) et `OrderVoter` (VIEW, CREATE, EDIT) dans `src/Security/`. `ProductController` utilise `denyAccessUnlessGranted()` sur les opérations d'écriture, `OrderController` vérifie la propriété via `findByUser`. `PaymentController` vérifie que l'utilisateur est bien propriétaire de la commande avant d'initier un paiement.
 
 **Le rôle n'est jamais attribuable par HTTP.** `POST /api/auth/register` force `["ROLE_USER"]` et ignore tout `roles` reçu dans le corps. Promouvoir un administrateur passe exclusivement par `php bin/console app:create-admin`. C'est RG11 de [MODELE_DONNEES.md](MODELE_DONNEES.md).
 
@@ -141,9 +143,7 @@ Le plafond à 50 n'est pas cosmétique : sans lui, `?limit=100000` devient un d�
   >
   > Conséquence : **les aperçus de partage sociaux ne fonctionnent pas.** WhatsApp, Facebook et LinkedIn n'exécutent pas le JavaScript, donc les balises `<meta og:*>` posées par `react-helmet-async` leur sont invisibles, et rien côté serveur ne les injecte. Le référencement Google, lui, fonctionne (Google exécute le JS). Le dispositif décrit dans ces trois documents est une **intention**, pas une implémentation.
 - **Le back-office.** `/admin/*` est du Twig rendu serveur. Aucune de ces routes n'appartient au contrat d'API.
-- **Le webhook Stripe.** `POST /api/webhooks/stripe` **devra** être exempté du firewall `api` (Stripe n'a pas de session VOLO) et du CSRF (Stripe ne peut pas lire `volo_csrf`). Sa protection reposera exclusivement sur la **vérification de signature** du payload, pas sur un cookie.
-
-  Ce point est à décider **avant** d'écrire le webhook : un `access_control` mal posé le rendrait soit inaccessible (401 pour Stripe), soit ouvert à tous. Voir [DIAGRAMME_ETATS.md](DIAGRAMME_ETATS.md) §2.
+- **Le webhook Stripe.** `POST /api/webhooks/stripe` est **implémenté** dans `WebhookController`. Il est exempté du firewall (`PUBLIC_ACCESS` dans `security.yaml`) et du CSRF (`CsrfProtectionSubscriber::EXEMPT_PATHS`). Sa protection repose exclusivement sur la **vérification de signature HMAC** du payload via `Stripe\Webhook::constructEvent()`. Le webhook traite `payment_intent.succeeded` (Payment → CAPTURED, Order → PAID) et `payment_intent.payment_failed` (Payment → FAILED), avec idempotence. Il envoie un email de confirmation via `OrderConfirmationService` (best-effort).
 
 ---
 

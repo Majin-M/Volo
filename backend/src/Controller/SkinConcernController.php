@@ -20,7 +20,7 @@ namespace App\Controller;
 use App\Repository\SkinConcernRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Routing\Attribute\Route;
 
 class SkinConcernController extends AbstractController
 {
@@ -31,6 +31,11 @@ class SkinConcernController extends AbstractController
         $this->skinConcernRepository = $skinConcernRepository;
     }
 
+    /**
+     * Retourne la liste de toutes les problematiques de peau.
+     *
+     * @return JsonResponse Liste des problematiques serializees (groupe product:read).
+     */
     #[Route('/api/skin-concerns', name: 'api_skin_concerns_list', methods: ['GET'])]
     public function index(): JsonResponse
     {

@@ -28,7 +28,7 @@ Exemple d'utilisation :
 ===============================================================================
 */
 
-import React, { createContext, useState, useEffect, useMemo, use } from 'react';
+import { createContext, useState, useEffect, useMemo, use } from 'react';
 import { apiCall } from '../api/api';
 
 const AuthContext = createContext(null);
@@ -52,7 +52,7 @@ export const AuthProvider = ({ children }) => {
                 const response = await apiCall('/auth/me');
                 setUser(response.data.user);
                 localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(response.data.user));
-            } catch (err) {
+            } catch {
                 setUser(null);
                 localStorage.removeItem(USER_STORAGE_KEY);
             } finally {
@@ -92,6 +92,25 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    /**
+     * Met a jour le profil utilisateur via PATCH /api/auth/me et
+     * rafraichit l'etat local avec les donnees renvoyees par le backend.
+     *
+     * @param {object} fields Champs a modifier (firstName, lastName, currentPassword, newPassword).
+     * @returns {Promise<object>} Le profil mis a jour.
+     * @throws {Error} Si l'API renvoie une erreur (validation, mot de passe incorrect, etc.).
+     */
+    const updateProfile = async (fields) => {
+        const response = await apiCall('/auth/me', {
+            method: 'PATCH',
+            body: JSON.stringify(fields),
+        });
+        const updatedUser = response.data.user;
+        setUser(updatedUser);
+        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUser));
+        return updatedUser;
+    };
+
     const value = useMemo(
         () => ({
             isAuthenticated: !!user,
@@ -99,6 +118,7 @@ export const AuthProvider = ({ children }) => {
             isLoading,
             login,
             logout,
+            updateProfile,
         }),
         [user, isLoading]
     );
@@ -106,4 +126,5 @@ export const AuthProvider = ({ children }) => {
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => use(AuthContext);

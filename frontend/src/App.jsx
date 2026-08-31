@@ -20,7 +20,6 @@ Exemple d'utilisation :
 ===============================================================================
 */
 
-import React from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
@@ -38,6 +37,13 @@ import RegisterPage from './pages/RegisterPage';
 import CartPage from './pages/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
 import ContactPage from './pages/ContactPage';
+import OrderConfirmationPage from './pages/OrderConfirmationPage';
+import OrderHistoryPage from './pages/OrderHistoryPage';
+import AccountPage from './pages/AccountPage';
+import NotFoundPage from './pages/NotFoundPage';
+import MentionsLegalesPage from './pages/MentionsLegalesPage';
+import PolitiqueConfidentialitePage from './pages/PolitiqueConfidentialitePage';
+import CGVPage from './pages/CGVPage';
 
 // Configuration Stripe (Cle publique de test)
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
@@ -79,7 +85,14 @@ function AppWrapper() {
                     <Route path="/connexion" element={<LoginPage />} />
                     <Route path="/inscription" element={<RegisterPage />} />
                     <Route path="/commande" element={<CheckoutPage />} />
+                    <Route path="/confirmation" element={<OrderConfirmationPage />} />
+                    <Route path="/mes-commandes" element={<OrderHistoryPage />} />
+                    <Route path="/mon-compte" element={<AccountPage />} />
                     <Route path="/contact" element={<ContactPage />} />
+                    <Route path="/mentions-legales" element={<MentionsLegalesPage />} />
+                    <Route path="/politique-confidentialite" element={<PolitiqueConfidentialitePage />} />
+                    <Route path="/cgv" element={<CGVPage />} />
+                    <Route path="*" element={<NotFoundPage />} />
                 </Routes>
             </main>
             <Footer />

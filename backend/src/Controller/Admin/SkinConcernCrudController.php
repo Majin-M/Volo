@@ -1,5 +1,25 @@
 <?php
 
+/*
+===============================================================================
+Controleur : SkinConcernCrudController (Admin CRUD)
+===============================================================================
+Objectif :
+    Gerer les operations CRUD sur les problematiques de peau depuis
+    le panneau d'administration EasyAdmin.
+
+Responsabilites :
+    - Lister les problematiques avec leur nom.
+    - Permettre la creation et l'edition (nom, slug, description).
+    - Generer automatiquement le slug a partir du champ nom
+      (SlugField avec targetFieldName).
+
+Dependances :
+    - EasyAdmin : AbstractCrudController, Field, SlugField,
+      TextareaField.
+===============================================================================
+*/
+
 namespace App\Controller\Admin;
 
 use App\Entity\SkinConcern;

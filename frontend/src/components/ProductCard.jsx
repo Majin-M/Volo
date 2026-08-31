@@ -23,7 +23,6 @@ Exemple d'utilisation :
 ===============================================================================
 */
 
-import React from 'react';
 import styles from './ProductCard.module.css';
 
 const ProductCard = ({ product, onAddToCart }) => {
@@ -33,7 +32,7 @@ const ProductCard = ({ product, onAddToCart }) => {
             <div>
                 {product.imageUrl ? (
                     <img
-                        src={`http://127.0.0.1:8000/images/products/${product.imageUrl}`}
+                        src={`/images/products/${product.imageUrl}`}
                         alt={product.name}
                         className={styles.productImage}
                     />

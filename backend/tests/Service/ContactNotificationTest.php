@@ -45,6 +45,9 @@ class ContactNotificationTest extends WebTestCase
 
         $this->em = static::getContainer()->get('doctrine.orm.entity_manager');
         $this->em->getConnection()->executeStatement('TRUNCATE TABLE contact_message');
+
+        // Vider le cache du rate limiter pour eviter les faux 429 entre tests.
+        static::getContainer()->get('cache.rate_limiter')->clear();
     }
 
     private function payload(): string

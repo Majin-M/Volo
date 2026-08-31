@@ -1,0 +1,59 @@
+framework:
+    workflows:
+        order:
+            type: state_machine
+            marking_store:
+                type: method
+                property: status
+            supports:
+                - App\Entity\Order
+            initial_marking: pending
+            places:
+                - pending
+                - paid
+                - shipped
+                - delivered
+                - cancelled
+            transitions:
+                pay:
+                    from: pending
+                    to: paid
+                cancel_pending:
+                    from: pending
+                    to: cancelled
+                ship:
+                    from: paid
+                    to: shipped
+                cancel_paid:
+                    from: paid
+                    to: cancelled
+                deliver:
+                    from: shipped
+                    to: delivered
+                cancel_shipped:
+                    from: shipped
+                    to: cancelled
+
+        payment:
+            type: state_machine
+            marking_store:
+                type: method
+                property: status
+            supports:
+                - App\Entity\Payment
+            initial_marking: pending
+            places:
+                - pending
+                - captured
+                - failed
+                - refunded
+            transitions:
+                capture:
+                    from: pending
+                    to: captured
+                fail:
+                    from: pending
+                    to: failed
+                refund:
+                    from: captured
+                    to: refunded

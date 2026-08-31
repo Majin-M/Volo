@@ -1,5 +1,26 @@
 <?php
 
+/*
+===============================================================================
+Controleur : DashboardController (Admin)
+===============================================================================
+Objectif :
+    Configurer le tableau de bord d'administration EasyAdmin.
+
+Responsabilites :
+    - Definir la page d'accueil du panneau admin (redirection vers
+      la liste des produits).
+    - Configurer le titre et le favicon du dashboard.
+    - Construire le menu lateral avec les sections Catalogue
+      (Produits, Marques, Problematiques) et Ventes (Commandes,
+      Paiements, Clients).
+
+Dependances :
+    - EasyAdmin : AbstractDashboardController, Dashboard, MenuItem.
+    - AdminUrlGenerator : Generation des URLs du panneau admin.
+===============================================================================
+*/
+
 namespace App\Controller\Admin;
 
 use App\Entity\Brand;

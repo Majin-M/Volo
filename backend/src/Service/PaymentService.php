@@ -60,6 +60,7 @@ class PaymentService
         $payment->setStatus(PaymentStatus::PENDING);
         $payment->setClientSecret($result->clientSecret);
         $payment->setAmount($result->amount);
+        $payment->setStripePaymentIntentId($result->externalId);
 
         $this->entityManager->persist($payment);
         $this->entityManager->flush();

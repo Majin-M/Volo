@@ -14,7 +14,7 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
 use Symfony\Component\HttpFoundation\File\File; // <--- IMPORTANT
-use Vich\UploaderBundle\Mapping\Annotation as Vich; // <--- IMPORTANT
+use Vich\UploaderBundle\Mapping\Attribute as Vich;
 use Symfony\Component\Validator\Constraints as Assert; // <--- Pour la validation
 
 #[ORM\Entity(repositoryClass: BrandRepository::class)]

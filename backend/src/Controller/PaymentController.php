@@ -25,20 +25,23 @@ namespace App\Controller;
 use App\Enum\PaymentMethod;
 use App\Repository\OrderRepository;
 use App\Service\PaymentService;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Routing\Attribute\Route;
 
 class PaymentController extends AbstractController
 {
     /**
      * @param OrderRepository $orderRepository Pour recuperer la commande a payer.
      * @param PaymentService $paymentService Orchestre l'initiation du paiement.
+     * @param LoggerInterface $logger Pour journaliser les erreurs de paiement.
      */
     public function __construct(
         private OrderRepository $orderRepository,
         private PaymentService $paymentService,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -65,6 +68,12 @@ class PaymentController extends AbstractController
             return new JsonResponse(['error' => 'Commande non trouvee.'], 404);
         }
 
+        // Verification de propriete : seul le proprietaire peut payer sa commande
+        $user = $this->getUser();
+        if (!$user || $order->getUser() !== $user) {
+            return new JsonResponse(['error' => 'Acces refuse.'], 403);
+        }
+
         $method = PaymentMethod::tryFrom($methodValue);
         if (!$method) {
             return new JsonResponse(['error' => 'Moyen de paiement invalide.'], 400);
@@ -81,7 +90,11 @@ class PaymentController extends AbstractController
                 ],
             ], JsonResponse::HTTP_CREATED);
         } catch (\Throwable $e) {
-            return new JsonResponse(['error' => 'Erreur de paiement : ' . $e->getMessage()], 500);
+            $this->logger->error('Erreur lors de l\'initiation du paiement.', [
+                'order_id' => $orderId,
+                'exception' => $e->getMessage(),
+            ]);
+            return new JsonResponse(['error' => 'Une erreur est survenue lors du paiement.'], 500);
         }
     }
 }

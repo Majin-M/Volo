@@ -23,7 +23,7 @@ Exemple d'utilisation :
 ===============================================================================
 */
 
-import React, { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useCart } from '../contexts/CartContext';
@@ -53,6 +53,7 @@ const CheckoutPage = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [clientSecret, setClientSecret] = useState(null);
+    const orderIdRef = useRef(null);
     const [paymentSuccess, setPaymentSuccess] = useState(false);
 
     // Gestion changement adresse
@@ -94,16 +95,18 @@ const CheckoutPage = () => {
                 })
             });
 
-            const orderId = orderResponse.data.id;
+            const newOrderId = orderResponse.data.id;
 
-            if (!orderId) {
+            if (!newOrderId) {
                 throw new Error("Impossible de recuperer l'identifiant de la commande.");
             }
+
+            orderIdRef.current = newOrderId;
 
             // --- ETAPE 2 : Initialiser le paiement avec l'orderId ---
             const paymentResponse = await apiCall('/payments', {
                 method: 'POST',
-                body: JSON.stringify({ orderId })
+                body: JSON.stringify({ orderId: newOrderId })
             });
 
             setClientSecret(paymentResponse.data.clientSecret);
@@ -121,9 +124,17 @@ const CheckoutPage = () => {
      */
     const handlePaymentSuccess = (paymentIntent) => {
         setPaymentSuccess(true);
-        alert(`Commande n°${paymentIntent.id} validee avec succes !`);
         clearCart();
-        navigate('/'); // Redirection Accueil
+        navigate('/confirmation', {
+            state: {
+                order: {
+                    orderId: orderIdRef.current,
+                    amount: cartTotal,
+                    paymentIntentId: paymentIntent.id,
+                },
+            },
+            replace: true,
+        });
     };
 
     // Si panier vide -> Retour accueil
