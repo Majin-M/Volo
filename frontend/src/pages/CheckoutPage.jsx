@@ -71,14 +71,6 @@ const CheckoutPage = () => {
         setLoading(true);
         setError(null);
 
-        // 1. Check Token
-        const token = localStorage.getItem('token');
-        if (!token) {
-            setError("Vous devez etre connecte pour commander.");
-            setLoading(false);
-            return;
-        }
-
         try {
             // Transformation Items
             const itemsPayload = cartItems.map(item => ({
@@ -96,23 +88,23 @@ const CheckoutPage = () => {
             });
 
             const newOrderId = orderResponse.data.id;
+            const orderReference = orderResponse.data.reference;
 
             if (!newOrderId) {
                 throw new Error("Impossible de recuperer l'identifiant de la commande.");
             }
 
-            orderIdRef.current = newOrderId;
+            orderIdRef.current = { id: newOrderId, reference: orderReference };
 
             // --- ETAPE 2 : Initialiser le paiement avec l'orderId ---
             const paymentResponse = await apiCall('/payments', {
                 method: 'POST',
-                body: JSON.stringify({ orderId: newOrderId })
+                body: JSON.stringify({ orderId: newOrderId }),
             });
 
             setClientSecret(paymentResponse.data.clientSecret);
 
-        } catch (err) {
-            console.error(err);
+        } catch {
             setError("Erreur lors de l'initialisation du paiement.");
         } finally {
             setLoading(false);
@@ -128,7 +120,8 @@ const CheckoutPage = () => {
         navigate('/confirmation', {
             state: {
                 order: {
-                    orderId: orderIdRef.current,
+                    orderId: orderIdRef.current.id,
+                    reference: orderIdRef.current.reference,
                     amount: cartTotal,
                     paymentIntentId: paymentIntent.id,
                 },

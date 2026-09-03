@@ -62,8 +62,8 @@ class StripePaymentGateway implements PaymentGatewayInterface
             'amount' => (int) round(((float) $order->getTotal()) * 100),
             'currency' => 'eur',
             'metadata' => [
-                'order_id' => $order->getId(),
-                'order_reference' => 'CMD-' . $order->getId(),
+                'order_id' => (string) $order->getId(),
+                'order_reference' => $order->getReference(),
             ],
         ]);
 

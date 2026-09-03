@@ -43,7 +43,7 @@ class BrandCrudController extends AbstractCrudController
             // Image de la marque (Logo)
             ImageField::new('logoUrl')
                 ->setLabel('Logo')
-                ->setBasePath('/media/brands')
+                ->setBasePath('/images/brands')
                 ->onlyOnIndex(),
                 
             Field::new('imageFile')

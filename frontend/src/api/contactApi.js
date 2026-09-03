@@ -10,8 +10,8 @@ Responsabilites :
     - Deballer la reponse API pour retourner uniquement les donnees utiles.
 
 Exemple d'utilisation :
-    const response = await submitContactMessage({ firstName, email, subject, message });
-    console.log(response.data.message);
+    const result = await submitContactMessage({ firstName, email, subject, message });
+    // result.data.message -> Confirmation
 ===============================================================================
 */
 

@@ -36,6 +36,9 @@ frontend/node_modules/
 frontend/dist/
 frontend/.vite/
 
+# --- Sauvegardes BDD ---
+backups/
+
 # --- Editeurs / OS ---
 .vscode/
 .idea/

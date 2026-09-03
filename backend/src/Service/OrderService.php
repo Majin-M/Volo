@@ -102,12 +102,20 @@ class OrderService
                     throw new \InvalidArgumentException("Le produit avec l'ID $productId n'existe pas.");
                 }
 
-                // Vérifier si le produit est disponible (Optionnel, recommandé)
                 if (!$product->isAvailable()) {
-                    // On peut soit lever une erreur, soit juste l'ignorer.
-                    // Ici on lève une erreur pour être strict.
                     throw new \InvalidArgumentException("Le produit {$product->getName()} n'est pas disponible.");
                 }
+
+                if ($product->getStock() < $quantity) {
+                    throw new \InvalidArgumentException(sprintf(
+                        'Stock insuffisant pour "%s" : %d demande(s), %d disponible(s).',
+                        $product->getName(),
+                        $quantity,
+                        $product->getStock(),
+                    ));
+                }
+
+                $product->decrementStock($quantity);
 
                 // Calcul du prix de la ligne
                 $unitPrice = (float) $product->getPrice();

@@ -48,7 +48,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Entity(repositoryClass: ProductRepository::class)]
 #[ORM\Table(name: 'product')]
 #[ORM\HasLifecycleCallbacks]
-#[Vich\Uploadable] // <--- IMPORTANT : L'attribut doit être sur la classe
+#[Vich\Uploadable] 
 class Product
 {
     #[ORM\Id]
@@ -72,6 +72,10 @@ class Product
     #[ORM\Column(type: 'boolean')]
     #[Groups('product:read')]
     private bool $isAvailable = true;
+
+    #[ORM\Column(type: 'integer')]
+    #[Groups('product:read')]
+    private int $stock = 0;
 
     // Relation avec la marque
     #[ORM\ManyToOne(targetEntity: Brand::class, inversedBy: 'products')]
@@ -98,9 +102,9 @@ class Product
     // Ce champ NE sera PAS persisté en BDD.
     // Il sert uniquement au formulaire d'upload.
     #[Vich\UploadableField(
-        mapping: 'produit_images', // <--- Assure-toi que ce nom correspond à ton config/packages/vich_uploader.yaml
+        mapping: 'produit_images', 
         fileNameProperty: 'imageUrl',
-        // size: 'image'  <-- SUPPRIMÉ : Ce paramètre n'existe pas et causait l'erreur
+
     )]
     #[Assert\Image(
         maxSize: '2M',
@@ -165,6 +169,31 @@ class Product
     public function setIsAvailable(bool $isAvailable): self
     {
         $this->isAvailable = $isAvailable;
+        return $this;
+    }
+
+    public function getStock(): int
+    {
+        return $this->stock;
+    }
+
+    public function setStock(int $stock): self
+    {
+        $this->stock = $stock;
+        return $this;
+    }
+
+    public function decrementStock(int $quantity): self
+    {
+        if ($quantity > $this->stock) {
+            throw new \LogicException(sprintf(
+                'Stock insuffisant pour "%s" : %d demande(s), %d disponible(s).',
+                $this->name,
+                $quantity,
+                $this->stock,
+            ));
+        }
+        $this->stock -= $quantity;
         return $this;
     }
 

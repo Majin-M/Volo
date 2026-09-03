@@ -60,7 +60,7 @@ const OrderConfirmationPage = () => {
                     <div className={styles.details}>
                         <div className={styles.detailRow}>
                             <span className={styles.detailLabel}>Reference</span>
-                            <span className={styles.detailValue}>CMD-{order.orderId}</span>
+                            <span className={styles.detailValue}>{order.reference}</span>
                         </div>
                         <div className={styles.detailRow}>
                             <span className={styles.detailLabel}>Montant</span>

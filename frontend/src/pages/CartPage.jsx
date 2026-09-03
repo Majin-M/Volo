@@ -34,6 +34,8 @@ import styles from './CartPage.module.css';
 // JSX statique (ne depend d'aucune prop/etat) : construit une seule fois.
 const noindexTag = (
     <Helmet>
+        <title>Mon panier — VOLO</title>
+        <meta name="description" content="Consultez et modifiez votre panier VOLO avant de passer commande." />
         <meta name="robots" content="noindex, nofollow" />
     </Helmet>
 );

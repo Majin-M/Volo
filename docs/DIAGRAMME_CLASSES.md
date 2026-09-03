@@ -57,6 +57,40 @@ classDiagram
         <<Repository>>
     }
 
+    class WelcomeEmailService {
+        <<Service>>
+        +sendWelcome(User) void
+    }
+
+    class StatusTransitionSubscriber {
+        <<EventSubscriber>>
+        -WorkflowInterface orderStateMachine
+        -WorkflowInterface paymentStateMachine
+        +preUpdate(PreUpdateEventArgs) void
+    }
+
+    class AuditSubscriber {
+        <<EventSubscriber>>
+        +postPersist(PostPersistEventArgs) void
+        +preUpdate(PreUpdateEventArgs) void
+    }
+
+    class SoftDeleteFilter {
+        <<DoctrineFilter>>
+        +addFilterConstraint(ClassMetadata, string) string
+    }
+
+    class ExceptionSubscriber {
+        <<EventSubscriber>>
+        +onKernelException(ExceptionEvent) void
+    }
+
+    class WorkflowInterface {
+        <<interface>>
+        +can(object, string) bool
+        +apply(object, string) void
+    }
+
     OrderController --> OrderService
     PaymentController --> PaymentService
     PaymentService --> PaymentGatewayResolver
@@ -64,6 +98,7 @@ classDiagram
     PaymentGatewayInterface <|.. StripePaymentGateway
     PaymentGatewayInterface <|.. PayPalPaymentGateway
     OrderService --> OrderRepository
+    StatusTransitionSubscriber --> WorkflowInterface
 ```
 
 La flèche importante est celle qui **manque** : aucun `Controller` ne pointe vers un `Repository`, et `PaymentService` ne pointe vers aucune classe Stripe. Les sections suivantes expliquent pourquoi.
@@ -228,7 +263,9 @@ C'est un choix : Symfony construit tout son système d'autorisation (`ROLE_USER`
 
 Ce serait une erreur : `PayPalPaymentGateway`, aujourd'hui un stub, devrait alors implémenter cinq méthodes vides au lieu de deux. Chaque méthode ajoutée à une interface est une dette imposée à **toutes** les implémentations, présentes et futures.
 
-Quand le webhook sera écrit ([DIAGRAMME_ETATS.md](DIAGRAMME_ETATS.md) §2), il aura besoin de vérifier une signature. La bonne réponse sera une **interface séparée** :
+Le webhook est implémenté (`WebhookController`). La vérification de signature Stripe y est faite directement via `Stripe\Webhook::constructEvent()` plutôt que par une `WebhookVerifierInterface` séparée — un compromis pragmatique : le SDK Stripe fournit déjà cette abstraction. Si PayPal est implémenté avec son propre webhook, l'extraction en interface dédiée aura lieu à ce moment — ce qui reste conforme à ISP : séparer quand la deuxième implémentation existe, pas avant.
+
+L'exemple théorique d'une interface séparée reste valide :
 
 ```php
 interface WebhookVerifierInterface
@@ -237,7 +274,7 @@ interface WebhookVerifierInterface
 }
 ```
 
-Une passerelle qui gère les webhooks implémentera les deux interfaces ; une passerelle qui n'en gère pas n'implémentera que la première. C'est exactement ce qu'ISP prescrit, et c'est une décision à prendre **avant** d'écrire le webhook, pas après.
+Une passerelle qui gère les webhooks implémentera les deux interfaces ; une passerelle qui n'en gère pas n'implémentera que la première.
 
 ---
 

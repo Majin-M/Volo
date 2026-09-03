@@ -26,7 +26,8 @@ Décrit les données de VOLO du dictionnaire jusqu'au schéma physique MySQL. Le
 | `name` | string(255) | NOT NULL | |
 | `description` | text | NULL | |
 | `price` | decimal(10,2) | NOT NULL | **Jamais un `float`** — cf. §5 |
-| `isAvailable` | bool | NOT NULL, défaut `true` | Il n'y a **pas de stock**, seulement un booléen — cf. §6 |
+| `isAvailable` | bool | NOT NULL, défaut `true` | Interrupteur admin — un produit peut être désactivé même avec du stock |
+| `stock` | int | NOT NULL, défaut `0` | Quantité en stock. Décrémenté à chaque commande. Ajouté par migration `Version20260901120000` |
 | `imageUrl` | string(255) | NULL | Rempli par VichUploader |
 | `createdAt` / `updatedAt` | datetime | NOT NULL / NULL | |
 
@@ -67,7 +68,9 @@ Décrit les données de VOLO du dictionnaire jusqu'au schéma physique MySQL. Le
 | `status` | enum | NOT NULL, défaut `pending` | Cycle de vie : [DIAGRAMME_ETATS.md](DIAGRAMME_ETATS.md) §1 |
 | `total` | decimal(10,2) | NOT NULL | Recalculé serveur, jamais reçu du client |
 | `street` / `city` / `postalCode` / `country` | string | NOT NULL | Adresse **copiée**, pas référencée — cf. §5 |
+| `reference` | string(36) | NOT NULL, UNIQUE | UUID v4 — identifiant public (l'ID interne n'est jamais exposé au client) |
 | `notes` | text | NULL | |
+| `deletedAt` | datetime | NULL | Soft Delete — `null` = actif, renseigné = supprimé logiquement |
 | `createdAt` / `updatedAt` | datetime | NOT NULL | |
 
 > ❌ **`paymentStatus` et `paymentMethod` ne sont plus des colonnes.** Elles figuraient ici comme « redondantes avec `payment.status` / `payment.method` » ; la migration `Version20260717120000` les a **supprimées de la base** le 17/07/2026 (§6.1).
@@ -93,6 +96,7 @@ Décrit les données de VOLO du dictionnaire jusqu'au schéma physique MySQL. Le
 | `clientSecret` | string(255) | NULL | Jeton Stripe — ⚠️ cf. §6 |
 | `stripePaymentIntentId` | string(255) | NULL, UNIQUE | Identifiant `pi_...` de l'intention Stripe — clé de lookup pour le webhook |
 | `amount` | decimal(10,2) | NOT NULL | |
+| `deletedAt` | datetime | NULL | Soft Delete — même mécanisme que `Order` |
 | `createdAt` / `updatedAt` | datetime | NOT NULL | |
 
 ### MESSAGE_CONTACT (`contact_message`)
@@ -108,6 +112,22 @@ Décrit les données de VOLO du dictionnaire jusqu'au schéma physique MySQL. Le
 | `createdAt` / `updatedAt` | datetime | NOT NULL | |
 
 > **Table d'archive, pas de travail.** Depuis le 17/07/2026, `ContactService` persiste le message **et** notifie l'administrateur par email. La base garantit qu'un envoi raté ne perd rien ; le traitement se fait dans la boîte mail. C'est ce qui rend RG12 et `processed_by_user_id` inutiles — cf. §6.5.
+
+### JOURNAL_AUDIT (`audit_log`)
+
+| Propriété | Type | Contraintes | Remarque |
+|---|---|---|---|
+| `id` | int | PK, auto | |
+| `entityType` | string(50) | NOT NULL | Nom court de l'entité (`Order`, `Payment`, `User`) |
+| `entityId` | int | NOT NULL | ID de l'enregistrement concerné |
+| `action` | string(20) | NOT NULL | `create` ou `update` |
+| `field` | string(100) | NULL | Champ modifié (absent pour `create`) |
+| `oldValue` | string(255) | NULL | Valeur avant modification |
+| `newValue` | string(255) | NULL | Valeur après modification |
+| `userIdentifier` | string(255) | NULL | Email de l'utilisateur connecté (null si système) |
+| `createdAt` | datetime | NOT NULL | Horodatage de l'événement |
+
+> **Audit Trail automatique.** `AuditSubscriber` (Doctrine `postPersist` + `preUpdate`) trace les créations et les modifications des champs sensibles : `Order.status`, `Payment.status`, `User.password` (stocké comme `[hashed]`), `User.roles`. Index composé sur `(entity_type, entity_id)` et index sur `created_at` pour les requêtes d'historique.
 
 ---
 
@@ -189,18 +209,21 @@ PRODUIT_PROBLEMATIQUE (#product_id→PRODUIT, #skin_concern_id→PROBLEMATIQUE)
 
 ROUTINE_PRODUIT (#routine_id→ROUTINE, #product_id→PRODUIT)
 
-COMMANDE (#id, status, total, street, city, postalCode, country, notes,
-          paymentStatus, paymentMethod, createdAt, updatedAt,
+COMMANDE (#id, reference, status, total, street, city, postalCode, country, notes,
+          deletedAt, createdAt, updatedAt,
           user_id→UTILISATEUR)
 
 LIGNE_COMMANDE (#id, quantity, unitPrice, productName,
                 order_id→COMMANDE, product_id→PRODUIT)
 
-PAIEMENT (#id, status, method, clientSecret, amount, createdAt, updatedAt,
-          order_id→COMMANDE UNIQUE)
+PAIEMENT (#id, status, method, clientSecret, amount, deletedAt,
+          createdAt, updatedAt, order_id→COMMANDE UNIQUE)
 
 MESSAGE_CONTACT (#id, firstName, email, subject, message, isProcessed,
                  createdAt, updatedAt)
+
+JOURNAL_AUDIT (#id, entityType, entityId, action, field, oldValue,
+              newValue, userIdentifier, createdAt)
 ```
 
 > `processed_by_user_id` figurait ici comme cible traduisant RG12. **La règle est abandonnée** (§6.5) : le traitement se fait par email, la colonne n'a plus d'objet. Le MLD décrit désormais la table telle qu'elle existe.
@@ -244,6 +267,9 @@ Cette section affirmait que deux index UNIQUE « manquent » et qu'ils étaient 
 | `user` | `email` | `UNIQ_8D93D649E7927C74` | Unicité de l'identifiant de connexion |
 | `skin_concern` | `slug` | `UNIQ_DBD33427989D9B62` | RG9 — identifiant public dans les URL |
 | `payment` | `order_id` | `UNIQ_6D28840D8D9F6D38` | RG8 — cardinalité (0,1) : un seul paiement par commande |
+| `shop_order` | `reference` | `UNIQ_323FC9CAAEA34913` | Unicité de la référence UUID publique |
+| `audit_log` | `(entity_type, entity_id)` | `idx_audit_entity` | Recherche rapide de l'historique d'une entité |
+| `audit_log` | `created_at` | `idx_audit_date` | Requêtes chronologiques sur le journal |
 
 Doctrine les avait créés depuis les attributs `#[ORM\UniqueConstraint]` / `unique: true` des entités : ils n'étaient pas « à créer », seulement jamais regardés. Le troisième a été renommé par la migration `Version20260717120000`, en même temps que sa colonne.
 
@@ -319,11 +345,11 @@ Sans lui, supprimer une commande ayant un paiement lèverait une violation de co
 
 Il ne donne pas accès au compte Stripe, la gravité est donc limitée — mais c'est une donnée sensible conservée sans raison identifiée. À moins qu'un besoin de reprise de paiement soit avéré, la colonne devrait disparaître.
 
-### 6.4 Aucune gestion de stock — 🟡 assumé
+### 6.4 Gestion de stock — ✅ IMPLÉMENTÉ
 
-`PRODUIT.isAvailable` est un booléen. Il n'y a pas de quantité. Deux clients peuvent donc commander simultanément le dernier exemplaire d'un produit sans qu'aucun mécanisme ne s'y oppose.
+Colonne `stock` (integer, NOT NULL, défaut 0) ajoutée à `Product` par la migration `Version20260901120000`. `OrderService` vérifie le stock disponible et le décrémente atomiquement à la création de commande. `Product::decrementStock()` lève une `LogicException` si le stock est insuffisant.
 
-Assumé pour la v1 (le cahier des charges ne mentionne pas la gestion de stock), mais c'est une limite à énoncer explicitement plutôt qu'à laisser découvrir : **VOLO ne peut pas être exploité commercialement en l'état** sans surventes possibles.
+Le front (`ProductDetailPage`) affiche « Rupture de stock » (bouton désactivé), « Plus que N en stock » (≤ 5, alerte visuelle), et plafonne le sélecteur de quantité au stock disponible. `isAvailable` est conservé comme interrupteur admin : un produit peut être désactivé même avec du stock restant.
 
 ### 6.5 `MESSAGE_CONTACT.processed_by_user_id` absent — ✅ CLOS, RG12 abandonnée
 
@@ -378,7 +404,7 @@ Corrigé par suppression du contrôleur, du formulaire et des templates, plus un
 | 6.1 | Statut de paiement dupliqué | 🔴 | ✅ Corrigé, **appliqué** et testé — `OrderPaymentTest` |
 | 6.2 | Cascade remove inversé Payment → Order | 🔴 | ✅ Idem — le sens du cascade est tenu par un test |
 | 6.3 | `clientSecret` persisté | 🟠 | À réexaminer |
-| 6.4 | Aucun stock | 🟡 | Assumé v1 |
+| 6.4 | Gestion de stock | 🟡 | ✅ **Implémenté** — `Product.stock`, `decrementStock()`, migration `Version20260901120000` |
 | 6.5 | `processed_by_user_id` absent | 🟡 | ✅ **Clos** — RG12 abandonnée, traitement par email |
 | 6.6 | Nommage des colonnes | 🟡 | ✅ **Vérifié — conforme** (`underscore`) |
 | 6.8 | Mot de passe en clair via EasyAdmin | 🔴 | ✅ Corrigé — `persistEntity()` hache |
@@ -386,7 +412,7 @@ Corrigé par suppression du contrôleur, du formulaire et des templates, plus un
 
 **Les deux 🔴 d'origine sont désormais réellement traités** — migration appliquée sur `volo` le 17/07/2026, `schema:validate` vert, neuf tests. Ils ne l'étaient pas quand ce tableau l'a affirmé une première fois : la migration qui les traitait était cassée et n'avait jamais tourné. Voir [CORRECTION.md](CORRECTION.md).
 
-Les 🔴 de 6.8 et 6.9 sont traités aussi. **Le seul 🔴 restant du projet n'est pas dans ce tableau** : c'est l'absence du webhook Stripe — aucune commande ne passe jamais à `paid` ([DIAGRAMME_ETATS.md](DIAGRAMME_ETATS.md) §2).
+Les 🔴 de 6.8 et 6.9 sont traités aussi. **Le webhook Stripe est désormais implémenté** (`WebhookController`) — les commandes passent automatiquement à `paid` après capture du paiement. Tous les 🔴 du projet sont résolus.
 
 **Sur 6.5** : le défaut n'était pas qu'une colonne manque — c'est que **les messages n'étaient lus par personne**, et depuis la mise en place du CSRF, qu'ils n'arrivaient même plus (403 pour tout visiteur anonyme). Le formulaire ne fonctionnait d'aucun bout.
 

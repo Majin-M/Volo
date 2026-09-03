@@ -100,6 +100,9 @@ const ProductListPage = () => {
             <Helmet>
                 <title>{pageTitle}</title>
                 <meta name="description" content={pageDescription} />
+                <meta property="og:title" content={pageTitle} />
+                <meta property="og:description" content={pageDescription} />
+                <meta property="og:type" content="website" />
             </Helmet>
 
             <h1 style={{ color: '#5F4C42', marginBottom: '30px', textAlign: 'center' }}>

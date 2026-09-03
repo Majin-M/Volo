@@ -125,9 +125,7 @@ Aucune traduction n'est donc nécessaire entre la base et l'API — contrairemen
 
 **Erreurs** : `api_specification.md` documente une enveloppe `{ error: { code, message } }`.
 
-> ⚠️ **Aucun `ExceptionSubscriber` global n'existe.** Une exception non capturée produit donc la forme par défaut de Symfony (`{ "type", "title", "status", "detail" }` en dev, un HTML d'erreur en prod), pas l'enveloppe documentée. Le contrat et l'implémentation divergent silencieusement.
->
-> Le front doit aujourd'hui parser deux formats selon le chemin d'erreur emprunté. C'est un bug documentaire autant que technique : la spécification décrit une intention, pas le comportement.
+> ✅ **`ExceptionSubscriber` est implémenté.** Il écoute `kernel.exception` et retourne un JSON unifié `{"error": {"code": N, "message": "..."}}` pour toutes les routes `/api/*`. En prod, les messages d'erreur 500 sont masqués (message générique) ; en dev, le message original est conservé pour le débogage. Les erreurs 500 sont journalisées via `LoggerInterface`. Le contrat et l'implémentation sont désormais cohérents.
 
 **Pagination** : `?page` et `?limit` (défaut 20, max 50), réponse enveloppée `{ data: [...], pagination: {...} }`.
 

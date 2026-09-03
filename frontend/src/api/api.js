@@ -66,7 +66,6 @@ export async function apiCall(endpoint, options = {}) {
 
         try {
             const text = await response.text();
-            console.error("Corps de la reponse:", text);
 
             try {
                 const errorData = JSON.parse(text);
@@ -84,8 +83,8 @@ export async function apiCall(endpoint, options = {}) {
                     errorMessage = text;
                 }
             }
-        } catch (readErr) {
-            console.error("Impossible de lire le corps de la reponse:", readErr);
+        } catch {
+           
         }
 
         throw new Error(errorMessage);

@@ -63,8 +63,19 @@ class ProductController extends AbstractController
         // 2. Appel au Service
         $result = $this->productService->getPaginatedProducts($filters, $page, $limit);
 
-        // 3. Retour JSON
-        return $this->json($result);
+        // 3. Retour JSON avec cache HTTP
+        $response = $this->json($result);
+        $etag = md5((string) json_encode($result));
+        $response->setEtag($etag);
+        $response->setPublic();
+        $response->setMaxAge(60);
+        $response->headers->set('Cache-Control', 'public, max-age=60, must-revalidate');
+
+        if ($response->isNotModified($request)) {
+            return $response;
+        }
+
+        return $response;
     }
 
     /**
@@ -74,13 +85,22 @@ class ProductController extends AbstractController
      * @return JsonResponse Donnees completes du produit (relations incluses).
      */
     #[Route('/api/products/{id}', name: 'api_product_show', methods: ['GET'])]
-    public function show(int $id): JsonResponse
+    public function show(int $id, Request $request): JsonResponse
     {
         $productData = $this->productService->getProductById($id);
 
-        return $this->json([
-            'data' => $productData
-        ]);
+        $response = $this->json(['data' => $productData]);
+        $etag = md5((string) json_encode($productData));
+        $response->setEtag($etag);
+        $response->setPublic();
+        $response->setMaxAge(300);
+        $response->headers->set('Cache-Control', 'public, max-age=300, must-revalidate');
+
+        if ($response->isNotModified($request)) {
+            return $response;
+        }
+
+        return $response;
     }
 
     /**

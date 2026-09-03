@@ -20,6 +20,7 @@ Exemple d'utilisation :
 
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { apiCall } from '../api/api';
 import { useAuth } from '../contexts/AuthContext';
 import { validateEmail, isRequired } from '../utils/validators';
@@ -82,9 +83,6 @@ const LoginPage = () => {
             }
 
         } catch (err) {
-            console.error('Login error:', err);
-            // apiCall relaie le message du backend, y compris pour le 429
-            // ("Trop de tentatives...") renvoye par le limiteur de debit.
             setError(err.message || "Email ou mot de passe incorrect.");
         } finally {
             setLoading(false);
@@ -92,6 +90,12 @@ const LoginPage = () => {
     };
 
     return (
+        <>
+        <Helmet>
+            <title>Connexion — VOLO</title>
+            <meta name="description" content="Connectez-vous a votre compte VOLO pour retrouver votre panier, vos commandes et votre routine skincare personnalisee." />
+            <meta name="robots" content="noindex, nofollow" />
+        </Helmet>
         <div className={styles.splitScreen}>
             {/* Panneau visuel — masque sur mobile via CSS */}
             <div className={styles.visualPanel}>
@@ -164,6 +168,7 @@ const LoginPage = () => {
                 </div>
             </div>
         </div>
+        </>
     );
 };
 

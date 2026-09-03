@@ -187,18 +187,6 @@ parameters:
 			path: src/Controller/OrderController.php
 
 		-
-			message: '#^Parameter \#1 \$user of method App\\Repository\\OrderRepository\:\:countByUser\(\) expects App\\Entity\\User, Symfony\\Component\\Security\\Core\\User\\UserInterface given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Controller/OrderController.php
-
-		-
-			message: '#^Parameter \#1 \$user of method App\\Repository\\OrderRepository\:\:findByUser\(\) expects App\\Entity\\User, Symfony\\Component\\Security\\Core\\User\\UserInterface given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Controller/OrderController.php
-
-		-
 			message: '#^Cannot access offset ''method'' on mixed\.$#'
 			identifier: offsetAccess.nonOffsetAccessible
 			count: 1
@@ -323,6 +311,12 @@ parameters:
 			identifier: argument.type
 			count: 2
 			path: src/Controller/WebhookController.php
+
+		-
+			message: '#^Property App\\Entity\\AuditLog\:\:\$id \(int\|null\) is never assigned int so it can be removed from the property type\.$#'
+			identifier: property.unusedType
+			count: 1
+			path: src/Entity/AuditLog.php
 
 		-
 			message: '#^Method App\\Entity\\Brand\:\:getProducts\(\) return type with generic interface Doctrine\\Common\\Collections\\Collection does not specify its types\: TKey, T$#'
@@ -547,12 +541,6 @@ parameters:
 			path: src/Service/OrderService.php
 
 		-
-			message: '#^Parameter \#1 \$params of method Stripe\\Service\\PaymentIntentService\:\:create\(\) expects array\{amount\: int, amount_details\?\: array\{discount_amount\?\: int\|null, enforce_arithmetic_validation\?\: bool, line_items\?\: array\<array\{discount_amount\?\: int, payment_method_options\?\: array\{card\?\: array\{commodity_code\?\: string\}, card_present\?\: array\{commodity_code\?\: string\}, klarna\?\: array\{image_url\?\: string, product_url\?\: string, reference\?\: string, subscription_reference\?\: string\}, paypal\?\: array\{category\?\: string, description\?\: string, sold_by\?\: string\}\}, product_code\?\: string, product_name\: string, quantity\: int, tax\?\: array\{total_tax_amount\: int\}, unit_cost\: int, unit_of_measure\?\: string\}\>\|null, shipping\?\: array\{amount\?\: int\|null, from_postal_code\?\: string\|null, to_postal_code\?\: string\|null\}\|null, tax\?\: array\{total_tax_amount\: int\}\|null\}, application_fee_amount\?\: int, automatic_payment_methods\?\: array\{allow_redirects\?\: string, enabled\: bool\}, capture_method\?\: string, confirm\?\: bool, confirmation_method\?\: string, confirmation_token\?\: string, \.\.\.\}\|null, array\{amount\: int, currency\: ''eur'', metadata\: array\{order_id\: int\|null, order_reference\: non\-falsy\-string\}\} given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Service/PaymentGateway/StripePaymentGateway.php
-
-		-
 			message: '#^Parameter \$amount of class App\\Service\\PaymentGateway\\PaymentIntentResult constructor expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 1
@@ -573,7 +561,7 @@ parameters:
 		-
 			message: '#^Cannot cast mixed to int\.$#'
 			identifier: cast.int
-			count: 1
+			count: 2
 			path: src/Service/ProductService.php
 
 		-

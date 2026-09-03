@@ -8,30 +8,64 @@
 
 .card {
     background-color: #fff;
-    border-radius: 20px;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.06);
+    border-radius: 24px;
+    box-shadow: 0 24px 64px rgba(95, 76, 66, 0.08), 0 0 0 1px rgba(233, 215, 195, 0.4);
     width: 100%;
     max-width: 560px;
-    padding: 50px 40px;
+    padding: 56px 44px;
     text-align: center;
-    border: 1px solid #E9D7C3;
+    animation: confirmCardIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes confirmCardIn {
+    from {
+        transform: scale(0.92) translateY(30px);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+    }
 }
 
 .iconWrapper {
-    width: 72px;
-    height: 72px;
+    width: 80px;
+    height: 80px;
     border-radius: 50%;
-    background-color: #e8f5e9;
+    background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 0 auto 24px;
+    margin: 0 auto 28px;
+    animation: confirmIconPop 0.5s 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    box-shadow: 0 8px 24px rgba(76, 175, 80, 0.2);
+}
+
+@keyframes confirmIconPop {
+    from {
+        transform: scale(0);
+        opacity: 0;
+    }
+    60% {
+        transform: scale(1.15);
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
 
 .checkIcon {
-    width: 36px;
-    height: 36px;
-    color: #4caf50;
+    width: 38px;
+    height: 38px;
+    color: #2e7d32;
+    stroke-dasharray: 30;
+    stroke-dashoffset: 30;
+    animation: confirmCheckDraw 0.5s 0.6s ease forwards;
+}
+
+@keyframes confirmCheckDraw {
+    to { stroke-dashoffset: 0; }
 }
 
 .title {
@@ -39,27 +73,41 @@
     color: #5F4C42;
     font-size: 2em;
     margin: 0 0 10px;
+    animation: confirmFadeUp 0.5s 0.2s ease both;
 }
 
 .subtitle {
     color: #7a6a60;
     font-size: 1.05em;
-    margin: 0 0 32px;
-    line-height: 1.5;
+    margin: 0 0 36px;
+    line-height: 1.6;
+    animation: confirmFadeUp 0.5s 0.3s ease both;
+}
+
+@keyframes confirmFadeUp {
+    from {
+        transform: translateY(12px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
 
 .details {
-    background-color: #F8F0E8;
-    border-radius: 12px;
-    padding: 24px;
-    margin-bottom: 24px;
+    background: linear-gradient(135deg, #F8F0E8, #f5ece2);
+    border-radius: 16px;
+    padding: 24px 28px;
+    margin-bottom: 28px;
+    animation: confirmFadeUp 0.5s 0.4s ease both;
 }
 
 .detailRow {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 0;
+    padding: 12px 0;
 }
 
 .detailRow + .detailRow {
@@ -67,69 +115,108 @@
 }
 
 .detailLabel {
-    color: #7a6a60;
-    font-size: 0.9em;
+    color: #9a8a80;
+    font-size: 0.85em;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 1px;
+    font-weight: 500;
 }
 
 .detailValue {
     color: #5F4C42;
     font-weight: 600;
-    font-size: 1.05em;
+    font-size: 1em;
+    font-family: 'Lato', sans-serif;
+    word-break: break-all;
 }
 
 .statusBadge {
-    background-color: #e8f5e9;
+    background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
     color: #2e7d32;
-    padding: 4px 14px;
-    border-radius: 20px;
+    padding: 6px 16px;
+    border-radius: 24px;
     font-size: 0.85em;
     font-weight: 600;
+    letter-spacing: 0.3px;
 }
 
 .info {
-    color: #999;
+    color: #9a8a80;
     font-size: 0.88em;
-    margin-bottom: 32px;
+    margin-bottom: 36px;
+    animation: confirmFadeUp 0.5s 0.5s ease both;
 }
 
 .actions {
     display: flex;
     flex-direction: column;
     gap: 12px;
+    animation: confirmFadeUp 0.5s 0.6s ease both;
 }
 
 .primaryButton {
-    background-color: #5F4C42;
+    background: linear-gradient(135deg, #5F4C42, #7a6a60);
     color: #fff;
     border: none;
-    padding: 15px;
-    border-radius: 25px;
+    padding: 16px;
+    border-radius: 14px;
     font-size: 1.05em;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
+    box-shadow: 0 4px 16px rgba(95, 76, 66, 0.25);
+    font-family: 'Lato', sans-serif;
 }
 
 .primaryButton:hover {
-    background-color: #463325;
+    filter: brightness(1.1);
     transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(95, 76, 66, 0.35);
+}
+
+.primaryButton:active {
+    transform: translateY(0);
 }
 
 .secondaryButton {
     background-color: transparent;
     color: #5F4C42;
     border: 2px solid #E9D7C3;
-    padding: 13px;
-    border-radius: 25px;
+    padding: 14px;
+    border-radius: 14px;
     font-size: 1.05em;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
+    font-family: 'Lato', sans-serif;
 }
 
 .secondaryButton:hover {
     border-color: #5F4C42;
     background-color: #F8F0E8;
+    transform: translateY(-2px);
+}
+
+.secondaryButton:active {
+    transform: translateY(0);
+}
+
+@media (max-width: 480px) {
+    .card {
+        padding: 40px 24px;
+    }
+
+    .title {
+        font-size: 1.6em;
+    }
+
+    .details {
+        padding: 20px;
+    }
+
+    .detailRow {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
 }

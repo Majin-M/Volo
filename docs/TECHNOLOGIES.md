@@ -39,7 +39,7 @@ Serveur de développement quasi instantané et rechargement à chaud. Surtout : 
 
 ### Context API — et pas Redux
 
-`AuthContext` et `CartContext` suffisent. Redux résout un problème que VOLO n'a pas : un état global complexe, partagé par des dizaines de composants, avec des mises à jour concurrentes. Deux contextes et un `useReducer` sur le formulaire de contact couvrent tout.
+`AuthContext` et `CartContext` suffisent. Redux résout un problème que VOLO n'a pas : un état global complexe, partagé par des dizaines de composants, avec des mises à jour concurrentes. Deux contextes et `useReducer` là où l'état est complexe (AccountPage, formulaire de contact) couvrent tout.
 
 Ajouter Redux ici serait ajouter du vocabulaire (actions, reducers, middlewares, store) sans résoudre de difficulté existante.
 
@@ -71,13 +71,13 @@ Traduit les objets PHP en SQL. Le vrai bénéfice n'est pas le confort : **Doctr
 
 **Le piège** : Doctrine mappe `decimal` sur une **`string` PHP**, jamais un `float`. D'où `private ?string $price = null;`, qui surprend mais est délibéré ([MODELE_DONNEES.md](MODELE_DONNEES.md) §5).
 
-### MySQL 8 — en réalité **MariaDB 10.4** en développement
+**Patterns Doctrine exploités** : `SoftDeleteFilter` (SQL Filter qui exclut transparemment les enregistrements `deletedAt IS NOT NULL`), `AuditSubscriber` (listener `postPersist` / `preUpdate` traçant les changements sensibles dans `audit_log`).
 
-> ⚠️ **Trois moteurs pour un seul projet.** Ce document dit « MySQL 8 ». `backend/compose.yaml` épingle `mysql:8.0`. Et XAMPP — sur lequel le développement se fait réellement — livre **MariaDB 10.4.32**. XAMPP a cessé de livrer MySQL il y a des années ; l'argument « MySQL a été retenu parce qu'il est fourni par XAMPP » repose donc sur une prémisse fausse.
+### MySQL 8 — ✅ unifié
+
+> ✅ **Résolu le 01/09/2026.** `DATABASE_URL` dans `.env` cible désormais MySQL 8.0 explicitement (`?serverVersion=8.0&charset=utf8mb4`). Les deux `compose.yaml` (racine et backend) utilisent `mysql:8.0`. Doctrine génère les migrations pour MySQL 8 partout, éliminant les incompatibilités MariaDB (ex : `RENAME INDEX`).
 >
-> **Ce n'est pas un détail de version, ce sont des SGBD différents.** Constaté en corrigeant une migration : `RENAME INDEX` existe depuis MySQL 5.7 et seulement depuis **MariaDB 10.5.2** — sur 10.4 il échoue en erreur de syntaxe 1064. Une migration écrite et testée mentalement « pour MySQL 8 » casse sur le poste de dev.
->
-> À trancher : soit le dev bascule sur le `volo-db` de `compose.yaml` (MySQL 8, comme la cible), soit la doc et la production assument MariaDB. Développer sur un moteur et déployer sur un autre est la situation actuelle, et personne ne l'a décidée.
+> **Historique** : trois moteurs coexistaient (MariaDB 10.4 sous XAMPP, MySQL 8.0 dans Compose, MySQL 8 en cible prod). Constaté en corrigeant une migration : `RENAME INDEX` existe depuis MySQL 5.7 mais seulement depuis MariaDB 10.5.2 — sur 10.4 il échouait en erreur de syntaxe 1064.
 
 **Pourquoi pas PostgreSQL** : PostgreSQL aurait offert des types plus riches (ENUM natifs, contraintes `CHECK` plus expressives, JSONB). MySQL/MariaDB a été retenu pour sa disponibilité sur la quasi-totalité des hébergements mutualisés français — le projet doit pouvoir être déployé sans VPS.
 
@@ -139,7 +139,7 @@ Paiement par carte. VOLO ne voit **jamais** le numéro de carte : Stripe Element
 
 **Le SDK Stripe n'est appelé que depuis une seule classe** (`StripePaymentGateway`), derrière `PaymentGatewayInterface` — voir [DIAGRAMME_CLASSES.md](DIAGRAMME_CLASSES.md) §3.
 
-> ⚠️ **Le webhook n'existe pas.** L'intégration est à moitié faite : VOLO sait demander un paiement, pas apprendre qu'il a réussi ([DIAGRAMME_ETATS.md](DIAGRAMME_ETATS.md) §2).
+> ✅ **Le webhook est implémenté.** `WebhookController` écoute `POST /api/webhooks/stripe`, vérifie la signature HMAC via `Stripe\Webhook::constructEvent()`, et traite `payment_intent.succeeded` (Payment → CAPTURED, Order → PAID) et `payment_intent.payment_failed` (Payment → FAILED). Les métadonnées Stripe incluent l'`order_id` (cast en string) et la `reference` UUID de la commande. L'intégration est fonctionnelle de bout en bout — testée avec `stripe listen --forward-to` en développement local et des clés API en mode test. Le parcours d'achat est complet.
 
 ---
 
@@ -159,8 +159,10 @@ Pose sur chaque réponse :
 | `X-Content-Type-Options: nosniff` | Empêche le navigateur de « deviner » qu'un fichier uploadé est du JS |
 | `X-Frame-Options: DENY` | Clickjacking |
 | `Referrer-Policy` | Fuite d'URL vers les sites tiers |
+| `Permissions-Policy: camera=(), microphone=(), geolocation=()` | Désactive les API capteur inutiles |
+| `Strict-Transport-Security` | Force HTTPS (HSTS) |
 
-Quatre en-têtes, une classe. Le meilleur rapport effort/protection du projet.
+Six en-têtes, une classe. Le meilleur rapport effort/protection du projet.
 
 ### `PasswordValidator`
 
@@ -197,14 +199,14 @@ Dépôt monorepo à la racine (`backend/` + `frontend/`). Le dépôt initial ne 
 | Outil | État | Ce que ça coûte |
 |---|---|---|
 | PHPUnit | ✅ **Présent** — 26 tests / 88 assertions, 4 fichiers | Couverture partielle, ciblée sécurité et paiement : [STRATEGIE_TESTS.md](STRATEGIE_TESTS.md) §1 |
-| Vitest | Absent | Aucun test front |
-| PHPStan | ✅ **Présent** — `level: max` + baseline | Voir ci-dessous |
+| Vitest | ✅ **Présent** — 3 fichiers de tests (LoginPage, CartContext, validators) | Couverture partielle, ciblée auth, panier et validation |
+| PHPStan | ✅ **Présent** — `level: max` + baseline (~128 entrées, régénéré 02/09/2026) | Voir ci-dessous |
 | CI/CD | Absent | Rien ne vérifie qu'une branche compile avant fusion |
 | OpenAPI | Absent | `api_specification.md` peut mentir sans que rien ne le signale — et [le fait massivement](api_specification.md) |
 
 > ⚠️ **Ce tableau annonçait « Aucun test » et « PHPStan absent ». Les deux sont faux**, et l'étaient déjà quand ces lignes ont été écrites : `backend/phpunit.dist.xml`, `backend/tests/` et `backend/phpstan.neon` sont dans le dépôt.
 >
-> **PHPStan tourne en `level: max`** — le niveau le plus strict. Mais avec un `phpstan-baseline.neon` de ~550 lignes : les erreurs existantes sont gelées, seules les nouvelles remontent. C'est un usage légitime sur du code existant, à condition de le savoir. Aujourd'hui **11 erreurs échappent au baseline** et ne sont vues par personne, faute de CI qui exécute la commande.
+> **PHPStan tourne en `level: max`** — le niveau le plus strict. Le `phpstan-baseline.neon` a été régénéré le 02/09/2026 (~128 entrées) après les modifications de `StripePaymentGateway` (cast explicite `(string)` sur `order_id`, type `metadata` corrigé). **0 erreur hors baseline** à cette date.
 >
 > Deux pièges appris à l'usage : PHPStan a besoin du conteneur `dev` compilé (`cache:warmup` avant, sinon il refuse de démarrer), et de `--memory-limit=1G` (128M ne suffisent pas, il s'arrête en cours d'analyse).
 

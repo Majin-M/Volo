@@ -118,6 +118,13 @@ class Order
     #[ORM\OneToOne(targetEntity: Payment::class, mappedBy: 'orderEntity')]
     private ?Payment $payment = null;
 
+    #[ORM\Column(type: 'string', length: 36, unique: true)]
+    #[Groups('order:read')]
+    private string $reference;
+
+    #[ORM\Column(type: 'datetime', nullable: true)]
+    private ?\DateTimeInterface $deletedAt = null;
+
     #[ORM\Column(type: 'datetime')]
     #[Groups('order:read')]
     private \DateTimeInterface $createdAt;
@@ -129,8 +136,17 @@ class Order
     public function __construct()
     {
         $this->items = new ArrayCollection();
+        $this->reference = self::generateUuid();
         $this->createdAt = new \DateTime();
         $this->updatedAt = new \DateTime();
+    }
+
+    private static function generateUuid(): string
+    {
+        $data = random_bytes(16);
+        $data[6] = chr(ord($data[6]) & 0x0f | 0x40);
+        $data[8] = chr(ord($data[8]) & 0x3f | 0x80);
+        return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
     }
 
     // --- Getters & Setters ---
@@ -243,6 +259,21 @@ class Order
             }
         }
         return $this;
+    }
+
+    public function getReference(): string { return $this->reference; }
+
+    public function getDeletedAt(): ?\DateTimeInterface { return $this->deletedAt; }
+
+    public function softDelete(): self
+    {
+        $this->deletedAt = new \DateTime();
+        return $this;
+    }
+
+    public function isDeleted(): bool
+    {
+        return $this->deletedAt !== null;
     }
 
     public function getCreatedAt(): \DateTimeInterface { return $this->createdAt; }

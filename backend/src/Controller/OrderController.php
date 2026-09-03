@@ -24,6 +24,7 @@ Dépendances :
 
 namespace App\Controller;
 
+use App\Entity\User;
 use App\Repository\OrderRepository;
 use App\Security\OrderVoter;
 use App\Service\OrderService;
@@ -54,11 +55,8 @@ class OrderController extends AbstractController
     #[Route('/api/orders', name: 'api_orders_list', methods: ['GET'])]
     public function index(Request $request): JsonResponse
     {
+        /** @var User $user */
         $user = $this->getUser();
-
-        if (!$user) {
-            return $this->json(['error' => 'Utilisateur non authentifié.'], 401);
-        }
 
         $page = max(1, $request->query->getInt('page', 1));
         $limit = min($request->query->getInt('limit', 20), 100);
@@ -85,11 +83,8 @@ class OrderController extends AbstractController
     #[Route('/api/orders', name: 'api_orders_create', methods: ['POST'])]
     public function create(Request $request): JsonResponse
     {
+        /** @var User $user */
         $user = $this->getUser();
-
-        if (!$user) {
-            return $this->json(['error' => 'Utilisateur non authentifié.'], 401);
-        }
 
         $this->denyAccessUnlessGranted(OrderVoter::CREATE);
 

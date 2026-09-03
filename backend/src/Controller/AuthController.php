@@ -49,6 +49,7 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\PasswordValidator;
+use App\Service\WelcomeEmailService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -89,6 +90,7 @@ class AuthController extends AbstractController
         #[Autowire(service: 'limiter.profile_update_attempts')] private RateLimiterFactory $profileUpdateLimiter,
         private LoggerInterface $logger,
         #[Autowire(param: 'kernel.environment')] private string $environment,
+        private WelcomeEmailService $welcomeEmailService,
     ) {
     }
 
@@ -181,6 +183,8 @@ class AuthController extends AbstractController
 
         $this->entityManager->persist($user);
         $this->entityManager->flush();
+
+        $this->welcomeEmailService->sendWelcome($user);
 
         $token = $this->jwtManager->create($user);
 

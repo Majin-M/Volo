@@ -55,8 +55,7 @@ const OrderHistoryPage = () => {
             try {
                 const response = await apiCall('/orders');
                 setOrders(response.data || []);
-            } catch (err) {
-                console.error(err);
+            } catch {
                 setError('Impossible de charger vos commandes.');
             } finally {
                 setLoading(false);
@@ -76,8 +75,9 @@ const OrderHistoryPage = () => {
     return (
         <>
             <Helmet>
-                <meta name="robots" content="noindex, nofollow" />
                 <title>Mes commandes — VOLO</title>
+                <meta name="description" content="Retrouvez l'historique de vos commandes VOLO : statut, details et suivi." />
+                <meta name="robots" content="noindex, nofollow" />
             </Helmet>
 
             <div className={styles.container}>
@@ -110,7 +110,7 @@ const OrderHistoryPage = () => {
                             <div key={order.id} className={styles.orderCard}>
                                 <div className={styles.orderHeader}>
                                     <div>
-                                        <span className={styles.orderRef}>CMD-{order.id}</span>
+                                        <span className={styles.orderRef}>{order.reference}</span>
                                         <span className={styles.orderDate}>
                                             {new Date(order.createdAt).toLocaleDateString('fr-FR', {
                                                 day: 'numeric',

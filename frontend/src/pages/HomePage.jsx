@@ -22,14 +22,14 @@ import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import styles from './HomePage.module.css';
 
-// Problematiques de peau (icone + slug pour filtrer le catalogue)
+// Problematiques de peau (image + slug pour filtrer le catalogue)
 const concerns = [
-    { title: "Vieillissement", slug: "vieillissement", icon: "🕰️" },
-    { title: "Acné & Imperfections", slug: "acne", icon: "✨" },
-    { title: "Hyperpigmentation", slug: "hyperpigmentation", icon: "🌗" },
-    { title: "Sécheresse", slug: "secheresse", icon: "💧" },
-    { title: "Sensibilité", slug: "sensibilite", icon: "🌸" },
-    { title: "Teint terne & Éclat", slug: "eclat", icon: "☀️" },
+    { title: "Vieillissement", slug: "vieillissement", image: "/images/concerns/vieillissement.jpg" },
+    { title: "Acné & Imperfections", slug: "acne", image: "/images/concerns/acne.jpg" },
+    { title: "Hyperpigmentation", slug: "hyperpigmentation", image: "/images/concerns/hyperpigmentation.jpg" },
+    { title: "Sécheresse", slug: "secheresse", image: "/images/concerns/secheresse.jpg" },
+    { title: "Sensibilité", slug: "sensibilite", image: "/images/concerns/eclat.jpg" },
+    { title: "Teint terne & Éclat", slug: "eclat", image: "/images/concerns/eclat.jpg" },
 ];
 
 // Routines organisees PAR PROBLEMATIQUE (et non par niveau debutant/expert)
@@ -92,7 +92,10 @@ const resetButtonStyle = {
 
 // Duplique pour boucle infinie fluide (technique marquee classique).
 // Statique : ne depend d'aucune prop/etat, donc calcule une seule fois.
-const loopedRoutines = [...routines, ...routines];
+const loopedRoutines = [
+    ...routines.map((r) => ({ ...r, uid: `${r.slug}-a` })),
+    ...routines.map((r) => ({ ...r, uid: `${r.slug}-b` })),
+];
 
 export const HomePage = () => {
     const navigate = useNavigate();
@@ -113,6 +116,10 @@ export const HomePage = () => {
                     name="description"
                     content="Decouvrez des routines et produits skincare adaptes a votre peau : acne, secheresse, hyperpigmentation, sensibilite. Livraison offerte."
                 />
+                <meta property="og:title" content="VOLO — Skincare inclusive" />
+                <meta property="og:description" content="Routines et produits skincare adaptes a votre peau. Livraison offerte." />
+                <meta property="og:type" content="website" />
+                <meta property="og:image" content="/images/hero.jpg" />
             </Helmet>
 
             {/* 1. HERO SECTION - Banniere full-width */}
@@ -146,7 +153,12 @@ export const HomePage = () => {
                             onClick={() => handleConcernClick(concern.slug)}
                         >
                             <div className={styles.concernImageWrapper}>
-                                <span className={styles.concernIcon}>{concern.icon}</span>
+                                <img
+                                    src={concern.image}
+                                    alt={concern.title}
+                                    className={styles.concernImage}
+                                    loading="lazy"
+                                />
                             </div>
                             <span className={styles.concernLabel}>{concern.title}</span>
                         </button>
@@ -162,10 +174,10 @@ export const HomePage = () => {
                 </p>
                 <div className={styles.marqueeWrapper}>
                     <div className={styles.marqueeTrack}>
-                        {loopedRoutines.map((routine, i) => (
+                        {loopedRoutines.map((routine) => (
                             <button
                                 type="button"
-                                key={`${routine.slug}-${i}`}
+                                key={routine.uid}
                                 className={styles.routineCard}
                                 style={resetButtonStyle}
                                 onClick={() => handleRoutineClick(routine.slug)}

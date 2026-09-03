@@ -13,11 +13,11 @@ Responsabilites :
     - Deballe la reponse API pour retourner uniquement les donnees utiles.
 
 Exemple d'utilisation :
-    const response = await fetchProducts({ brand: 1, page: 1 });
-    console.log(response.data); // Liste des produits
+    const products = await fetchProducts({ brand: 1, page: 1 });
+    // products.data -> Liste des produits
 
-    const response = await fetchProductById(42);
-    console.log(response.data); // Detail du produit
+    const product = await fetchProductById(42);
+    // product.data -> Detail du produit
 ===============================================================================
 */
 

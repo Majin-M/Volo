@@ -113,6 +113,12 @@ Feuille de style : ProductDetailPage
     margin-bottom: 20px;
 }
 
+.lowStock {
+    color: #c0392b;
+    font-weight: 500;
+    margin: 8px 0;
+}
+
 /* --- Actions --- */
 .actions {
     display: flex;

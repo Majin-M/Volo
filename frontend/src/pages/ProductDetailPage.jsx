@@ -45,31 +45,29 @@ const ProductDetailPage = () => {
     const [added, setAdded] = useState(false);
 
     useEffect(() => {
-        let cancelled = false;
+        const controller = new AbortController();
+        setLoading(true);
+        setError(null);
+        setAdded(false);
 
-        const loadProduct = async () => {
-            setLoading(true);
-            setError(null);
-            setAdded(false);
-
-            try {
-                const response = await fetchProductById(id);
-                if (!cancelled) {
+        fetchProductById(id)
+            .then((response) => {
+                if (!controller.signal.aborted) {
                     setProduct(response.data);
                 }
-            } catch (err) {
-                if (!cancelled) {
+            })
+            .catch((err) => {
+                if (!controller.signal.aborted) {
                     setError(err.message);
                 }
-            } finally {
-                if (!cancelled) {
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) {
                     setLoading(false);
                 }
-            }
-        };
+            });
 
-        loadProduct();
-        return () => { cancelled = true; };
+        return () => controller.abort();
     }, [id]);
 
     /**
@@ -128,6 +126,12 @@ const ProductDetailPage = () => {
             <Helmet>
                 <title>{product.name} — VOLO</title>
                 <meta name="description" content={shortDescription} />
+                <meta property="og:title" content={`${product.name} — VOLO`} />
+                <meta property="og:description" content={shortDescription} />
+                <meta property="og:type" content="product" />
+                {product.imageUrl && (
+                    <meta property="og:image" content={`/images/products/${product.imageUrl}`} />
+                )}
             </Helmet>
 
             {/* Fil d'Ariane */}
@@ -175,9 +179,15 @@ const ProductDetailPage = () => {
                         <p className={styles.description}>{product.description}</p>
                     )}
 
-                    {!product.isAvailable && (
+                    {!product.isAvailable ? (
                         <p className={styles.unavailable}>Actuellement indisponible</p>
-                    )}
+                    ) : product.stock === 0 ? (
+                        <p className={styles.unavailable}>Rupture de stock</p>
+                    ) : product.stock <= 5 ? (
+                        <p className={styles.lowStock}>
+                            Plus que {product.stock} en stock
+                        </p>
+                    ) : null}
 
                     <div className={styles.actions}>
                         <div className={styles.quantityControl}>
@@ -192,7 +202,7 @@ const ProductDetailPage = () => {
                             <span className={styles.qtyValue}>{quantity}</span>
                             <button
                                 type="button"
-                                onClick={() => setQuantity((q) => q + 1)}
+                                onClick={() => setQuantity((q) => Math.min(q + 1, product.stock || 99))}
                                 aria-label="Augmenter la quantite"
                                 className={styles.qtyButton}
                             >
@@ -203,7 +213,7 @@ const ProductDetailPage = () => {
                         <button
                             type="button"
                             onClick={handleAddToCart}
-                            disabled={!product.isAvailable}
+                            disabled={!product.isAvailable || product.stock === 0}
                             className={styles.addButton}
                         >
                             {added ? 'Ajoute ✓' : 'Ajouter au panier'}

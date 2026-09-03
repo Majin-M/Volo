@@ -194,6 +194,14 @@ class ProductService
             $product->setIsAvailable((bool) $data['isAvailable']);
         }
 
+        if (array_key_exists('stock', $data)) {
+            $stock = (int) $data['stock'];
+            if ($stock < 0) {
+                throw new \InvalidArgumentException('Le stock ne peut pas etre negatif.');
+            }
+            $product->setStock($stock);
+        }
+
         if (isset($data['brandId'])) {
             $brandId = (int) $data['brandId'];
             $brand = $this->brandRepository->find($brandId);

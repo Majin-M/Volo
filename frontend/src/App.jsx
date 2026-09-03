@@ -20,13 +20,14 @@ Exemple d'utilisation :
 ===============================================================================
 */
 
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 
 // Composants Layouts
 import NavBar from './components/NavBar';
 import Footer from './components/Footer';
+import PrivateRoute from './components/PrivateRoute';
 
 // Pages
 import HomePage from './pages/HomePage';
@@ -71,11 +72,9 @@ function App() {
  * Objectif : Gerer la mise en page des elements communs (Nav/Footer).
  */
 function AppWrapper() {
-    const location = useLocation();
-
     return (
         <div style={appStyle}>
-            <NavBar location={location} />
+            <NavBar />
             <main style={{ flex: 1 }}>
                 <Routes>
                     <Route path="/" element={<HomePage />} />
@@ -84,10 +83,10 @@ function AppWrapper() {
                     <Route path="/panier" element={<CartPage />} />
                     <Route path="/connexion" element={<LoginPage />} />
                     <Route path="/inscription" element={<RegisterPage />} />
-                    <Route path="/commande" element={<CheckoutPage />} />
-                    <Route path="/confirmation" element={<OrderConfirmationPage />} />
-                    <Route path="/mes-commandes" element={<OrderHistoryPage />} />
-                    <Route path="/mon-compte" element={<AccountPage />} />
+                    <Route path="/commande" element={<PrivateRoute><CheckoutPage /></PrivateRoute>} />
+                    <Route path="/confirmation" element={<PrivateRoute><OrderConfirmationPage /></PrivateRoute>} />
+                    <Route path="/mes-commandes" element={<PrivateRoute><OrderHistoryPage /></PrivateRoute>} />
+                    <Route path="/mon-compte" element={<PrivateRoute><AccountPage /></PrivateRoute>} />
                     <Route path="/contact" element={<ContactPage />} />
                     <Route path="/mentions-legales" element={<MentionsLegalesPage />} />
                     <Route path="/politique-confidentialite" element={<PolitiqueConfidentialitePage />} />

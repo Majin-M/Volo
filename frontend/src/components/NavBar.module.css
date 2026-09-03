@@ -1,0 +1,194 @@
+.nav {
+    background-color: #fff;
+    padding: 15px 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #E9D7C3;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.logoImage {
+    height: 65px;
+    display: block;
+}
+
+.links {
+    display: flex;
+    align-items: center;
+}
+
+.link {
+    color: #5F4C42;
+    text-decoration: none;
+    margin: 0 15px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.link:hover {
+    color: #9CB997;
+}
+
+.cartLink {
+    display: flex;
+    align-items: center;
+    position: relative;
+    margin-right: 20px;
+    color: #5F4C42;
+}
+
+.cartLink:hover {
+    color: #9CB997;
+}
+
+.badge {
+    position: absolute;
+    top: -8px;
+    right: -10px;
+    background-color: #5F4C42;
+    color: #fff;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75em;
+    font-weight: bold;
+    border: 2px solid #fff;
+}
+
+.authSection {
+    display: flex;
+    align-items: center;
+    margin-left: 15px;
+}
+
+.userName {
+    font-size: 0.9em;
+}
+
+.logoutButton {
+    background: none;
+    border: 1px solid #5F4C42;
+    color: #5F4C42;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.logoutButton:hover {
+    background-color: #5F4C42;
+    color: #fff;
+}
+
+/* Hamburger — hidden on desktop */
+.hamburger {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    z-index: 1001;
+}
+
+.hamburgerLine {
+    display: block;
+    width: 24px;
+    height: 2px;
+    background-color: #5F4C42;
+    border-radius: 2px;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.hamburgerLineTop {
+    transform: translateY(7px) rotate(45deg);
+}
+
+.hamburgerLineMid {
+    opacity: 0;
+}
+
+.hamburgerLineBot {
+    transform: translateY(-7px) rotate(-45deg);
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+    .nav {
+        padding: 10px 20px;
+    }
+
+    .logoImage {
+        height: 50px;
+    }
+
+    .hamburger {
+        display: flex;
+    }
+
+    .links {
+        position: fixed;
+        top: 0;
+        right: -100%;
+        width: 75%;
+        max-width: 320px;
+        height: 100vh;
+        background-color: #fff;
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 80px 30px 30px;
+        gap: 20px;
+        box-shadow: -4px 0 12px rgba(0, 0, 0, 0.1);
+        transition: right 0.3s ease;
+        z-index: 999;
+    }
+
+    .linksOpen {
+        right: 0;
+    }
+
+    .link {
+        margin: 0;
+        font-size: 1.1em;
+        padding: 8px 0;
+        width: 100%;
+        border-bottom: 1px solid #E9D7C3;
+    }
+
+    .cartLink {
+        margin-right: 0;
+        padding: 8px 0;
+        width: 100%;
+        border-bottom: 1px solid #E9D7C3;
+    }
+
+    .authSection {
+        flex-direction: column;
+        align-items: flex-start;
+        margin-left: 0;
+        gap: 12px;
+        width: 100%;
+    }
+
+    .userName {
+        font-size: 1.1em;
+        padding: 8px 0;
+        border-bottom: 1px solid #E9D7C3;
+        width: 100%;
+    }
+
+    .logoutButton {
+        width: 100%;
+        text-align: center;
+        padding: 10px;
+    }
+}

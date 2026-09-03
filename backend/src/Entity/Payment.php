@@ -91,6 +91,9 @@ class Payment
     #[ORM\JoinColumn(name: 'order_id', nullable: false, onDelete: 'CASCADE')]
     private ?Order $orderEntity = null;
 
+    #[ORM\Column(type: 'datetime', nullable: true)]
+    private ?\DateTimeInterface $deletedAt = null;
+
     #[ORM\Column(type: 'datetime')]
     private \DateTimeInterface $createdAt;
 
@@ -138,6 +141,19 @@ class Payment
         }
 
         return $this;
+    }
+
+    public function getDeletedAt(): ?\DateTimeInterface { return $this->deletedAt; }
+
+    public function softDelete(): self
+    {
+        $this->deletedAt = new \DateTime();
+        return $this;
+    }
+
+    public function isDeleted(): bool
+    {
+        return $this->deletedAt !== null;
     }
 
     public function getCreatedAt(): \DateTimeInterface { return $this->createdAt; }

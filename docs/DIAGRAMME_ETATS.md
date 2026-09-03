@@ -130,28 +130,19 @@ La correction est arrivée **avant** l'écriture du webhook, ce qui était l'enj
 
 ---
 
-## 4. ⚠️ Aucune transition n'est contrainte
+## 4. ✅ Les transitions sont désormais contraintes
 
-Les diagrammes ci-dessus décrivent des transitions *autorisées*. Le code n'en connaît aucune :
+Les diagrammes ci-dessus décrivent des transitions *autorisées*. Le setter `setStatus()` les acceptait toutes sans vérification — la seule protection était la liste déroulante d'EasyAdmin, une protection d'interface, pas de domaine.
 
-```php
-public function setStatus(OrderStatus $status): static
-{
-    $this->status = $status;
-    return $this;
-}
-```
+**Résolution appliquée le 01/09/2026** — deux mécanismes complémentaires :
 
-Ce setter accepte `delivered → pending`, `cancelled → shipped`, n'importe quoi. La seule protection actuelle est que `OrderCrudController` (EasyAdmin) présente une liste déroulante — c'est-à-dire **une protection d'interface, pas de domaine**. Un appel direct à `PATCH /api/orders/{id}` contourne l'interface.
+1. **Composant Workflow Symfony** (`config/packages/workflow.yaml`) : déclare les state machines `order` (5 places, 6 transitions) et `payment` (4 places, 3 transitions). `WebhookController` utilise `$workflow->can()` / `$workflow->apply()` pour les transitions automatiques.
 
-Deux façons de fermer le trou :
+2. **`StatusTransitionSubscriber`** (`src/EventSubscriber/StatusTransitionSubscriber.php`) : écouteur Doctrine `preUpdate` qui intercepte **tout** changement de statut (API, EasyAdmin, commande console) et vérifie que la paire (ancien → nouveau) correspond à une transition déclarée dans le workflow. Si non, lève une `LogicException` avant la persistance.
 
-1. **Une méthode de domaine par transition** (`$order->marquerExpediee()`), qui lève une exception si l'état courant ne le permet pas. Verbeux mais explicite, et chaque transition devient testable individuellement.
-2. **Une table de transitions** consultée par un unique `transitionner(OrderStatus $vers)`. Plus compact, et le tableau devient directement le test paramétré décrit dans [STRATEGIE_TESTS.md](STRATEGIE_TESTS.md) §4.
+Ce double filet garantit que les diagrammes ci-dessus ne sont plus prospectifs mais **appliqués** : `delivered → pending` ou `cancelled → shipped` sont désormais impossibles quel que soit le point d'entrée.
 
-Symfony fournit aussi le composant **Workflow**, conçu exactement pour ça (déclaration YAML des places et transitions, `$workflow->can()` / `$workflow->apply()`). Il n'est pas installé sur le projet. C'est probablement la meilleure option ici : la déclaration YAML devient la traduction directe et vérifiable des diagrammes de ce document, plutôt qu'une seconde source de vérité à maintenir à la main.
-
-**Statut : non résolu**, à ajouter à la roadmap.
+**Statut : ✅ résolu.**
 
 ---
 
@@ -184,7 +175,7 @@ L'absence de statut de compte est une **simplification assumée** pour la v1. El
 |---|---|---|
 | Webhook Stripe absent → aucune commande ne passe à `paid` | 🔴 Bloquant fonctionnel | ✅ **Résolu** — `WebhookController` implémenté |
 | Statut de paiement dupliqué `Order` / `Payment` | 🔴 Dette de conception | ✅ **Corrigé, appliqué et testé** |
-| Aucune transition contrainte dans le code | 🟠 Risque d'incohérence | Non résolu — portée limitée (voir ci-dessous) |
+| Aucune transition contrainte dans le code | 🟠 Risque d'incohérence | ✅ **Résolu** — Workflow Symfony + `StatusTransitionSubscriber` (§4) |
 | `REFUNDED` / `CANCELLED` jamais posés | 🟡 Énumérations trompeuses | À trancher |
 | Aucun statut de compte utilisateur | 🟡 Simplification | Assumé pour la v1 |
 
@@ -196,6 +187,4 @@ Trois de ces cinq points ont été trouvés **en dessinant les diagrammes**, pas
 >
 > Ce que §3 affirmait est maintenant vérifiable plutôt que promis : *« le jour où le webhook sera écrit, il devra penser à mettre à jour les deux »* — il n'y en a plus qu'une, et `testEcrireSurPaymentSuffitAChangerCeQueLitOrder` le prouve.
 >
-> **La portée de §4 est plus limitée qu'écrit.** §4 dit qu'« un appel direct à `PATCH /api/orders/{id}` contourne l'interface ». Cette route **n'existe pas** ([api_specification.md](api_specification.md) §7). Il n'y a aujourd'hui aucun endpoint HTTP par lequel forcer un statut arbitraire : la seule voie est EasyAdmin, avec sa liste déroulante. Le défaut reste réel — le setter accepte n'importe quelle transition, et le webhook Stripe en sera le premier appelant non humain — mais il n'est pas exploitable de l'extérieur en l'état.
->
-> C'est le même travers que celui relevé dans [STRATEGIE_TESTS.md](STRATEGIE_TESTS.md) §1 : **raisonner sur une route sans avoir vérifié qu'elle existe.** Le raisonnement était juste, la prémisse fausse. `debug:router` coûte trente secondes.
+> **§4 est désormais résolu (01/09/2026).** Les transitions de statut sont contraintes par le composant Workflow Symfony (`workflow.yaml`) et `StatusTransitionSubscriber` (Doctrine `preUpdate`). `WebhookController` utilise `$workflow->can()` / `$workflow->apply()` pour les transitions automatiques. Toute transition invalide — API, EasyAdmin, console — lève une `LogicException` avant la persistance.

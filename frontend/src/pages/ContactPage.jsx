@@ -111,7 +111,6 @@ const ContactPage = () => {
             await submitContactMessage({ firstName, email, subject, message });
             dispatch({ type: 'SUBMIT_SUCCESS' });
         } catch (err) {
-            console.error('Contact error:', err);
             dispatch({
                 type: 'SUBMIT_ERROR',
                 error: err.message || "Une erreur est survenue lors de l'envoi. Veuillez reessayer.",

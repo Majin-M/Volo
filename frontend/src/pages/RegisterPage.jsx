@@ -21,6 +21,7 @@ Exemple d'utilisation :
 
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { apiCall } from '../api/api';
 import { useAuth } from '../contexts/AuthContext';
 import { validateEmail, validatePassword, isRequired } from '../utils/validators';
@@ -98,6 +99,12 @@ const RegisterPage = () => {
     };
 
     return (
+        <>
+        <Helmet>
+            <title>Inscription — VOLO</title>
+            <meta name="description" content="Creez votre compte VOLO pour decouvrir des routines skincare personnalisees et suivre vos commandes." />
+            <meta name="robots" content="noindex, nofollow" />
+        </Helmet>
         <div className={styles.splitScreen}>
             {/* Panneau visuel — masque sur mobile via CSS */}
             <div className={styles.visualPanel}>
@@ -213,6 +220,7 @@ const RegisterPage = () => {
                 </div>
             </div>
         </div>
+        </>
     );
 };
 

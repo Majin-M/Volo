@@ -213,8 +213,8 @@ Les deux derniers restent manuels : ils portent sur le rendu d'EasyAdmin, qui de
 
 ---
 
-## Ce qui reste ouvert
+## ✅ Webhook Stripe — résolu
 
-Rien dans cette correction ne remplace le **webhook Stripe** (`docs/DIAGRAMME_ETATS.md` §2). Aucune commande ne passe encore automatiquement à `paid` : c'est toujours le manque fonctionnel le plus important du projet.
+> **Mise à jour du 02/09/2026** : le webhook Stripe est implémenté (`WebhookController`). Les commandes passent automatiquement à `paid` après capture du paiement via `payment_intent.succeeded`. Le parcours d'achat est complet de bout en bout.
 
-Cette correction en était le prérequis. Le webhook n'a désormais qu'**une seule** colonne à mettre à jour.
+Cette correction en était le prérequis — le webhook n'a qu'**une seule** colonne à mettre à jour, ce qui était l'objectif de tout ce travail.

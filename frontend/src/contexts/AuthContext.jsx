@@ -84,8 +84,8 @@ export const AuthProvider = ({ children }) => {
     const logout = async () => {
         try {
             await apiCall('/auth/logout', { method: 'POST' });
-        } catch (err) {
-            console.error('Logout error:', err);
+        } catch {
+            // Best-effort — clear local state regardless
         } finally {
             setUser(null);
             localStorage.removeItem(USER_STORAGE_KEY);

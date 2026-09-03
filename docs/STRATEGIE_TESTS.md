@@ -1,6 +1,6 @@
 # Stratégie de tests
 
-> **État au 30/08/2026** : PHPUnit 13, **26 tests, 88 assertions**, verts. Répartis sur quatre fichiers : `AuthControllerTest` (inscription, cookies), `OrderPaymentTest` (dérivation du statut, contrat d'API, cascade), `CsrfProtectionTest` (double-submit), `ContactNotificationTest` (persistance + notification email). Aucun test front (Vitest absent). PHPStan `level: max` à 0 erreur, ESLint à 0 erreur, mais aucune CI ne les exécute automatiquement.
+> **État au 02/09/2026** : PHPUnit 13, **26 tests, 88 assertions**, verts. Répartis sur quatre fichiers : `AuthControllerTest` (inscription, cookies), `OrderPaymentTest` (dérivation du statut, contrat d'API, cascade), `CsrfProtectionTest` (double-submit), `ContactNotificationTest` (persistance + notification email). **Tests front présents** : Vitest + Testing Library, 3 fichiers (`LoginPage.test.jsx`, `CartContext.test.jsx`, `validators.test.js`). PHPStan `level: max` à 0 erreur (baseline ~128 entrées, régénéré 02/09/2026), ESLint à 0 erreur, React Doctor **100/100** (0 issue — bugs, performance, accessibilité), mais aucune CI ne les exécute automatiquement.
 >
 > Ce document existe pour deux raisons : dire quoi écrire quand on s'y mettra, et **nommer précisément ce qui est aujourd'hui non vérifié** — parce que « ça marche quand je clique » n'est pas une vérification.
 >
@@ -132,23 +132,29 @@ Trois parcours prioritaires, correspondant aux diagrammes de séquence existants
 2. **Catalogue → détail produit → panier → connexion → commande.** Le parcours de conversion complet.
 3. **Connexion admin → création d'un produit → visibilité côté client.**
 
-Le parcours 2 s'arrête aujourd'hui à une `alert()` : la page de confirmation n'existe pas (roadmap 3.13 ⬜ 🔴). Le test E2E ne pourra donc pas assurer sa dernière étape avant que cette page soit écrite.
+Le parcours 2 se termine désormais par la page de confirmation (`OrderConfirmationPage.jsx` — ✅ implémentée) avec animations cascade et check SVG animé.
 
-Le paiement Stripe complet n'est pas testable E2E tant que le webhook n'existe pas — [DIAGRAMME_ETATS.md](DIAGRAMME_ETATS.md) §2.
+Le paiement Stripe complet est désormais testable E2E — le webhook est implémenté (`WebhookController`). En développement local, `stripe listen --forward-to` permet de recevoir les événements. Le parcours d'achat est complet de bout en bout.
 
 ---
 
 ## 7. Front-end (Vitest + React Testing Library)
 
-Cohérent avec l'outillage Vite déjà présent. Composants prioritaires, dans cet ordre :
+Cohérent avec l'outillage Vite déjà présent. **Trois fichiers de tests existent** :
+
+| Fichier | Ce qui est testé | Statut |
+|---|---|---|
+| `CartContext.test.jsx` | Panier vide, ajout, incrémentation, calcul total, suppression, mise à jour quantité, clear, persistance/restauration localStorage | ✅ Écrit |
+| `LoginPage.test.jsx` | Rendu formulaire, erreurs champ vide/email invalide, login réussi (API + redirect), erreur API, erreur 429, bouton disabled | ✅ Écrit |
+| `validators.test.js` | `validateEmail` (6 cas), `validatePassword` (5 cas), `isRequired` (4 cas) | ✅ Écrit |
+
+Composants restants à couvrir, dans cet ordre de priorité :
 
 | Composant | Pourquoi |
 |---|---|
-| `CartContext` | Touche à l'argent. Ajout, suppression, quantités, persistance `localStorage`, calcul du total |
 | `AuthContext` | Restauration de session via `/auth/me`, déconnexion, état de chargement |
 | `CheckoutPage` | Validation avant envoi, gestion des erreurs de paiement |
-| `LoginPage` / `RegisterPage` | Validation, affichage du blocage 429, confirmation de mot de passe |
-| `validators.js` | Fonctions pures — les moins chères à tester, à écrire en premier |
+| `RegisterPage` | Validation, confirmation de mot de passe |
 
 Pas d'objectif de couverture globale : la priorité va à ce qui touche l'argent et l'authentification. Mais tout nouveau composant critique doit arriver avec son test.
 

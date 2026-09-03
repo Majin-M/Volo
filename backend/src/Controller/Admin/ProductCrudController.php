@@ -30,6 +30,7 @@ use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
 use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
 use EasyCorp\Bundle\EasyAdminBundle\Field\ImageField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\NumberField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextareaField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
@@ -52,6 +53,7 @@ class ProductCrudController extends AbstractCrudController
                 ->setBasePath('/images/products') 
                 ->onlyOnIndex(),
             NumberField::new('price')->setLabel('Prix'),
+            IntegerField::new('stock')->setLabel('Stock'),
             AssociationField::new('brand')->setLabel('Marque'),
             Field::new('isAvailable')->setLabel('Disponible ?'),
             
@@ -67,6 +69,7 @@ class ProductCrudController extends AbstractCrudController
                 ->setRequired(false),
                 
             NumberField::new('price'),
+            IntegerField::new('stock')->setLabel('Stock'),
             Field::new('isAvailable')->setLabel('Disponible'),
             AssociationField::new('brand'),
             

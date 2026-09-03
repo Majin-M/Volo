@@ -23,13 +23,24 @@
 > **Tâches à ajouter**, issues des révisions de juillet 2026 :
 >
 > - ~~Appliquer `Version20260717120000` sur la base de dev~~ — ✅ **fait le 17/07/2026** (sauvegarde, dry-run, migration, `schema:validate` vert sur `volo` et `volo_test`).
-> - **Contraindre les transitions de statut** — composant Workflow de Symfony ([DIAGRAMME_ETATS.md](DIAGRAMME_ETATS.md) §4). 🟠
+> - ~~**Contraindre les transitions de statut**~~ — ✅ **Implémenté le 01/09/2026**. Composant Workflow Symfony (`workflow.yaml`) + `StatusTransitionSubscriber` (Doctrine `preUpdate`). Les diagrammes de [DIAGRAMME_ETATS.md](DIAGRAMME_ETATS.md) §4 sont désormais appliqués.
 > - **Trancher `REFUNDED` / `CANCELLED`** — implémenter l'annulation ou retirer les valeurs ([DIAGRAMME_ETATS.md](DIAGRAMME_ETATS.md) §5). 🟡
 > - ~~Lire les messages de contact~~ — ✅ **résolu le 17/07/2026** par la notification email (`ContactService`), et non par un écran d'administration. RG12 / `processed_by_user_id` abandonnés en conséquence ([MODELE_DONNEES.md](MODELE_DONNEES.md) §6.5). L'*envoi* était cassé aussi (403 pour tout visiteur anonyme) — corrigé et testé.
 > - **Mettre en place un worker Messenger** — `SendEmailMessage` a dû être retiré du routage `async` : aucun worker n'existe, donc un email en file n'en serait jamais sorti. Les emails partent en synchrone en attendant. **Prérequis de 4.2** ([TECHNOLOGIES.md](TECHNOLOGIES.md) §2). 🟠
 > - **`openapi.yaml`** — le seul mécanisme qui empêcherait `api_specification.md` de dériver à nouveau ([CONTRAT_API.md](CONTRAT_API.md) §8). 🟠
-> - **Unifier le SGBD** — dev sur MariaDB 10.4, cible Compose sur MySQL 8 ([TECHNOLOGIES.md](TECHNOLOGIES.md) §2). 🟠
+> - ~~**Unifier le SGBD**~~ — ✅ **Résolu le 01/09/2026**. `DATABASE_URL` cible MySQL 8.0 partout, les deux `compose.yaml` utilisent `mysql:8.0` ([TECHNOLOGIES.md](TECHNOLOGIES.md) §2).
 > - **Trancher les trois chemins d'images** — `/images/products`, `/media/products`, `/media/brands` coexistent ([TECHNOLOGIES.md](TECHNOLOGIES.md) §2). 🟡
+>
+> **Tâches complétées le 01-02/09/2026** :
+>
+> - ~~**Gestion de stock**~~ — ✅ `Product.stock` (integer), `OrderService` vérifie et décrémente, `decrementStock()` + migration `Version20260901120000`.
+> - ~~**Stripe fonctionnel de bout en bout**~~ — ✅ Clés test configurées, webhook avec Stripe CLI, UUID `reference` dans les métadonnées Stripe, `CMD-{id}` éliminé partout.
+> - ~~**Audit Trail**~~ — ✅ `AuditLog` + `AuditSubscriber` (Doctrine `postPersist` / `preUpdate`) — trace les changements de statut et les modifications sensibles.
+> - ~~**Soft Delete**~~ — ✅ `SoftDeleteFilter` (Doctrine SQL Filter) sur `Order` et `Payment`.
+> - ~~**ExceptionSubscriber**~~ — ✅ JSON unifié `{"error": {"code", "message"}}` pour `/api/*`.
+> - ~~**WelcomeEmailService**~~ — ✅ Email de bienvenue à l'inscription.
+> - ~~**Sauvegardes BDD**~~ — ✅ `scripts/backup-db.sh` : `mysqldump` compressé, rétention 30 jours.
+> - ~~**UI/UX améliorée**~~ — ✅ Toast notifications redessinées (gradients, SVG, progress bar, animations), `ConfirmDialog` redessiné (backdrop blur, icônes contextuelles), `OrderConfirmationPage` redessinée (animations cascade, check SVG animé), images de problématiques de peau sur la page d'accueil (remplacement des emojis).
 
 ## Table des matières
 

@@ -25,105 +25,93 @@ Exemple d'utilisation :
 ===============================================================================
 */
 
-import { useState } from 'react';
+import { useReducer } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../contexts/AuthContext';
 import styles from './AccountPage.module.css';
 
+const initialState = {
+    isEditing: false,
+    firstName: '',
+    lastName: '',
+    showPasswordForm: false,
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+    saving: false,
+    message: null,
+};
+
+function reducer(state, action) {
+    switch (action.type) {
+        case 'START_EDITING':
+            return { ...initialState, isEditing: true, firstName: action.firstName, lastName: action.lastName };
+        case 'CANCEL':
+            return initialState;
+        case 'SET_FIELD':
+            return { ...state, [action.field]: action.value };
+        case 'SHOW_PASSWORD_FORM':
+            return { ...state, showPasswordForm: true };
+        case 'SAVE_START':
+            return { ...state, saving: true, message: null };
+        case 'SAVE_SUCCESS':
+            return { ...initialState, message: { type: 'success', text: action.text } };
+        case 'SAVE_ERROR':
+            return { ...state, saving: false, message: { type: 'error', text: action.text } };
+        case 'SET_MESSAGE':
+            return { ...state, message: action.message };
+        default:
+            return state;
+    }
+}
+
 const AccountPage = () => {
     const navigate = useNavigate();
     const { user, logout, updateProfile } = useAuth();
-
-    const [isEditing, setIsEditing] = useState(false);
-    const [firstName, setFirstName] = useState('');
-    const [lastName, setLastName] = useState('');
-
-    const [showPasswordForm, setShowPasswordForm] = useState(false);
-    const [currentPassword, setCurrentPassword] = useState('');
-    const [newPassword, setNewPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-
-    const [saving, setSaving] = useState(false);
-    const [message, setMessage] = useState(null);
-
-    if (!user) {
-        return (
-            <div className={styles.container}>
-                <div className={styles.card}>
-                    <p style={{ textAlign: 'center', color: '#7a6a60' }}>
-                        Vous devez etre connecte pour acceder a cette page.
-                    </p>
-                    <button
-                        type="button"
-                        className={styles.primaryButton}
-                        onClick={() => navigate('/connexion')}
-                    >
-                        Se connecter
-                    </button>
-                </div>
-            </div>
-        );
-    }
+    const [state, dispatch] = useReducer(reducer, initialState);
 
     const startEditing = () => {
-        setFirstName(user.firstName || '');
-        setLastName(user.lastName || '');
-        setIsEditing(true);
-        setMessage(null);
+        dispatch({ type: 'START_EDITING', firstName: user.firstName || '', lastName: user.lastName || '' });
     };
 
     const cancelEditing = () => {
-        setIsEditing(false);
-        setShowPasswordForm(false);
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-        setMessage(null);
+        dispatch({ type: 'CANCEL' });
     };
 
     const handleSaveProfile = async () => {
-        setMessage(null);
-
         const fields = {};
-        if (firstName !== (user.firstName || '')) fields.firstName = firstName;
-        if (lastName !== (user.lastName || '')) fields.lastName = lastName;
+        if (state.firstName !== (user.firstName || '')) fields.firstName = state.firstName;
+        if (state.lastName !== (user.lastName || '')) fields.lastName = state.lastName;
 
-        if (showPasswordForm) {
-            if (!currentPassword) {
-                setMessage({ type: 'error', text: 'Le mot de passe actuel est requis.' });
+        if (state.showPasswordForm) {
+            if (!state.currentPassword) {
+                dispatch({ type: 'SET_MESSAGE', message: { type: 'error', text: 'Le mot de passe actuel est requis.' } });
                 return;
             }
-            if (!newPassword) {
-                setMessage({ type: 'error', text: 'Le nouveau mot de passe est requis.' });
+            if (!state.newPassword) {
+                dispatch({ type: 'SET_MESSAGE', message: { type: 'error', text: 'Le nouveau mot de passe est requis.' } });
                 return;
             }
-            if (newPassword !== confirmPassword) {
-                setMessage({ type: 'error', text: 'Les mots de passe ne correspondent pas.' });
+            if (state.newPassword !== state.confirmPassword) {
+                dispatch({ type: 'SET_MESSAGE', message: { type: 'error', text: 'Les mots de passe ne correspondent pas.' } });
                 return;
             }
-            fields.currentPassword = currentPassword;
-            fields.newPassword = newPassword;
+            fields.currentPassword = state.currentPassword;
+            fields.newPassword = state.newPassword;
         }
 
         if (Object.keys(fields).length === 0) {
-            setMessage({ type: 'info', text: 'Aucune modification detectee.' });
+            dispatch({ type: 'SET_MESSAGE', message: { type: 'info', text: 'Aucune modification detectee.' } });
             return;
         }
 
-        setSaving(true);
+        dispatch({ type: 'SAVE_START' });
         try {
             await updateProfile(fields);
-            setMessage({ type: 'success', text: 'Profil mis a jour.' });
-            setIsEditing(false);
-            setShowPasswordForm(false);
-            setCurrentPassword('');
-            setNewPassword('');
-            setConfirmPassword('');
+            dispatch({ type: 'SAVE_SUCCESS', text: 'Profil mis a jour.' });
         } catch (err) {
-            setMessage({ type: 'error', text: err.message || 'Erreur lors de la mise a jour.' });
-        } finally {
-            setSaving(false);
+            dispatch({ type: 'SAVE_ERROR', text: err.message || 'Erreur lors de la mise a jour.' });
         }
     };
 
@@ -135,8 +123,9 @@ const AccountPage = () => {
     return (
         <>
             <Helmet>
-                <meta name="robots" content="noindex, nofollow" />
                 <title>Mon compte — VOLO</title>
+                <meta name="description" content="Gerez votre profil, modifiez vos informations et consultez vos commandes VOLO." />
+                <meta name="robots" content="noindex, nofollow" />
             </Helmet>
 
             <div className={styles.container}>
@@ -149,13 +138,13 @@ const AccountPage = () => {
                         </span>
                     </div>
 
-                    {message && (
-                        <div className={`${styles.message} ${styles[message.type]}`}>
-                            {message.text}
+                    {state.message && (
+                        <div className={`${styles.message} ${styles[state.message.type]}`}>
+                            {state.message.text}
                         </div>
                     )}
 
-                    {!isEditing ? (
+                    {!state.isEditing ? (
                         <>
                             <div className={styles.infoGrid}>
                                 {user.firstName && (
@@ -210,8 +199,8 @@ const AccountPage = () => {
                                     id="edit-firstName"
                                     type="text"
                                     className={styles.formInput}
-                                    value={firstName}
-                                    onChange={(e) => setFirstName(e.target.value)}
+                                    value={state.firstName}
+                                    onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'firstName', value: e.target.value })}
                                     maxLength={255}
                                 />
                             </div>
@@ -224,8 +213,8 @@ const AccountPage = () => {
                                     id="edit-lastName"
                                     type="text"
                                     className={styles.formInput}
-                                    value={lastName}
-                                    onChange={(e) => setLastName(e.target.value)}
+                                    value={state.lastName}
+                                    onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'lastName', value: e.target.value })}
                                     maxLength={255}
                                 />
                             </div>
@@ -235,11 +224,11 @@ const AccountPage = () => {
                                 <span className={styles.infoValue}>{user.email}</span>
                             </div>
 
-                            {!showPasswordForm ? (
+                            {!state.showPasswordForm ? (
                                 <button
                                     type="button"
                                     className={styles.linkButton}
-                                    onClick={() => setShowPasswordForm(true)}
+                                    onClick={() => dispatch({ type: 'SHOW_PASSWORD_FORM' })}
                                 >
                                     Changer le mot de passe
                                 </button>
@@ -253,8 +242,8 @@ const AccountPage = () => {
                                             id="edit-currentPassword"
                                             type="password"
                                             className={styles.formInput}
-                                            value={currentPassword}
-                                            onChange={(e) => setCurrentPassword(e.target.value)}
+                                            value={state.currentPassword}
+                                            onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'currentPassword', value: e.target.value })}
                                             autoComplete="current-password"
                                         />
                                     </div>
@@ -266,8 +255,8 @@ const AccountPage = () => {
                                             id="edit-newPassword"
                                             type="password"
                                             className={styles.formInput}
-                                            value={newPassword}
-                                            onChange={(e) => setNewPassword(e.target.value)}
+                                            value={state.newPassword}
+                                            onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'newPassword', value: e.target.value })}
                                             autoComplete="new-password"
                                         />
                                     </div>
@@ -279,8 +268,8 @@ const AccountPage = () => {
                                             id="edit-confirmPassword"
                                             type="password"
                                             className={styles.formInput}
-                                            value={confirmPassword}
-                                            onChange={(e) => setConfirmPassword(e.target.value)}
+                                            value={state.confirmPassword}
+                                            onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'confirmPassword', value: e.target.value })}
                                             autoComplete="new-password"
                                         />
                                     </div>
@@ -292,15 +281,15 @@ const AccountPage = () => {
                                     type="button"
                                     className={styles.primaryButton}
                                     onClick={handleSaveProfile}
-                                    disabled={saving}
+                                    disabled={state.saving}
                                 >
-                                    {saving ? 'Enregistrement...' : 'Enregistrer'}
+                                    {state.saving ? 'Enregistrement...' : 'Enregistrer'}
                                 </button>
                                 <button
                                     type="button"
                                     className={styles.secondaryButton}
                                     onClick={cancelEditing}
-                                    disabled={saving}
+                                    disabled={state.saving}
                                 >
                                     Annuler
                                 </button>

@@ -7,7 +7,7 @@
 *Section personnelle — à adapter avec tes informations :*
 
 - Nom, prénom
-- Formation actuelle (titre professionnel visé : Développeur Web et Web Mobile / Concepteur Développeur d'Applications)
+- Formation actuelle (titre professionnel visé : Concepteur Développeur d'Applications)
 - Parcours (reconversion, formation initiale...)
 - Compétences techniques principales : PHP/Symfony, JavaScript/React, MySQL, Docker, Git
 - Objectif professionnel
@@ -32,7 +32,7 @@
 | **Who** (Qui ?) | Développeur full-stack unique. Client : projet de formation simulant un besoin réel |
 | **What** (Quoi ?) | Application e-commerce skincare complète : catalogue filtrable par marque et problématique de peau, panier, tunnel de commande avec paiement Stripe, back-office d'administration, formulaire de contact avec notification email |
 | **Where** (Où ?) | Application web accessible via navigateur. Développement local sur XAMPP (Windows). Cible : VPS avec Nginx + HTTPS (Certbot / Let's Encrypt) |
-| **When** (Quand ?) | Développement de janvier à août 2026 (environ 3 mois) — 5 phases : infrastructure, back-end, front-end, fonctionnalités avancées, déploiement |
+| **When** (Quand ?) | Développement de janvier à août 2026 (environ 8 mois) — 5 phases : infrastructure, back-end, front-end, fonctionnalités avancées, déploiement |
 | **Why** (Pourquoi ?) | Répondre au besoin d'une plateforme skincare inclusive qui guide le consommateur selon sa problématique de peau. Projet validant les compétences full-stack |
 | **How** (Comment ?) | Architecture découplée SPA React + API REST Symfony. Méthodologie Agile/Kanban. Paiement sécurisé via Stripe. JWT en cookie HttpOnly |
 | **How much** (Combien ?) | Projet individuel. Stack open-source (coût 0). Seul coût de production : VPS + nom de domaine + certificat SSL (Let's Encrypt gratuit) |
@@ -224,7 +224,7 @@ UTILISATEUR (#id, email UNIQUE, password, roles, firstName, lastName, createdAt,
 
 MARQUE (#id, name, logoUrl, createdAt, updatedAt)
 
-PRODUIT (#id, name, description, price DECIMAL(10,2), isAvailable, imageUrl,
+PRODUIT (#id, name, description, price DECIMAL(10,2), stock, isAvailable, imageUrl,
          createdAt, updatedAt, brand_id→MARQUE)
 
 PROBLEMATIQUE (#id, name, slug UNIQUE, description, createdAt, updatedAt)
@@ -303,6 +303,97 @@ Sur un projet où l'identité visuelle est un différenciateur revendiqué, gard
 
 ## 8. Conception technique (Zoning, wireframe et maquette)
 
+### Composants front-end clés
+
+#### Barre de navigation (`NavBar.jsx`)
+
+Composant présent sur toutes les pages, rendu dans `App.jsx` au-dessus du `<Routes>`.
+
+**Éléments affichés :**
+
+- **Logo VOLO** (`/images/Vologo.webp`) — lien vers l'accueil
+- **Lien « Catalogue »** → `/soins`
+- **Icône panier** (SVG) → `/panier` — avec un **badge compteur** circulaire affiché dynamiquement quand `cartCount > 0` (valeur tirée de `useCart()` / `CartContext`). L'`aria-label` annonce également le nombre d'articles pour l'accessibilité
+- **Zone authentification** (conditionnelle via `useAuth()`) :
+  - Non connecté : lien « Connexion » → `/connexion`
+  - Connecté : prénom de l'utilisateur (lien vers `/mon-compte`) + bouton « Déconnexion » (appelle `POST /api/auth/logout` pour effacer le cookie HttpOnly côté serveur, affiche un toast, redirige vers l'accueil)
+
+**Responsive mobile** : menu hamburger avec tiroir latéral animé (breakpoint 768px). Les trois lignes du burger s'animent en croix via transitions CSS. Le tiroir se ferme automatiquement au changement de route (`useEffect` sur `location.pathname`). Stylé via CSS Modules (`NavBar.module.css`), cohérent avec le reste du projet.
+
+#### Protection des routes côté front-end
+
+Un composant **`PrivateRoute`** centralise la protection des routes côté front-end. La protection est assurée à **deux niveaux** :
+
+**1. Côté serveur (protection réelle)** — `security.yaml` :
+
+| Règle | Effet |
+|---|---|
+| `^/api/auth/(login\|register)` | `PUBLIC_ACCESS` |
+| `^/api/products` (GET) | `PUBLIC_ACCESS` |
+| `^/api/brands` (GET), `^/api/skin-concerns` (GET) | `PUBLIC_ACCESS` |
+| `^/api/contact` (POST) | `PUBLIC_ACCESS` |
+| `^/api/webhooks/stripe` (POST) | `PUBLIC_ACCESS` |
+| `^/api/admin/**` | `ROLE_ADMIN` |
+| `^/api/products` (POST/PUT/DELETE) | `ROLE_ADMIN` |
+| `^/api/**` (catch-all) | `ROLE_USER` |
+| `^/admin/**` | `ROLE_ADMIN` |
+| `^/user/**` | `ROLE_ADMIN` (filet de sécurité) |
+
+Toute requête non authentifiée vers une route protégée reçoit un **401** du firewall JWT avant même d'atteindre le contrôleur.
+
+**2. Côté client (UX)** — composant `PrivateRoute` :
+
+Un composant wrapper réutilisable (`PrivateRoute.jsx`) protège les routes privées dans `App.jsx` :
+
+```jsx
+<Route path="/commande" element={<PrivateRoute><CheckoutPage /></PrivateRoute>} />
+<Route path="/confirmation" element={<PrivateRoute><OrderConfirmationPage /></PrivateRoute>} />
+<Route path="/mes-commandes" element={<PrivateRoute><OrderHistoryPage /></PrivateRoute>} />
+<Route path="/mon-compte" element={<PrivateRoute><AccountPage /></PrivateRoute>} />
+```
+
+`PrivateRoute` consulte `useAuth()` : si `isLoading`, affiche un état de chargement ; si `!isAuthenticated`, redirige vers `/connexion` via `<Navigate replace />`. Ce pattern centralise la logique de garde et évite les vérifications ad hoc par page. **La vraie protection reste côté serveur** : même si un utilisateur contourne le front, l'API refuse la requête.
+
+#### Normalisation des données côté front-end
+
+La couche API (`api/api.js`) est un **transport pur** — elle ne transforme pas les données :
+
+- `apiCall(endpoint, options)` : préfixe `/api`, pose `credentials: 'include'`, injecte le header `X-Csrf-Token` sur les méthodes mutantes, parse la réponse JSON brute
+- `productApi.js` : `fetchProducts(params)` construit les query params (`?brand=`, `?skin_concern=`, `?page=`, `?limit=`) via `URLSearchParams`, retourne l'enveloppe `{ data, meta }` telle quelle
+- `contactApi.js` : `submitContactMessage(payload)` POST vers `/contact`, retourne la réponse brute
+
+**Pas de couche de normalisation explicite.** Les transformations (ex : construction des URLs d'images à partir de `imageUrl` + préfixe `/images/products/`) se font au niveau des composants de rendu (`ProductCard`, `ProductDetailPage`). C'est un choix de simplicité cohérent avec l'absence de Redux et de couche DTO côté front.
+
+#### Espace administrateur — Back-office EasyAdmin
+
+L'administration se fait **entièrement via EasyAdmin (Twig, `/admin`)**, pas dans la SPA React. C'est un choix délibéré : Symfony fournit un back-office CRUD complet en quelques classes, là où l'écrire en React aurait représenté plusieurs semaines.
+
+**Dashboard** (`DashboardController`) : redirige vers la gestion des produits. Menu organisé en deux sections :
+
+| Section | Entrées |
+|---|---|
+| **Catalogue** | Produits, Marques, Problématiques |
+| **Ventes** | Commandes, Paiements, Clients |
+
+Plus un lien « Retour au site » vers la SPA.
+
+**CRUD Controllers** (6 fichiers) :
+
+| Controller | Fonctionnalités |
+|---|---|
+| `ProductCrudController` | CRUD complet + upload image via VichUploader (`VichImageType`). Champ `imageFile` (non persisté) → `imageUrl` (persisté). Validation : JPEG/PNG/WebP, max 2 Mo |
+| `BrandCrudController` | CRUD + upload logo via VichUploader. Validation : JPEG/PNG/WebP, max 1 Mo |
+| `SkinConcernCrudController` | CRUD des problématiques de peau |
+| `OrderCrudController` | Consultation et gestion des statuts de commande |
+| `PaymentCrudController` | Gestion des statuts de paiement — créé après la suppression du doublon `Order.paymentStatus` |
+| `UserCrudController` | Gestion des utilisateurs. `persistEntity()` surchargé pour **hacher le mot de passe** avant écriture (correction du bug 6.8) |
+
+**Sécurité du back-office** :
+- Firewall `admin` séparé : `form_login` classique avec session PHP (pas JWT)
+- `SecurityController` + template Twig dédié avec `_csrf_token` (EasyAdmin ne fournit **aucun écran de connexion** par défaut)
+- Login throttling : max 5 tentatives / 15 minutes
+- Accès uniquement via `ROLE_ADMIN`, attribuable uniquement par console (`app:create-admin`)
+
 ### Stack technique
 
 | Couche | Technologie | Version | Justification |
@@ -311,7 +402,7 @@ Sur un projet où l'identité visuelle est un différenciateur revendiqué, gard
 | Build tool | Vite | 8 | HMR instantané + proxy `/api` (pièce d'architecture pour les cookies HttpOnly) |
 | Back-end | Symfony | 7.4 | Écosystème sécurité (firewalls, voters, rate limiter), EasyAdmin, Mailer |
 | ORM | Doctrine | — | Paramétrage systématique des requêtes → injection SQL structurellement impossible |
-| BDD | MariaDB 10.4 (dev) / MySQL 8 (cible) | — | Compatibilité hébergements mutualisés français |
+| BDD | MySQL 8.0 | — | Unifié dev/prod. Compatibilité hébergements mutualisés français |
 | Auth | LexikJWTBundle | — | JWT RSA signé, stocké en cookie HttpOnly (jamais en localStorage) |
 | Paiement | Stripe (SDK PHP + React Elements) | — | Le numéro de carte ne transite jamais par VOLO (conformité PCI-DSS légère) |
 | Back-office | EasyAdmin 5 | — | CRUD généré depuis les entités Doctrine en quelques classes |
@@ -321,13 +412,14 @@ Sur un projet où l'identité visuelle est un différenciateur revendiqué, gard
 | Tests frontend | Vitest + Testing Library | — | Tests des contextes, validators, pages |
 | Analyse statique | PHPStan level max | — | 0 erreur (avec baseline pour l'existant) |
 | Linting front | ESLint 10 | — | 0 erreur |
+| Qualité React | React Doctor 0.9 | — | Score 100/100, 0 issue (bugs, perf, a11y) |
 | SEO | react-helmet-async + SitemapController | — | Meta par page + sitemap XML dynamique |
 
 ### Architecture de communication (développement)
 
 ```
 Navigateur → localhost:5173 (Vite)
-              ├── /api/*  → proxy → 127.0.0.1:8000 (Apache/Symfony) → MariaDB
+              ├── /api/*  → proxy → 127.0.0.1:8000 (Apache/Symfony) → MySQL 8
               └── /*      → React SPA
 ```
 
@@ -407,7 +499,7 @@ Développement itératif en **5 phases** inspiré du Kanban.
 |---|---|---|
 | **Présentation** | SPA React (navigateur) | React 19 + Vite + CSS Modules |
 | **Logique métier** | API REST Symfony | PHP 8.2 + Symfony 7.4 |
-| **Données** | Base de données relationnelle | MariaDB 10.4 / MySQL 8 + Doctrine ORM |
+| **Données** | Base de données relationnelle | MySQL 8.0 + Doctrine ORM |
 
 ### Architecture multicouches Symfony
 
@@ -446,9 +538,13 @@ Entity              ← données, relations Doctrine
 | **Strategy** | `PaymentGatewayInterface` + `StripePaymentGateway` / `PayPalPaymentGateway` — choix du prestataire à l'exécution via `PaymentGatewayResolver` |
 | **Service Layer** | Toute la logique métier dans `src/Service/` — les contrôleurs délèguent |
 | **Repository** | Requêtes BDD centralisées dans `src/Repository/` |
-| **Subscriber / Observer** | `CsrfProtectionSubscriber`, `SecurityHeadersSubscriber`, `WorkflowValidationListener` — logique transversale sur les événements Symfony |
+| **Subscriber / Observer** | `CsrfProtectionSubscriber`, `SecurityHeadersSubscriber`, `StatusTransitionSubscriber`, `ExceptionSubscriber`, `AuditSubscriber` — logique transversale sur les événements Symfony |
 | **DTO (implicite)** | `PaymentIntentResult` encapsule le retour de la gateway |
-| **State Machine** | `OrderStatus` et `PaymentStatus` avec transitions validées par `WorkflowValidationListener` (Doctrine `preUpdate`) |
+| **State Machine** | `OrderStatus` et `PaymentStatus` avec transitions validées par `StatusTransitionSubscriber` (Doctrine `preUpdate`) |
+| **Soft Delete** | `deletedAt` nullable sur `Order` et `Payment` + `SoftDeleteFilter` Doctrine SQL Filter — les enregistrements supprimés sont exclus transparemment des requêtes |
+| **UUID** | `Order.reference` (UUID v4) comme identifiant public — l'ID auto-incrémenté reste interne, le client ne voit que la référence |
+| **Audit Trail** | `AuditLog` + `AuditSubscriber` (Doctrine `postPersist` / `preUpdate`) — trace les changements de statut (Order, Payment) et les modifications sensibles (User.password, User.roles) |
+| **Cache-Aside (HTTP)** | `ETag` + `Cache-Control` sur les endpoints produits (`max-age=60` liste, `max-age=300` détail) avec `isNotModified()` pour les 304 |
 
 ---
 
@@ -500,6 +596,7 @@ X-Content-Type-Options: nosniff
 X-Frame-Options: DENY
 Referrer-Policy: strict-origin-when-cross-origin
 Strict-Transport-Security: max-age=31536000; includeSubDomains
+Permissions-Policy: camera=(), microphone=(), geolocation=()
 ```
 
 ---
@@ -568,9 +665,9 @@ $client->request('POST', '/api/orders', [], [], [
 
 ### Analyse statique
 
-- **PHPStan** : `level: max` (le plus strict), 0 erreur (avec baseline de ~550 lignes pour l'existant)
+- **PHPStan** : `level: max` (le plus strict), 0 erreur (avec baseline de ~128 entrées, régénéré le 02/09/2026)
 - **ESLint** : 0 erreur
-- **React Doctor** : CI GitHub Actions sur les PRs (sécurité, performance, accessibilité, bundle size)
+- **React Doctor** : score **100/100** (0 issue). Analyse statique frontend : bugs, sécurité, performance, accessibilité. CI GitHub Actions sur les PRs
 
 ---
 
@@ -605,9 +702,80 @@ docker-compose.yml — 5 services :
 
 **Nginx** : reverse proxy — routes `/api/*`, `/images/*`, `/sitemap.xml` vers PHP-FPM ; tout le reste vers la SPA React.
 
+### Configuration du serveur Web (Nginx)
+
+Le reverse proxy Nginx est la pièce centrale de l'infrastructure de production. Sa configuration (`docker/nginx/default.conf`) définit deux upstreams et un routage précis :
+
+**Upstreams :**
+
+| Upstream | Cible | Rôle |
+|---|---|---|
+| `php-fpm` | `backend:9000` | Symfony (PHP-FPM) |
+| `frontend` | `frontend:80` | Build React statique (nginx interne) |
+
+**Règles de routage :**
+
+| Chemin | Servi par | Raison |
+|---|---|---|
+| `/api/*` | PHP-FPM (Symfony) | Endpoints REST |
+| `/_wdt/*`, `/_profiler/*` | PHP-FPM | Outils de debug Symfony (dev uniquement) |
+| `/sitemap.xml` | PHP-FPM | Généré dynamiquement depuis la BDD |
+| `/images/products/*`, `/images/brands/*` | Nginx directement | Fichiers statiques (uploads VichUploader), servis depuis le volume partagé `backend_public` |
+| `/*` (tout le reste) | Frontend (React SPA) | Routing client-side — toutes les URLs non matchées renvoient `index.html` |
+
+**Volume partagé `backend_public`** : le backend (PHP-FPM) écrit les fichiers uploadés dans `public/images/`, et nginx les sert directement sans passer par PHP — performance et séparation des responsabilités.
+
 ### HTTPS est bloquant (pas optionnel)
 
-Les cookies `volo_token` et `volo_csrf` portent le drapeau `Secure`. Sans HTTPS, le navigateur **ne les envoie jamais** → la connexion échoue silencieusement. Solution : Certbot / Let's Encrypt.
+Les cookies `volo_token` et `volo_csrf` portent le drapeau `Secure`. Sans HTTPS, le navigateur **ne les envoie jamais** → la connexion échoue silencieusement (200 au login, puis 401 partout, sans message d'erreur explicite). Solution : Certbot / Let's Encrypt.
+
+| Port | Exposition | Justification |
+|---|---|---|
+| 443/tcp | Public | Seul point d'entrée applicatif |
+| 80/tcp | Public | Redirection vers 443 + challenge Certbot uniquement |
+| 22/tcp (SSH) | Restreint par IP | Déploiement |
+| 3306 (MySQL) | **Jamais exposé** | Socket local uniquement |
+
+### Vérifications après déploiement
+
+Checklist à exécuter après chaque mise en production :
+
+| Vérification | Commande / Action | Résultat attendu |
+|---|---|---|
+| Conteneurs actifs | `docker compose ps` | 5 services `Up (healthy)` |
+| BDD accessible | `docker compose exec backend php bin/console doctrine:schema:validate` | Schéma synchronisé |
+| Migrations appliquées | `docker compose exec backend php bin/console doctrine:migrations:status` | Aucune migration en attente |
+| API répond | `curl -k https://localhost/api/products` | 200 OK + JSON |
+| SPA chargée | Navigateur → `https://domaine.fr/` | Page d'accueil React |
+| Cookies HTTPS | DevTools > Application > Cookies | `volo_token` Secure + HttpOnly |
+| CSRF fonctionne | POST sans `X-Csrf-Token` | 403 Forbidden |
+| Sitemap | `curl https://domaine.fr/sitemap.xml` | XML valide avec les produits |
+| Back-office | `https://domaine.fr/admin/login` | Formulaire de connexion |
+| Emails | Formulaire de contact → vérifier Mailpit (`localhost:8025`) | Email reçu |
+| Webhook Stripe | Stripe Dashboard > Webhooks > Envoyer un événement test | 200 OK |
+| Headers de sécurité | `curl -I https://domaine.fr/api/products` | CSP, X-Frame-Options, HSTS présents |
+
+### Maintenance et sauvegarde
+
+**Sauvegardes BDD :**
+
+- Script `scripts/backup-db.sh` : `mysqldump` compressé (gzip), rétention 30 jours avec purge automatique, mode Docker (`volo-db`) ou local XAMPP (`--local`)
+- Données persistées dans le volume Docker `db_data`
+- Prêt pour cron (`0 3 * * *`) — le cron lui-même reste à activer sur le serveur cible
+- En production : export vers un stockage externe (à mettre en place)
+
+**Maintenance applicative :**
+
+| Action | Commande |
+|---|---|
+| Mise à jour du code | `git pull` + `docker compose build` + `docker compose up -d` |
+| Appliquer les migrations | `docker compose exec backend php bin/console doctrine:migrations:migrate --no-interaction` |
+| Vider le cache Symfony | `docker compose exec backend php bin/console cache:clear` |
+| Créer un administrateur | `docker compose exec backend php bin/console app:create-admin email@volo.fr "Password1!"` |
+| Consulter les logs | `docker compose logs -f backend` |
+| Charger les fixtures (dev) | `docker compose exec backend php bin/console doctrine:fixtures:load --no-interaction` |
+
+**État actuel** : le script de sauvegarde est implémenté et testé ; son activation via cron sur le serveur cible et le monitoring des conteneurs restent à mettre en place — identifiés comme axe d'amélioration.
 
 ### CI/CD
 
@@ -642,9 +810,34 @@ Les cookies `volo_token` et `volo_csrf` portent le drapeau `Secure`. Sans HTTPS,
 
 ## 15. Documentation du projet
 
-### Docstrings et conventions de commentaires
+### 15.1 Documentation technique interne (code)
 
-Chaque fichier métier commence par un bloc structuré :
+#### Docstrings et conventions de commentaires
+
+Chaque fichier métier commence par un bloc structuré standardisé. L'objectif : comprendre le rôle du fichier **sans lire son code**.
+
+**Entité Doctrine :**
+
+```php
+/*
+===============================================================================
+Entity : Product
+===============================================================================
+Purpose:
+    Represents a skincare product available on the VOLO platform.
+Responsibilities:
+    - Store product information (name, description, price, stock, availability).
+    - Define the relationship with Brand (many-to-one).
+    - Define the relationship with SkinConcern (many-to-many).
+Main Properties:
+    id, name, description, price, stock, isAvailable, brand, skinConcerns, createdAt
+Related Entities:
+    Brand, SkinConcern, OrderItem, Routine
+===============================================================================
+*/
+```
+
+**Service :**
 
 ```php
 /*
@@ -661,13 +854,54 @@ Dependencies:
     - ProductRepository, EntityManagerInterface
 Used By:
     - OrderController
+Throws:
+    - InvalidArgumentException if validation fails
 ===============================================================================
 */
 ```
 
-Même convention pour les entités, contrôleurs et composants React (JSDoc).
+**Contrôleur API :**
 
-### Conventions de nommage
+```php
+/*
+===============================================================================
+Controller : ProductController
+===============================================================================
+Available Endpoints:
+    GET     /api/products          List all products (paginated)
+    GET     /api/products/{id}     Get a single product
+    POST    /api/products          Create a product (ROLE_ADMIN)
+    PUT     /api/products/{id}     Replace a product (ROLE_ADMIN)
+    DELETE  /api/products/{id}     Delete a product (ROLE_ADMIN)
+Query Parameters (GET):
+    ?skin_concern={slug}  ?brand={id}  ?page={n}  ?limit={n}
+Security:
+    Public: GET  |  Admin: POST, PUT, DELETE (ProductVoter)
+Dependencies:
+    - ProductService, SerializerInterface
+===============================================================================
+*/
+```
+
+**Composant React (JSDoc) :**
+
+```jsx
+/**
+ * ProductCard
+ * -----------
+ * Purpose: Displays a single product in the catalogue grid.
+ * Props:
+ *   @param {Object}   product         - Product data object
+ *   @param {string}   product.name    - Product name
+ *   @param {string}   product.price   - Formatted price string
+ *   @param {number}   product.stock   - Available stock quantity
+ *   @param {boolean}  product.isAvailable
+ *   @param {Function} onAddToCart     - Callback on CTA click
+ * Used By: ProductListPage
+ */
+```
+
+#### Conventions de nommage
 
 | Contexte | Convention | Exemple |
 |---|---|---|
@@ -680,35 +914,64 @@ Même convention pour les entités, contrôleurs et composants React (JSDoc).
 | Branches Git | kebab-case avec préfixe | `feature/cart-system`, `fix/order-validation` |
 | Commits | Conventional Commits | `feat(auth): implement JWT login endpoint` |
 | Containers Docker | kebab-case, préfixe `volo-` | `volo-api`, `volo-db` |
+| Enums PHP | PascalCase, valeurs snake_case | `OrderStatus::PENDING = 'pending'` |
 
-### Règles Clean Code / SOLID
+#### Règles Clean Code / SOLID
 
 - **SRP** : chaque classe a une seule raison de changer (Controller ≠ Service ≠ Repository)
 - **OCP** : `PaymentGatewayInterface` — ajouter un moyen de paiement = un fichier, zéro modification
 - **DRY** : `PasswordValidator` partagé entre API et EasyAdmin
 - **Pas de logique dans les contrôleurs** : délégation systématique aux services
 - **Code en anglais, interface en français**
+- **Pas d'abréviations** sauf acronymes établis (`id`, `url`, `jwt`, `dto`)
+- **Cohérence inter-couches** : une même entité porte le même nom partout (`Product` en PHP, `product` en BDD, `ProductCard` en React, `/api/products` en REST)
 
-### Documentation technique
+### 15.2 Documentation de l'API
 
-12 fichiers de documentation dans `docs/` :
+**État actuel :** `api_specification.md` est un fichier Markdown maintenu à la main. Il documente chaque endpoint avec des marqueurs ✅ (implémenté) / ⬜ (prévu).
+
+**Contrat d'API transversal :** `CONTRAT_API.md` décrit les conventions qui s'appliquent à **toutes** les routes :
+- Stratégie d'authentification (JWT en cookie HttpOnly, pourquoi pas `localStorage`)
+- Mécanisme CSRF (double-submit cookie, exemptions, ordre des listeners)
+- Séparation des deux firewalls (`api` stateless vs `admin` session)
+- Règles d'autorisation (`access_control` + Voters)
+- Format des erreurs et pagination
+
+**Limite identifiée :** il n'existe pas de fichier OpenAPI (`openapi.yaml`). La spécification Markdown peut dériver silencieusement du code réel — et elle l'a fait massivement (11 routes documentées sur 20 existaient réellement lors de l'audit du 17/07/2026). Un fichier OpenAPI permettrait des tests de contrat automatisés et une documentation interactive (Swagger UI). C'est un axe d'amélioration prioritaire.
+
+### 15.3 Documentation du projet
+
+12 fichiers de documentation dans `docs/`, organisés par thème :
+
+**Architecture et conception :**
 
 | Document | Contenu |
 |---|---|
-| `architecture.md` | Architecture globale (révisée, écarts signalés) |
-| `CONTRAT_API.md` | Conventions transversales de l'API (JWT, CSRF, firewalls, autorisation) |
-| `api_specification.md` | Spécification des endpoints (avec marqueurs ✅/⬜) |
-| `MODELE_DONNEES.md` | MCD/MLD/MPD + dictionnaire de données + défauts corrigés |
-| `DIAGRAMME_CLASSES.md` | Diagrammes de classes + principes SOLID appliqués |
-| `DIAGRAMME_ETATS.md` | Machines à états (Order, Payment) + défauts trouvés |
+| `architecture.md` | Architecture globale (révisée, écarts signalés entre conception et réalité) |
+| `DIAGRAMME_CLASSES.md` | Diagrammes de classes + principes SOLID appliqués avec exemples concrets |
+| `DIAGRAMME_ETATS.md` | Machines à états (Order, Payment) — a révélé 3 défauts réels dans le code |
+| `DIAGRAMME_CAS_UTILISATION.md` | Diagramme de cas d'utilisation UML + séquences détaillées (connexion, commande/paiement) |
 | `DIAGRAMME_DEPLOIEMENT.md` | Infrastructure dev (XAMPP) vs cible prod (Docker/Nginx) |
-| `TECHNOLOGIES.md` | Choix technologiques justifiés (« pourquoi pas X ») |
-| `STRATEGIE_TESTS.md` | Stratégie de tests, pyramide, couverture |
-| `convention_de_nommage.md` | Conventions de nommage toutes couches |
-| `CORRECTION.md` | Journal des corrections (migration, cascade, doublon) |
-| `roadmap.md` | Roadmap 5 phases + backlog v2 |
 
-**Particularité notable** : la documentation est **auto-critique** — elle signale explicitement ce qui était prévu mais pas implémenté (⬜), ce qui a été abandonné (❌), et les défauts découverts pendant sa rédaction.
+**Données et API :**
+
+| Document | Contenu |
+|---|---|
+| `MODELE_DONNEES.md` | MCD/MLD/MPD + dictionnaire de données + 8 défauts documentés (5 corrigés) |
+| `CONTRAT_API.md` | Conventions transversales de l'API (JWT, CSRF, firewalls, autorisation) |
+| `api_specification.md` | Spécification des endpoints avec marqueurs d'état ✅/⬜ |
+
+**Qualité et processus :**
+
+| Document | Contenu |
+|---|---|
+| `TECHNOLOGIES.md` | Choix technologiques justifiés (« pourquoi cette techno et pas une autre ») |
+| `STRATEGIE_TESTS.md` | Stratégie de tests, pyramide, couverture, ce qui est non vérifié |
+| `convention_de_nommage.md` | Conventions de nommage toutes couches |
+| `CORRECTION.md` | Journal des corrections (migration cassée, cascade inversé, doublon) |
+| `roadmap.md` | Roadmap 5 phases + backlog v2 + tâches issues des révisions |
+
+**Particularité notable** : la documentation est **auto-critique** — elle signale explicitement ce qui était prévu mais pas implémenté (⬜), ce qui a été abandonné (❌), et les défauts découverts pendant sa rédaction. Trois des cinq défauts les plus graves du projet ont été trouvés **en rédigeant les diagrammes**, pas en lisant le code.
 
 ---
 
@@ -718,13 +981,20 @@ Même convention pour les entités, contrôleurs et composants React (JSDoc).
 
 **Ce qui fonctionne :**
 
-- Parcours d'achat complet : catalogue → filtrage → panier → inscription → connexion → commande → paiement Stripe → confirmation
+- Parcours d'achat complet de bout en bout : catalogue → filtrage → panier → inscription → connexion → commande → paiement Stripe → webhook → confirmation (vérifié le 02/09/2026 avec Stripe CLI en mode test)
 - Architecture découplée SPA + API REST avec séparation stricte des responsabilités
-- Sécurité multicouche : JWT HttpOnly, CSRF double-submit, rate limiting, headers de sécurité, hachage bcrypt, Voters
+- Sécurité multicouche : JWT HttpOnly, CSRF double-submit, rate limiting, headers de sécurité (CSP, HSTS, Permissions-Policy), hachage bcrypt, Voters
 - Back-office EasyAdmin fonctionnel (produits, marques, problématiques, commandes, paiements, utilisateurs)
-- Webhook Stripe avec vérification HMAC et idempotence
-- 26 tests backend + tests frontend couvrant l'authentification, le CSRF, le paiement, le contact et le panier
-- PHPStan level max à 0 erreur
+- Webhook Stripe avec vérification HMAC, idempotence et métadonnées UUID
+- Gestion de stock avec vérification et décrémentation atomique à la commande
+- Transitions de statut contraintes par le composant Workflow Symfony + `StatusTransitionSubscriber`
+- Audit trail automatique (`AuditSubscriber`) traçant les changements de statut et les modifications sensibles
+- Soft Delete sur `Order` et `Payment` via `SoftDeleteFilter` Doctrine
+- `ExceptionSubscriber` unifiant les réponses d'erreur JSON sur `/api/*`
+- 26 tests backend + tests frontend (Vitest) couvrant l'authentification, le CSRF, le paiement, le contact, le panier et les validateurs
+- PHPStan level max à 0 erreur (baseline ~128 entrées)
+- UI/UX soignée : toast notifications animées (gradients, SVG, progress bar), `ConfirmDialog` avec backdrop blur et icônes contextuelles, page de confirmation avec animations cascade et check SVG animé, images de problématiques de peau sur la page d'accueil
+- Pages légales conformes au droit français du e-commerce : CGV (17 articles, formulaire de rétractation, règlement cosmétiques CE 1223/2009, médiation, force majeure), mentions légales (LCEN + CGU intégrées), politique de confidentialité (RGPD, transferts internationaux Stripe US, profilage, mineurs, violation de données)
 - Documentation exhaustive et auto-critique
 
 **Défauts corrigés en cours de projet :**
@@ -734,17 +1004,28 @@ Même convention pour les entités, contrôleurs et composants React (JSDoc).
 - Mot de passe en clair via EasyAdmin → hachage dans `persistEntity()`
 - CRUD `/user` anonyme exposant les rôles → supprimé + filet de sécurité
 - Formulaire de contact bloqué en 403 pour les visiteurs → exemption CSRF
+- Références `CMD-{id}` dans le front → remplacées par la `reference` UUID de la commande
+- SGBD dev/prod désynchronisés (MariaDB 10.4 / MySQL 8) → unifié sur MySQL 8.0
+- Métadonnées Stripe sans référence de commande → `order_id` (cast string) + `reference` UUID
 
 ### Axes d'amélioration
 
 | Axe | Détail |
 |---|---|
-| **Contraindre les transitions de statut** | Le setter `setStatus()` accepte n'importe quelle transition. Solution : composant Workflow de Symfony |
+| ~~**Contraindre les transitions de statut**~~ | ✅ **Implémenté** — Le composant Workflow de Symfony est configuré (`workflow.yaml`) avec deux state machines (`order` : pending→paid→shipped→delivered, annulable depuis pending/paid/shipped ; `payment` : pending→captured/failed, captured→refunded). `WebhookController` utilise `$workflow->can()` / `$workflow->apply()`. Un `StatusTransitionSubscriber` (Doctrine `preUpdate`) valide chaque changement de statut contre les transitions autorisées — y compris depuis EasyAdmin. Toute transition invalide lève une `LogicException` |
 | **Implémenter PayPal** | Le stub `PayPalPaymentGateway` est prêt — l'architecture OCP permet d'ajouter PayPal sans toucher à `PaymentService` |
 | **CI/CD complète** | PHPStan et PHPUnit existent mais rien ne les exécute automatiquement. Pipeline GitHub Actions cible prête |
-| **Worker Messenger** | Les emails sont synchrones. Prérequis pour basculer en asynchrone |
-| **Fichier OpenAPI** | `api_specification.md` est du Markdown à la main — peut dériver silencieusement. Un `openapi.yaml` permettrait des tests de contrat automatisés |
-| **Gestion de stock** | Seulement un booléen `isAvailable` — pas de quantité |
-| **Aperçus sociaux** | Les `<meta og:*>` sont invisibles pour WhatsApp/Facebook/LinkedIn (pas de SSR) |
-| **Unifier le SGBD** | Dev sur MariaDB 10.4, cible Docker sur MySQL 8 — a déjà causé un bug |
-| **Backlog v2** | Programme de fidélité, diagnostic peau, blog skincare, application mobile (React Native), multi-langue |
+| **Worker Messenger** | Les emails sont synchrones (pas de worker `messenger:consume`). Prérequis pour basculer en asynchrone sans perdre de messages |
+| **Fichier OpenAPI** | `api_specification.md` est du Markdown à la main — peut dériver silencieusement. Un `openapi.yaml` permettrait des tests de contrat automatisés et une documentation interactive (Swagger UI) |
+| ~~**Notifications et communication**~~ | ✅ **Implémenté** — `WelcomeEmailService` envoie un email de bienvenue à l'inscription (best-effort, même pattern que `OrderConfirmationService`). Axes restants : notifications push, email de réinitialisation de mot de passe, notifications admin |
+| ~~**Gestion des images produits**~~ | ✅ **Corrigé** — `BrandCrudController` utilisait `setBasePath('/media/brands')` au lieu de `'/images/brands'` (incohérence avec `vich_uploader.yaml`). Axes restants : optimisation WebP, CDN, placeholder sans image |
+| ~~**NavBar responsive**~~ | ✅ **Implémenté** — Menu hamburger avec tiroir latéral animé, CSS Modules (`NavBar.module.css`), breakpoint 768px, fermeture automatique au changement de route, transitions CSS sur les lignes du burger (croix animée) |
+| ~~**Gestion de stock**~~ | ✅ **Implémenté** — Colonne `stock` (integer) ajoutée à `Product` (migration `Version20260901120000`). `OrderService` vérifie le stock disponible et le décrémente atomiquement à la création de commande. `Product::decrementStock()` lève une `LogicException` si stock insuffisant. Le front (`ProductDetailPage`) affiche « Rupture de stock », « Plus que N en stock » (≤ 5), et plafonne le sélecteur de quantité. `isAvailable` conservé comme override admin |
+| ~~**Aperçus sociaux**~~ | ✅ **Partiellement implémenté** — Balises `og:title`, `og:description`, `og:image`, `og:type` ajoutées via `react-helmet-async` sur HomePage, ProductDetailPage et ProductListPage. Limite : les crawlers sociaux (Facebook, WhatsApp) n'exécutent pas le JS — un `SeoController` côté Symfony serait nécessaire pour un rendu complet |
+| ~~**ExceptionSubscriber**~~ | ✅ **Implémenté** — `ExceptionSubscriber` écoute `kernel.exception` et retourne un JSON unifié `{"error": {"code": N, "message": "..."}}` pour toutes les routes `/api/*`. En prod, les messages d'erreur 500 sont masqués ; en dev, le message original est conservé. Journalise les erreurs 500 via `LoggerInterface` |
+| ~~**Permissions-Policy**~~ | ✅ **Implémenté** — Header `Permissions-Policy: camera=(), microphone=(), geolocation=()` ajouté dans `SecurityHeadersSubscriber` |
+| ~~**Sauvegardes automatisées**~~ | ✅ **Implémenté** — Script `scripts/backup-db.sh` : `mysqldump` compressé (gzip), rétention 30 jours avec purge automatique, mode Docker (`volo-db`) ou local XAMPP (`--local`). Prêt pour cron (`0 3 * * *`). Axe restant : monitoring et alerting conteneurs |
+| ~~**Composant PrivateRoute**~~ | ✅ **Implémenté** — `PrivateRoute.jsx` wraps les routes protégées (`/commande`, `/confirmation`, `/mes-commandes`, `/mon-compte`) dans `App.jsx`. Utilise `useAuth()` : redirige vers `/connexion` si non authentifié, affiche un loader pendant la restauration de session. Suppression du guard ad hoc dans `AccountPage` |
+| ~~**Unifier le SGBD**~~ | ✅ **Corrigé** — `DATABASE_URL` dans `.env` cible désormais MySQL 8.0 explicitement (`?serverVersion=8.0&charset=utf8mb4`). Les deux `compose.yaml` (racine et backend) utilisent `mysql:8.0`. Doctrine génère les migrations pour MySQL 8 partout, éliminant les incompatibilités MariaDB (ex : `RENAME INDEX`) |
+| ~~**React Doctor 100/100**~~ | ✅ **Corrigé** — 6 issues identifiées et résolues : `ConfirmDialog` migré vers `<dialog>` natif (accessibilité + suppression de la gestion manuelle d'Escape/focus), `ToastContext` stabilisé avec `useMemo` (évite les re-renders inutiles des consommateurs), `AccountPage` refactoré avec `useReducer` (9 `useState` liés consolidés), `HomePage` clés stables sans index de tableau, `ProductDetailPage` pattern `AbortController` + `.then()` au lieu de `async/await` dans `useEffect` |
+| **Backlog v2** | Programme de fidélité, diagnostic peau (questionnaire → routine personnalisée), blog skincare, avis produits, wishlist, application mobile (React Native sur la même API), multi-langue |

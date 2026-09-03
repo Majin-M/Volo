@@ -73,14 +73,10 @@ const Footer = () => {
                 {/* Colonne 3 : Contact */}
                 <div>
                     <h3 style={headingStyle}>Contact</h3>
-                    <p style={{ fontSize: '0.95em', marginBottom: '10px' }}>Besoin d'un conseil ?</p>
-                    <a href="mailto:contact@volo-skin.fr" style={{
-                        color: '#fff',
-                        textDecoration: 'underline',
-                        fontWeight: 'bold'
-                    }}>
-                        contact@volo-skin.fr
-                    </a>
+                    <ul style={{ listStyle: 'none', padding: 0, lineHeight: 2 }}>
+                        <li><a href="/contact" style={linkStyle}>Formulaire de contact</a></li>
+                        <li><a href="mailto:contact@volo-skin.fr" style={linkStyle}>contact@volo-skin.fr</a></li>
+                    </ul>
                 </div>
 
                 {/* Colonne 4 : Informations legales */}
