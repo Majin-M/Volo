@@ -198,15 +198,15 @@ Dépôt monorepo à la racine (`backend/` + `frontend/`). Le dépôt initial ne 
 
 | Outil | État | Ce que ça coûte |
 |---|---|---|
-| PHPUnit | ✅ **Présent** — 26 tests / 88 assertions, 4 fichiers | Couverture partielle, ciblée sécurité et paiement : [STRATEGIE_TESTS.md](STRATEGIE_TESTS.md) §1 |
+| PHPUnit | ✅ **Présent** — 36 tests / 108 assertions, 5 fichiers | Couverture partielle, ciblée sécurité et paiement : [STRATEGIE_TESTS.md](STRATEGIE_TESTS.md) §1 |
 | Vitest | ✅ **Présent** — 3 fichiers de tests (LoginPage, CartContext, validators) | Couverture partielle, ciblée auth, panier et validation |
-| PHPStan | ✅ **Présent** — `level: max` + baseline (~128 entrées, régénéré 02/09/2026) | Voir ci-dessous |
+| PHPStan | ✅ **Présent** — `level: max` + baseline (102 entrées) | Voir ci-dessous |
 | CI/CD | Absent | Rien ne vérifie qu'une branche compile avant fusion |
 | OpenAPI | Absent | `api_specification.md` peut mentir sans que rien ne le signale — et [le fait massivement](api_specification.md) |
 
 > ⚠️ **Ce tableau annonçait « Aucun test » et « PHPStan absent ». Les deux sont faux**, et l'étaient déjà quand ces lignes ont été écrites : `backend/phpunit.dist.xml`, `backend/tests/` et `backend/phpstan.neon` sont dans le dépôt.
 >
-> **PHPStan tourne en `level: max`** — le niveau le plus strict. Le `phpstan-baseline.neon` a été régénéré le 02/09/2026 (~128 entrées) après les modifications de `StripePaymentGateway` (cast explicite `(string)` sur `order_id`, type `metadata` corrigé). **0 erreur hors baseline** à cette date.
+> **PHPStan tourne en `level: max`** — le niveau le plus strict. Le `phpstan-baseline.neon` compte **102 entrées** ; il a été régénéré le 02/09/2026 après les modifications de `StripePaymentGateway` (cast explicite `(string)` sur `order_id`, type `metadata` corrigé). **0 erreur hors baseline**, revérifié le 13/09/2026.
 >
 > Deux pièges appris à l'usage : PHPStan a besoin du conteneur `dev` compilé (`cache:warmup` avant, sinon il refuse de démarrer), et de `--memory-limit=1G` (128M ne suffisent pas, il s'arrête en cours d'analyse).
 

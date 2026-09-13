@@ -82,6 +82,8 @@ final class OrderCrudController extends AbstractCrudController
     public function configureCrud(Crud $crud): Crud
     {
         return $crud
+            ->setEntityLabelInSingular('Commande')
+            ->setEntityLabelInPlural('Commandes')
             ->setPageTitle(Crud::PAGE_INDEX, 'Liste des Commandes')
             ->setPageTitle(Crud::PAGE_NEW, 'Nouvelle Commande')
             ->setPageTitle(Crud::PAGE_EDIT, 'Modifier la Commande')

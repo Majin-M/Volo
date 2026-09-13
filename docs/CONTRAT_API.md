@@ -127,7 +127,7 @@ Aucune traduction n'est donc nécessaire entre la base et l'API — contrairemen
 
 > ✅ **`ExceptionSubscriber` est implémenté.** Il écoute `kernel.exception` et retourne un JSON unifié `{"error": {"code": N, "message": "..."}}` pour toutes les routes `/api/*`. En prod, les messages d'erreur 500 sont masqués (message générique) ; en dev, le message original est conservé pour le débogage. Les erreurs 500 sont journalisées via `LoggerInterface`. Le contrat et l'implémentation sont désormais cohérents.
 
-**Pagination** : `?page` et `?limit` (défaut 20, max 50), réponse enveloppée `{ data: [...], pagination: {...} }`.
+**Pagination** : `?page` et `?limit` (défaut 20, max 50), réponse enveloppée `{ data: [...], meta: { page, limit, total } }`. La clé est bien `meta`, pas `pagination`.
 
 Le plafond à 50 n'est pas cosmétique : sans lui, `?limit=100000` devient un déni de service à une requête. Il doit être appliqué **côté serveur**, jamais déduit de ce que le front demande.
 
@@ -157,7 +157,9 @@ Un `openapi.yaml` apporterait trois choses que le Markdown ne peut pas donner :
 
 Le point 2 est le vrai argument : aujourd'hui, `api_specification.md` peut mentir sans que rien ne le signale.
 
-> ⚠️ **Et il ment beaucoup plus que ce paragraphe ne le laissait croire.** §6 donnait l'enveloppe d'erreur comme « un exemple avéré ». L'inventaire du 17/07/2026 a montré l'ampleur réelle : sur ~20 endpoints documentés, **11 existent**. Toute la section Administration (10 routes), toutes les écritures sur les produits, les routines, `GET /api/orders/{id}`, `/api/users/me` — **404**. L'enveloppe d'erreur était le plus petit des écarts.
+> ⚠️ **L'inventaire du 17/07/2026 avait montré l'ampleur de la dérive** : sur ~20 endpoints documentés, 11 existaient réellement. La situation s'est nettement redressée depuis — les écritures sur les produits et `PATCH /api/auth/me` sont implémentées, et le réaudit du 13/09/2026 confirme que **toute route `/api/*` réellement présente est documentée**. Restent en 404, et signalés ⬜ comme tels : la section Administration, les routines et `GET /api/orders/{id}`.
+>
+> Ce qui n'a pas changé, c'est la cause : rien n'empêche mécaniquement la spécification de dériver du code. C'est l'argument central en faveur d'un `openapi.yaml`.
 >
 > **Le projet n'utilise pas API Platform.** Ce paragraphe proposait de générer le contrat « depuis les attributs des entités » : la brique ne figure pas dans `composer.json`, les contrôleurs sont écrits à la main. Cette voie n'existe pas — voir [architecture.md](architecture.md) §1.
 

@@ -2,15 +2,17 @@
 
 Schématise l'infrastructure décrite en prose dans [architecture.md](architecture.md) §6 et [roadmap.md](roadmap.md) phases 1 et 5.
 
-> ⚠️ **Écart majeur entre la conception et la réalité, à énoncer d'emblée** : `architecture.md` décrivait une cible Docker (`volo-api`, `volo-react`, `volo-db`, `volo-nginx`). Le développement se fait sur **XAMPP** (Apache + MariaDB locaux) avec le serveur de développement Vite à côté.
+> **Révisé le 13/09/2026.** L'écart entre conception et réalité, longtemps béant, s'est en grande partie refermé :
 >
-> **Précision du 17/07/2026** : ce document affirmait « ce `docker-compose.yml` n'existe pas ». C'est inexact — **`backend/compose.yaml` existe**, mais il ne contient que deux services sur cinq : `volo-db` (MySQL 8) et `mailer` (Mailpit). Ni `volo-api`, ni `volo-react`, ni `volo-nginx`. Et `volo-db` n'est en pratique **pas utilisé** : le dev tape sur le MariaDB de XAMPP.
+> - **La pile Docker complète existe** : `docker-compose.yml` à la racine déclare les 5 services (`nginx`, `backend`, `frontend`, `db`, `mailer`), avec `backend/Dockerfile`, `frontend/Dockerfile` et `docker/nginx/default.conf`. `backend/compose.yaml` subsiste à côté, réduit à `db` + `mailer`, pour développer le back sur XAMPP sans monter toute la pile.
+> - **Le SGBD est unifié sur MySQL 8.0** depuis le 01/09/2026 (`serverVersion=8.0` dans `DATABASE_URL`, `mysql:8.0` dans les deux fichiers Compose). L'ancien écart MariaDB 10.4 / MySQL 8 — qui avait fait échouer une migration sur `RENAME INDEX`, absent de MariaDB avant 10.5.2 — n'existe plus.
+> - **Les sauvegardes existent** : `scripts/backup-db.sh` (mysqldump compressé, rétention 30 jours, mode Docker ou XAMPP).
 >
-> D'où une conséquence que personne n'avait relevée : **le projet se développe sur MariaDB 10.4 alors que sa cible Compose est MySQL 8.** Ce sont deux SGBD, pas deux versions — une migration l'a appris en échouant sur `RENAME INDEX`, absent de MariaDB avant 10.5.2. Voir [TECHNOLOGIES.md](TECHNOLOGIES.md) §2.
+> **Ce qui reste vrai** : aucun déploiement n'a eu lieu sur un serveur réel. La configuration Nginx est écrite et cohérente, mais elle n'a tourné qu'en local. Il n'existe ni environnement de staging, ni secrets de production, ni activation du cron de sauvegarde.
 >
-> Il n'y a par ailleurs **aucun environnement de production**. Toutes les configurations Nginx du projet ont été écrites pour un déploiement qui n'a jamais eu lieu.
+> ⚠️ Les noms de services annoncés ailleurs (`volo-api`, `volo-react`, `volo-nginx`) n'existent pas : les services s'appellent `nginx`, `backend`, `frontend`, `db`, `mailer`, seuls les `container_name` portent le préfixe `volo-`.
 >
-> Ce document distingue donc systématiquement **ce qui tourne** de **ce qui est prévu**.
+> Ce document distingue systématiquement **ce qui tourne** de **ce qui est prévu**.
 
 Mermaid n'a pas de notation UML « déploiement » native (nœuds en cube, artefacts). Les `subgraph` ci-dessous représentent les **machines**, les boîtes les **artefacts déployés**.
 
@@ -60,7 +62,7 @@ server: {
 
 > **Piège** : `127.0.0.1` et non `localhost`. Sous Windows, `localhost` peut résoudre en IPv6 (`::1`) alors qu'Apache n'écoute qu'en IPv4 — la connexion est alors refusée sans message explicite.
 
-**Ce que ce schéma ne montre pas et qui n'existe pas** : aucune flèche entrante depuis Stripe. Le webhook n'est pas implémenté ([DIAGRAMME_ETATS.md](DIAGRAMME_ETATS.md) §2). La flèche vers Stripe est donc à sens unique.
+**La flèche vers Stripe n'est plus à sens unique** : `WebhookController` reçoit `POST /api/webhooks/stripe`, vérifie la signature HMAC et fait transiter `Payment` puis `Order` ([DIAGRAMME_ETATS.md](DIAGRAMME_ETATS.md) §2). En développement, l'événement est rejoué avec la CLI Stripe, l'URL publique n'existant pas encore.
 
 ---
 
@@ -131,13 +133,14 @@ Google, lui, exécute le JS — le référencement pur fonctionne sans ce dispos
 
 | Élément | État | Conséquence |
 |---|---|---|
-| `docker-compose.yml` complet | Partiel (`backend/compose.yaml` : db + mailer) | L'environnement de dev n'est pas reproductible : chaque poste doit installer XAMPP et le configurer à la main. Et le SGBD du dev (MariaDB) n'est pas celui du Compose (MySQL 8) |
-| Environnement de staging | Inexistant | Rien n'est jamais testé dans des conditions proches de la production avant d'y arriver |
-| CI/CD | Inexistant | Déploiement manuel, donc oubliable et non reproductible |
-| Sauvegardes | Inexistantes | Une perte de base = une perte définitive |
+| `docker-compose.yml` complet | ✅ Présent (5 services) | L'environnement devient reproductible ; reste à l'éprouver sur une machine autre que le poste de développement |
+| Déploiement réel | Inexistant | La configuration Nginx n'a jamais tourné ailleurs qu'en local : pour de l'infrastructure, elle est donc à considérer comme non éprouvée |
+| Environnement de staging | Inexistant | Rien n'est testé dans des conditions proches de la production avant d'y arriver |
+| CI/CD | ⚠️ Un workflow existe mais ne s'exécute pas | `frontend/.github/workflows/react-doctor.yml` est hors de `<racine>/.github/workflows/` : GitHub ne le découvre pas. Ni absent, ni fonctionnel — à déplacer |
+| Sauvegardes | ✅ Script présent, cron non activé | `scripts/backup-db.sh` (mysqldump gzip, rétention 30 j) est prêt et testé ; sa planification sur le serveur cible reste à faire |
 | Variables d'environnement de prod | Inexistantes | Les secrets de prod n'ont jamais été définis |
 
-L'absence de Docker est celle qui coûte le plus cher aujourd'hui : elle explique pourquoi les configurations Nginx du projet n'ont **jamais été exécutées une seule fois**. Elles sont écrites, relues, et non testées — ce qui, pour de la configuration d'infrastructure, revient à dire qu'elles sont probablement fausses par endroits.
+Ce qui coûte le plus cher aujourd'hui n'est plus l'absence de Docker, mais l'**absence de déploiement** : la pile est décrite, elle n'a pas été confrontée à un serveur.
 
 ---
 

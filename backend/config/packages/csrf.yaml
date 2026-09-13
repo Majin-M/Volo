@@ -7,5 +7,11 @@ framework:
     csrf_protection:
         stateless_token_ids:
             - submit
-            - authenticate
+            # 'authenticate' est volontairement absent : le CSRF stateless
+            # rend un placeholder que le controleur Stimulus 'csrf-protection'
+            # doit remplacer cote JS. La page /admin/login est du Twig
+            # autonome, sans pipeline d'assets ni Stimulus : le placeholder
+            # etait donc soumis tel quel et toute connexion echouait sur
+            # "Invalid CSRF token". Le jeton de session classique fonctionne
+            # sans JavaScript.
             - logout

@@ -25,6 +25,22 @@ export default defineConfig({
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
       },
+      // Back-office EasyAdmin : Twig, rendu par Symfony, hors SPA React.
+      // changeOrigin reste false ici : EasyAdmin genere des redirections
+      // (ex. /admin -> /admin/login) a partir du Host recu. Avec
+      // changeOrigin, Symfony verrait 127.0.0.1:8000 et redirigerait
+      // le navigateur hors de localhost:5173.
+      '/admin': {
+        target: 'http://127.0.0.1:8000',
+      },
+      // Assets EasyAdmin (CSS/JS du bundle) servis par Symfony.
+      '/bundles': {
+        target: 'http://127.0.0.1:8000',
+      },
+      // Theme VOLO du back-office (CSS + favicon).
+      '/admin-theme': {
+        target: 'http://127.0.0.1:8000',
+      },
     },
   },
   test: {

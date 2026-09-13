@@ -1,0 +1,361 @@
+/*
+===============================================================================
+Feuille de style : back-office VOLO (theme EasyAdmin)
+===============================================================================
+Objectif :
+    Aligner l'apparence d'EasyAdmin sur l'identite visuelle du site client
+    (brun cacao, ivoire, beige, vert sage).
+
+Fonctionnement :
+    EasyAdmin declare tout son CSS dans `@layer ea`. Les regles non layered
+    l'emportent sur une couche, quelle que soit leur specificite : ce fichier
+    surcharge donc le theme sans aucun `!important`.
+
+Polices :
+    Aucune police distante n'est chargee. La Content-Security-Policy du site
+    (`default-src 'self'`, voir SecurityHeadersSubscriber) bloque
+    fonts.googleapis.com : on s'appuie sur des piles systeme, avec Playfair
+    Display et Lato en tete si elles sont installees localement.
+
+Charge par :
+    - DashboardController::configureAssets()
+===============================================================================
+*/
+
+/* --- Palette VOLO ------------------------------------------------------- */
+
+:root {
+    --volo-cacao: #5F4C42;
+    --volo-cacao-dark: #4A3B33;
+    --volo-cacao-darker: #3A2E28;
+    --volo-ivoire: #F8F0E8;
+    --volo-beige: #E9D7C3;
+    --volo-beige-dark: #DCC4A8;
+    --volo-sage: #9CB997;
+    --volo-sage-dark: #7FA079;
+    --volo-sage-darker: #6B8C66;
+    --volo-muted: #8A7A6F;
+
+    --volo-font-titre: 'Playfair Display', Georgia, 'Times New Roman', serif;
+    --volo-font-texte: 'Lato', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+        Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* --- Theme clair -------------------------------------------------------- */
+
+:root {
+    --font-family-base: var(--volo-font-texte);
+    --font-family-sans-serif: var(--volo-font-texte);
+
+    --color-primary: var(--volo-cacao);
+    --primary-bg: var(--volo-ivoire);
+    --secondary-bg: #fff;
+    --body-bg: var(--volo-ivoire);
+    --content-bg: var(--volo-ivoire);
+    --content-panel-bg: #fff;
+    --fieldset-bg: #fff;
+
+    --text-color: var(--volo-cacao);
+    --text-primary-color: var(--volo-cacao);
+    --text-secondary-color: var(--volo-muted);
+    --text-tertiary-color: var(--volo-muted);
+    --text-muted: var(--volo-muted);
+    --text-on-primary: #fff;
+
+    --border-color: var(--volo-beige);
+    --border-primary-color: var(--volo-beige);
+    --border-secondary-color: var(--volo-beige-dark);
+    --border-tertiary-color: var(--volo-beige-dark);
+    --content-top-border-color: var(--volo-beige);
+    --content-section-border-color: var(--volo-beige);
+
+    --link-color: var(--volo-cacao);
+    --link-hover-color: var(--volo-sage-darker);
+    --link-hover-decoration: underline;
+
+    /* Barre laterale : aplat cacao, reprise directe de la NavBar du site */
+    --sidebar-bg: var(--volo-cacao);
+    --sidebar-border-color: var(--volo-cacao-dark);
+    --sidebar-logo-color: var(--volo-ivoire);
+    --sidebar-menu-color: var(--volo-ivoire);
+    --sidebar-menu-icon-color: var(--volo-beige);
+    --sidebar-menu-header-color: var(--volo-beige-dark);
+    --sidebar-menu-submenu-color: var(--volo-beige);
+    --sidebar-menu-hover-color: #fff;
+    --sidebar-item-hover-bg: var(--volo-cacao-dark);
+    --sidebar-item-icon-tile-hover-bg: var(--volo-cacao-darker);
+    --sidebar-menu-active-item-bg: var(--volo-sage);
+    --sidebar-menu-active-item-color: #fff;
+    --sidebar-menu-badge-bg: var(--volo-beige);
+    --sidebar-menu-badge-color: var(--volo-cacao);
+    --sidebar-menu-badge-active-bg: var(--volo-sage);
+    --sidebar-menu-badge-active-color: #fff;
+    --sidebar-tooltip-bg: var(--volo-cacao-darker);
+    --sidebar-tooltip-color: var(--volo-ivoire);
+
+    --responsive-header-bg: var(--volo-cacao);
+    --responsive-header-border-color: var(--volo-cacao-dark);
+    --responsive-header-logo-color: var(--volo-ivoire);
+
+    --user-avatar-icon-bg: var(--volo-beige);
+    --user-avatar-icon-color: var(--volo-cacao);
+    --user-name-color: var(--volo-ivoire);
+
+    /* Action principale : vert sage, comme les CTA du site */
+    --button-primary-bg: var(--volo-sage);
+    --button-primary-border-color: var(--volo-sage);
+    --button-primary-color: #fff;
+    --button-primary-icon-color: #fff;
+    --button-primary-hover-bg: var(--volo-sage-dark);
+    --button-primary-hover-border-color: var(--volo-sage-dark);
+    --button-primary-hover-color: #fff;
+    --button-primary-active-bg: var(--volo-sage-darker);
+    --button-primary-active-border-color: var(--volo-sage-darker);
+    --button-primary-active-color: #fff;
+
+    --button-secondary-bg: #fff;
+    --button-secondary-color: var(--volo-cacao);
+    --button-secondary-icon-color: var(--volo-cacao);
+    --button-secondary-border-color: var(--volo-beige-dark);
+    --button-secondary-hover-bg: var(--volo-beige);
+    --button-secondary-hover-color: var(--volo-cacao);
+    --button-secondary-hover-border-color: var(--volo-beige-dark);
+    --button-secondary-active-bg: var(--volo-beige-dark);
+    --button-secondary-active-color: var(--volo-cacao);
+
+    --button-success-bg: var(--volo-sage);
+    --button-success-border-color: var(--volo-sage);
+    --button-success-hover-bg: var(--volo-sage-dark);
+    --button-success-hover-border-color: var(--volo-sage-dark);
+
+    --button-invisible-color: var(--volo-cacao);
+    --button-invisible-icon-color: var(--volo-cacao);
+    --button-invisible-hover-bg: var(--volo-beige);
+    --button-invisible-hover-color: var(--volo-cacao-dark);
+
+    --button-focus-outline-color: var(--volo-sage);
+    --button-border-radius: 6px;
+
+    --table-thead-color: var(--volo-cacao);
+    --table-cell-color: var(--volo-cacao);
+    --table-cell-border-color: var(--volo-beige);
+    --table-hover-cell-bg: var(--volo-ivoire);
+    --table-selected-cell-bg: var(--volo-beige);
+    --table-thead-marker-color: var(--volo-muted);
+    --table-thead-sorted-color: var(--volo-cacao);
+    --table-thead-sorted-marker-color: var(--volo-sage-darker);
+
+    --datalist-border-color: var(--volo-beige);
+    --datalist-label-color: var(--volo-muted);
+    --datalist-value-color: var(--volo-cacao);
+
+    --form-label-color: var(--volo-cacao);
+    --form-control-bg: #fff;
+    --form-input-text-color: var(--volo-cacao);
+    --form-input-border-color: var(--volo-beige-dark);
+    --form-input-hover-border-color: var(--volo-sage);
+    --form-input-group-text-bg: var(--volo-ivoire);
+    --form-input-group-text-border-color: var(--volo-beige-dark);
+    --form-input-addon-color: var(--volo-muted);
+    --form-control-disabled-bg: var(--volo-ivoire);
+    --form-control-disabled-color: var(--volo-muted);
+    --form-help-color: var(--volo-muted);
+    --form-fieldset-header-color: var(--volo-cacao);
+    --form-fieldset-border-color: var(--volo-beige);
+    --form-fieldset-header-border-color: var(--volo-beige);
+    --form-fieldset-icon-color: var(--volo-sage-darker);
+    --form-column-header-color: var(--volo-cacao);
+    --form-column-icon-color: var(--volo-sage-darker);
+    --form-tabs-border-color: var(--volo-beige);
+    --form-tabs-item-hover-bg: var(--volo-ivoire);
+    --form-tabs-indicator-color: var(--volo-sage);
+
+    --switch-bg: var(--volo-beige-dark);
+    --switch-checked-bg: var(--volo-sage);
+    --switch-thumb-bg: #fff;
+    --switch-success-bg: var(--volo-sage);
+    --form-type-check-input-checked-bg: var(--volo-sage);
+
+    --content-search-input-bg: #fff;
+    --content-search-icon-color: var(--volo-muted);
+
+    --dropdown-bg: #fff;
+    --dropdown-color: var(--volo-cacao);
+    --dropdown-border-color: var(--volo-beige);
+    --dropdown-link-color: var(--volo-cacao);
+    --dropdown-link-hover-bg: var(--volo-ivoire);
+    --dropdown-icon-color: var(--volo-muted);
+    --dropdown-toggle-bg: #fff;
+    --dropdown-toggle-color: var(--volo-cacao);
+    --dropdown-toggle-border-color: var(--volo-beige-dark);
+    --dropdown-toggle-hover-border-color: var(--volo-sage);
+    --dropdown-settings-active-item-bg: var(--volo-beige);
+    --dropdown-settings-active-item-color: var(--volo-cacao);
+
+    --popover-bg: #fff;
+    --popover-color: var(--volo-cacao);
+    --popover-border-color: var(--volo-beige);
+
+    --modal-bg: #fff;
+    --modal-header-bg: var(--volo-ivoire);
+    --modal-footer-bg: var(--volo-ivoire);
+    --modal-border-color: var(--volo-beige);
+    --modal-header-border-color: var(--volo-beige);
+    --modal-title-color: var(--volo-cacao);
+    --modal-icon-bg: var(--volo-beige);
+    --modal-icon-color: var(--volo-cacao);
+
+    --pagination-color: var(--volo-cacao);
+    --pagination-hover-border-color: var(--volo-sage);
+    --pagination-active-bg: var(--volo-cacao);
+    --pagination-active-color: #fff;
+    --pagination-disabled-color: var(--volo-muted);
+
+    --badge-primary-bg: var(--volo-beige);
+    --badge-primary-color: var(--volo-cacao);
+    --badge-secondary-bg: var(--volo-ivoire);
+    --badge-secondary-color: var(--volo-muted);
+    --badge-success-bg: var(--volo-sage);
+    --badge-success-color: #fff;
+    --badge-boolean-true-bg: var(--volo-sage);
+    --badge-boolean-true-color: #fff;
+    --badge-boolean-false-bg: var(--volo-beige-dark);
+    --badge-boolean-false-color: var(--volo-cacao);
+
+    --alert-primary-bg: var(--volo-beige);
+    --alert-primary-color: var(--volo-cacao);
+    --alert-primary-border-color: var(--volo-beige-dark);
+    --alert-success-bg: #EAF2E8;
+    --alert-success-color: var(--volo-sage-darker);
+    --alert-success-border-color: var(--volo-sage);
+
+    --highlight-bg: var(--volo-beige);
+    --highlight-color: var(--volo-cacao);
+    --color-success: var(--volo-sage-darker);
+
+    /* Ecran de connexion du back-office */
+    --page-login-bg: var(--volo-cacao);
+    --page-login-form-bg: var(--volo-ivoire);
+    --page-login-form-control-bg: #fff;
+    --page-login-form-control-border-color: var(--volo-beige-dark);
+    --page-login-form-control-button-bg: var(--volo-sage);
+}
+
+/* --- Theme sombre ------------------------------------------------------- */
+/* EasyAdmin permet de basculer en mode sombre : on garde la meme famille
+   chromatique en inversant les roles, plutot que de laisser le gris par
+   defaut cotoyer le cacao. */
+
+.ea-dark-scheme {
+    --body-bg: #2A211D;
+    --content-bg: #2A211D;
+    --content-panel-bg: #342A25;
+    --fieldset-bg: #342A25;
+
+    --text-color: var(--volo-ivoire);
+    --text-primary-color: var(--volo-ivoire);
+    --text-secondary-color: var(--volo-beige-dark);
+    --text-muted: #B3A398;
+
+    --border-color: #4A3B33;
+    --border-primary-color: #4A3B33;
+    --border-secondary-color: #5F4C42;
+
+    --link-color: var(--volo-beige);
+    --link-hover-color: var(--volo-sage);
+
+    --sidebar-bg: var(--volo-cacao-darker);
+    --sidebar-border-color: #241C18;
+    --sidebar-item-hover-bg: var(--volo-cacao-dark);
+    --sidebar-menu-active-item-bg: var(--volo-sage-darker);
+
+    --content-panel-bg: #342A25;
+    --form-control-bg: #2A211D;
+    --form-input-text-color: var(--volo-ivoire);
+    --form-input-border-color: #5F4C42;
+    --table-cell-color: var(--volo-ivoire);
+    --table-cell-border-color: #4A3B33;
+    --table-hover-cell-bg: #3D3029;
+    --table-thead-color: var(--volo-beige);
+
+    --switch-bg: #5F4C42;
+    --switch-checked-bg: var(--volo-sage-darker);
+    --form-type-check-input-checked-bg: var(--volo-sage-darker);
+    --button-primary-bg: var(--volo-sage-darker);
+    --button-primary-border-color: var(--volo-sage-darker);
+    --button-primary-hover-bg: var(--volo-sage);
+    --button-primary-hover-border-color: var(--volo-sage);
+    --sidebar-menu-active-item-color: #fff;
+    --pagination-active-bg: var(--volo-sage-darker);
+}
+
+/* Bootstrap pilote quelques controles par ses propres variables, hors du
+   vocabulaire EasyAdmin : sans cela les cases cochees restent bleues. */
+:root,
+.ea-dark-scheme {
+    --bs-primary: var(--volo-sage);
+    --bs-primary-rgb: 156, 185, 151;
+    --bs-link-color: var(--volo-cacao);
+    --bs-link-hover-color: var(--volo-sage-darker);
+}
+
+.form-check-input:checked {
+    background-color: var(--volo-sage);
+    border-color: var(--volo-sage);
+}
+
+.form-check-input:focus {
+    border-color: var(--volo-sage);
+    box-shadow: 0 0 0 0.25rem rgba(156, 185, 151, 0.35);
+}
+
+/* --- Typographie -------------------------------------------------------- */
+
+.content-header-title,
+.page-title,
+.content-header h1,
+h1, h2, h3,
+.title,
+.modal-title {
+    font-family: var(--volo-font-titre);
+    letter-spacing: 0.3px;
+}
+
+/* --- Identite de la barre laterale -------------------------------------- */
+
+/* Le logo est un .webp deja colore : on le laisse tel quel, on ne regle que
+   sa taille. Sans cela il s'affiche a sa taille native (~140px de haut). */
+#header-logo img,
+#responsive-header-logo img {
+    height: 42px;
+    width: auto;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+#header-logo .logo-custom,
+#responsive-header-logo .responsive-logo {
+    font-family: var(--volo-font-titre);
+    font-size: 1.05rem;
+    letter-spacing: 1.2px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.main-menu .menu-item a {
+    border-radius: 6px;
+}
+
+/* --- Ecran de connexion ------------------------------------------------- */
+
+.ea-login .form-signin,
+.ea-login-form {
+    border-radius: 10px;
+    border: 1px solid var(--volo-beige-dark);
+}
+
+.ea-login h1.title {
+    font-family: var(--volo-font-titre);
+    color: var(--volo-cacao);
+}

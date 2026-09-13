@@ -1,5 +1,9 @@
 framework:
-    default_locale: en
+    # Site et back-office entierement francophones. Cette locale pilote aussi
+    # les libelles natifs d'EasyAdmin (« Ajouter », « resultats », « Rechercher »),
+    # qui restaient en anglais avec 'en'.
+    default_locale: fr
     translator:
         default_path: '%kernel.project_dir%/translations'
+        fallbacks: ['fr', 'en']
         providers:

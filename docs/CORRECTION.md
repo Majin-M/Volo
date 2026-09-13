@@ -7,7 +7,7 @@ Corrige les deux défauts 🔴 identifiés dans `docs/MODELE_DONNEES.md` §6.1 e
 > - **La migration ne s'est jamais exécutée.** Elle plantait dès sa première requête (`Unknown column 'p.order_id'`). `Version20260717120000` n'était dans le `doctrine_migration_versions` d'aucune base, et `shop_order` portait toujours `payment_status` / `payment_method`. Le code des entités était corrigé, le schéma non — donc **l'application était cassée** contre la base de dev : Doctrine mappait `Payment.orderEntity` sur une colonne inexistante.
 > - **Les résultats affichés plus bas n'ont pas été obtenus.** La sortie d'exemple (« Commandes à reprendre en Payment : 3 ») ne pouvait pas être produite par une migration qui échouait avant. Et `verifier.php`, dont ce document annonce « 20 réussis, 0 échoués », **n'existe pas dans le dépôt**.
 >
-> **✅ Réparée, appliquée et vérifiée le 17/07/2026.** La migration a tourné sur `volo` après sauvegarde ; `doctrine:schema:validate` est vert sur les deux bases. Les vérifications que ce document demandait de « contrôler à la main » sont désormais des tests : `tests/Entity/OrderPaymentTest.php` (9 tests), dans une suite qui en compte 26 (88 assertions).
+> **✅ Réparée, appliquée et vérifiée le 17/07/2026.** La migration a tourné sur `volo` après sauvegarde ; `doctrine:schema:validate` est vert sur les deux bases. Les vérifications que ce document demandait de « contrôler à la main » sont désormais des tests : `tests/Entity/OrderPaymentTest.php` (9 tests), dans une suite qui en compte 36 (108 assertions).
 
 ---
 
@@ -39,7 +39,7 @@ L'ironie mérite d'être notée, parce qu'elle est instructive : cette migration
 - L'index `UNIQUE` est renommé lui aussi : le `CHANGE` conserve l'index mais pas son nom, qui reste haché sur l'ancienne colonne — et `doctrine:schema:validate` reste rouge tant qu'il diffère de ce qu'attend Doctrine.
 - `down()` est strictement symétrique (vérifié : aller-retour complet, état d'origine restauré à l'identique).
 
-**Piège de moteur, découvert à l'exécution** : `RENAME INDEX` (première tentative) n'existe qu'à partir de MariaDB 10.5.2 et XAMPP livre **10.4** — erreur de syntaxe 1064. Remplacé par `DROP INDEX` + `CREATE UNIQUE INDEX`, portable MySQL comme MariaDB. À rapprocher de `docs/TECHNOLOGIES.md` §2 : le projet croit tourner sur MySQL 8, il tourne sur MariaDB 10.4.
+**Piège de moteur, découvert à l'exécution** : `RENAME INDEX` (première tentative) n'existe qu'à partir de MariaDB 10.5.2 et XAMPP livre **10.4** — erreur de syntaxe 1064. Remplacé par `DROP INDEX` + `CREATE UNIQUE INDEX`, portable MySQL comme MariaDB. C'est cet incident qui a mis au jour la désynchronisation des moteurs, **résolue depuis le 01/09/2026** : le projet est unifié sur MySQL 8.0 (cf. `docs/TECHNOLOGIES.md` §2).
 
 **Résultat après réparation**, sur `volo_test` recréée de zéro :
 
@@ -179,7 +179,7 @@ php bin/console doctrine:migrations:migrate --no-interaction   # 8 migrations, O
 php bin/console doctrine:migrations:migrate prev               # down(), OK
 php bin/console doctrine:schema:validate                       # 2x [OK]
 
-php vendor/bin/phpunit                                         # OK (26 tests, 88 assertions)
+php bin/phpunit                                                # OK (36 tests, 108 assertions)
 ```
 
 L'aller-retour a été contrôlé colonne par colonne : après `down()`, `payment.order_entity_id`, `shop_order.payment_status` / `payment_method` et le nom d'index d'origine sont restaurés à l'identique.

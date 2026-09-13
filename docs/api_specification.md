@@ -87,32 +87,51 @@ Toutes les réponses suivent la même enveloppe :
 ```json
 {
   "error": {
-    "code": "PRODUCT_NOT_FOUND",
-    "message": "Aucun produit trouvé avec l'identifiant 42."
+    "code": 404,
+    "message": "Ressource introuvable."
   }
 }
 ```
 
+> `code` est le **statut HTTP en entier**, pas un symbole métier : il n'existe aucun identifiant du
+> type `PRODUCT_NOT_FOUND` dans le code. Cette enveloppe est produite par `ExceptionSubscriber`,
+> qui intercepte les exceptions sur `/api/*` ; en production les messages des erreurs 500 sont
+> remplacés par un texte générique.
+>
+> ⚠️ **Cette enveloppe n'est pas encore universelle.** Les contrôleurs qui renvoient une erreur
+> directement, sans lever d'exception, court-circuitent le subscriber et produisent la forme plate
+> `{"error": "message"}` — c'est le cas de plusieurs points dans `ProductController`,
+> `OrderController`, `AuthController` et `CsrfProtectionSubscriber`. Uniformiser ces retours est
+> un correctif identifié.
+
 ### Authentification
 
-Les routes protégées nécessitent un header :
+Le jeton JWT voyage dans un **cookie `HttpOnly` nommé `volo_token`**, posé par l'API à la connexion et renvoyé automatiquement par le navigateur.
 
 ```
-Authorization: Bearer <jwt_token>
+Cookie: volo_token=<jwt>          ← posé et lu par le serveur, invisible en JavaScript
+X-Csrf-Token: <valeur du cookie volo_csrf>   ← requis sur POST/PUT/PATCH/DELETE
 ```
+
+> ⚠️ **L'en-tête `Authorization: Bearer` ne fonctionne pas.** `lexik_jwt_authentication.yaml` déclare
+> `authorization_header.enabled: false` et `cookie.enabled: true` : un Bearer est silencieusement ignoré
+> et la requête repart en `401`. Le raisonnement derrière ce choix — et pourquoi `localStorage` a été
+> écarté — est dans [CONTRAT_API.md](CONTRAT_API.md) §1.
+>
+> En pratique, avec curl : `curl -c jar -b jar` pour conserver le cookie, jamais `-H "Authorization: ..."`.
 
 ### Codes de réponse
 
 | Code | Signification | Usage |
 |---|---|---|
-| `200 OK` | Succès | GET, PUT, PATCH |
+| `200 OK` | Succès | GET, PUT, PATCH, et `DELETE /api/products/{id}` (qui renvoie un message) |
 | `201 Created` | Ressource créée | POST |
-| `204 No Content` | Succès sans corps | DELETE |
 | `400 Bad Request` | Données invalides | Validation échouée |
-| `401 Unauthorized` | Non authentifié | JWT manquant ou expiré |
-| `403 Forbidden` | Non autorisé | Rôle insuffisant |
+| `401 Unauthorized` | Non authentifié | Cookie JWT manquant ou expiré |
+| `403 Forbidden` | Non autorisé | Rôle insuffisant, ou jeton CSRF absent/incorrect |
 | `404 Not Found` | Ressource introuvable | ID inexistant |
 | `422 Unprocessable Entity` | Erreur métier | Contrainte BDD |
+| `429 Too Many Requests` | Quota dépassé | Limitation de débit (connexion, inscription, contact, profil) |
 | `500 Internal Server Error` | Erreur serveur | Exception non gérée |
 
 ---
@@ -287,8 +306,8 @@ Détail d'un produit.
 ```json
 {
   "error": {
-    "code": "PRODUCT_NOT_FOUND",
-    "message": "Aucun produit trouvé avec l'identifiant 99."
+    "code": 404,
+    "message": "Produit introuvable."
   }
 }
 ```
@@ -335,7 +354,13 @@ Suppression d'un produit. Protégé par `ProductVoter::DELETE` (`ROLE_ADMIN`).
 
 **Accès :** `ROLE_ADMIN`
 
-**Réponse 204** (pas de corps)
+**Réponse 200 :**
+```json
+{ "message": "Produit supprime avec succes." }
+```
+
+> Un `204 No Content` serait plus conforme pour une suppression ; le contrôleur renvoie aujourd'hui
+> un `200` avec un message, hors de l'enveloppe d'erreur standard. Écart connu, à harmoniser.
 
 ---
 
@@ -570,7 +595,7 @@ Initiation d'un paiement pour une commande.
 
 > ⚠️ **La route s'appelle `GET /api/auth/me`, pas `/api/users/me`.** C'est un piège concret : un développeur front qui suit ce document reçoit un 404 sans comprendre pourquoi. `AuthContext` l'utilise pour restaurer la session au montage ([CONTRAT_API.md](CONTRAT_API.md) §1).
 >
-> `PATCH /api/users/me` **n'existe pas** (roadmap 2.11 ⬜ 🟠) : le profil n'est pas modifiable par l'API.
+> `PATCH /api/users/me` n'existe pas non plus sous ce nom — **la route réelle est `PATCH /api/auth/me`**, documentée plus bas, et le profil est bien modifiable par l'API (prénom, nom, mot de passe), avec une limitation à 10 tentatives par 15 minutes.
 
 ### GET /api/users/me → en réalité `GET /api/auth/me`
 
@@ -582,14 +607,20 @@ Profil de l'utilisateur connecté.
 ```json
 {
   "data": {
-    "id": 12,
-    "email": "user@example.com",
-    "firstName": "Sophie",
-    "lastName": "Martin",
-    "createdAt": "2026-01-01T00:00:00Z"
+    "user": {
+      "id": 12,
+      "email": "user@example.com",
+      "firstName": "Sophie",
+      "lastName": "Martin",
+      "role": ["ROLE_USER"]
+    }
   }
 }
 ```
+
+> Deux détails que le front doit connaître : le profil est **imbriqué sous `user`** (et non à plat sous
+> `data`), et la clé des rôles est `role` — au singulier — alors qu'elle contient un tableau.
+> `createdAt` n'est pas renvoyé.
 
 ---
 

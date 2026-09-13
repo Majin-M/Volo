@@ -23,6 +23,7 @@ Dependances :
 namespace App\Controller\Admin;
 
 use App\Entity\SkinConcern;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
 use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
 use EasyCorp\Bundle\EasyAdminBundle\Field\SlugField;
@@ -33,6 +34,14 @@ class SkinConcernCrudController extends AbstractCrudController
     public static function getEntityFqcn(): string
     {
         return SkinConcern::class;
+    }
+
+    public function configureCrud(Crud $crud): Crud
+    {
+        return $crud
+            ->setEntityLabelInSingular('Problématique')
+            ->setEntityLabelInPlural('Problématiques')
+            ->setPageTitle(Crud::PAGE_INDEX, 'Problématiques de peau');
     }
 
     public function configureFields(string $pageName): iterable

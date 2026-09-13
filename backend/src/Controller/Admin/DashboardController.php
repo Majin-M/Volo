@@ -36,6 +36,7 @@ use App\Controller\Admin\OrderCrudController;
 use App\Controller\Admin\PaymentCrudController;
 use App\Controller\Admin\UserCrudController;
 
+use EasyCorp\Bundle\EasyAdminBundle\Config\Assets;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Dashboard;
 use EasyCorp\Bundle\EasyAdminBundle\Config\MenuItem;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractDashboardController;
@@ -61,14 +62,25 @@ class DashboardController extends AbstractDashboardController
     public function configureDashboard(): Dashboard
     {
         return Dashboard::new()
-            ->setTitle('<img src="/volo-logo.svg" style="height: 30px"> VOLO Admin')
-            ->setFaviconPath('favicon.svg');
+            // '/volo-logo.svg' et 'favicon.svg' n'existaient pas dans public/ :
+            // le logo etait une image cassee. On reutilise celui de la SPA,
+            // servi a la meme URL en dev (Vite) comme en prod (Nginx).
+            ->setTitle('<img src="/images/Vologo.webp" alt=""> VOLO Admin')
+            ->setFaviconPath('/admin-theme/favicon.svg');
+    }
+
+    public function configureAssets(): Assets
+    {
+        return Assets::new()->addCssFile('/admin-theme/volo-admin.css');
     }
 
     public function configureMenuItems(): iterable
     {
         yield MenuItem::linkToDashboard('Tableau de bord', 'fa fa-home');
-        yield MenuItem::linkToRoute('Retour au site', 'fa fa-external-link-alt', 'app_home');
+        // La SPA React n'a pas de route Symfony nommee : on cible l'URL
+        // racine directement (linkToRoute('app_home') pointait dans le vide
+        // et faisait echouer le rendu du menu).
+        yield MenuItem::linkToUrl('Retour au site', 'fa fa-external-link-alt', '/');
 
         yield MenuItem::section('Catalogue');
 

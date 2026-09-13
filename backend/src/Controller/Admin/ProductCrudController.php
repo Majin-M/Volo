@@ -26,6 +26,7 @@ Dependances :
 namespace App\Controller\Admin;
 
 use App\Entity\Product;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
 use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
@@ -43,40 +44,54 @@ class ProductCrudController extends AbstractCrudController
         return Product::class;
     }
 
+    public function configureCrud(Crud $crud): Crud
+    {
+        return $crud
+            ->setEntityLabelInSingular('Produit')
+            ->setEntityLabelInPlural('Produits')
+            ->setPageTitle(Crud::PAGE_INDEX, 'Produits')
+            ->setDefaultSort(['createdAt' => 'DESC']);
+    }
+
+    /**
+     * Un seul jeu de champs, dont la visibilite est reglee par page.
+     *
+     * La version precedente listait deux fois les memes champs (un bloc
+     * « liste » puis un bloc « formulaire ») sans filtrer sur $pageName :
+     * chaque colonne apparaissait donc en double dans le tableau, une fois
+     * avec son libelle francais et une fois avec le libelle par defaut.
+     */
     public function configureFields(string $pageName): iterable
     {
         return [
-            // Dans la liste (Index)
             TextField::new('name')->setLabel('Nom'),
+
             ImageField::new('imageUrl')
                 ->setLabel('Image')
-                ->setBasePath('/images/products') 
+                ->setBasePath('/images/products')
                 ->onlyOnIndex(),
-            NumberField::new('price')->setLabel('Prix'),
-            IntegerField::new('stock')->setLabel('Stock'),
-            AssociationField::new('brand')->setLabel('Marque'),
-            Field::new('isAvailable')->setLabel('Disponible ?'),
-            
-            // Dans le formulaire (Create/Edit)
-            TextField::new('name'),
-            TextareaField::new('description')->setLabel('Description'),
-            
-            // CHAMP UPLOAD IMAGE
+
             Field::new('imageFile')
-                ->setLabel('Image (Fichier)')
+                ->setLabel('Image (fichier)')
                 ->setFormType(VichImageType::class)
                 ->onlyOnForms()
                 ->setRequired(false),
-                
-            NumberField::new('price'),
+
+            TextareaField::new('description')
+                ->setLabel('Description')
+                ->hideOnIndex(),
+
+            NumberField::new('price')->setLabel('Prix'),
             IntegerField::new('stock')->setLabel('Stock'),
+            AssociationField::new('brand')->setLabel('Marque'),
             Field::new('isAvailable')->setLabel('Disponible'),
-            AssociationField::new('brand'),
-            
-            // Relations ManyToMany (Problématiques)
-            AssociationField::new('skinConcerns')->setLabel('Problématiques')->setFormTypeOptions([
-                'by_reference' => false // Important pour ManyToMany dans EasyAdmin
-            ]),
+
+            AssociationField::new('skinConcerns')
+                ->setLabel('Problématiques')
+                ->hideOnIndex()
+                ->setFormTypeOptions([
+                    'by_reference' => false, // Important pour ManyToMany dans EasyAdmin
+                ]),
         ];
     }
 }

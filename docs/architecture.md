@@ -1,8 +1,10 @@
 # Architecture — Projet VOLO
 
-> ⚠️ **Ce document décrivait la conception d'origine, pas le projet construit.** Il a été repris le 17/07/2026 après confrontation au code réel. Plusieurs briques qu'il présentait au présent n'ont jamais existé : API Platform, les Voters, la couche `DTO/`, les événements métier.
+> **Repris le 13/09/2026, après confrontation ligne à ligne au code.** La révision précédente datait du 17/07 et décrivait un projet nettement moins avancé : elle niait l'existence des Voters, des écritures sur `/api/products`, de la pile Docker, du webhook Stripe, des emails de confirmation et de la gestion de stock. Ces briques existent toutes désormais et sont décrites ici au présent.
 >
-> Les écarts sont désormais signalés ⬜ **prévu** ou ❌ **abandonné** plutôt que décrits comme acquis. Quand ce document et [CONTRAT_API.md](CONTRAT_API.md) divergent, **c'est CONTRAT_API qui fait foi** : il a été écrit à partir du code.
+> Ce qui reste marqué ❌ **abandonné** ou ⬜ **prévu** l'est en connaissance de cause : API Platform et la couche `DTO/` n'existent toujours pas.
+>
+> Quand ce document et [CONTRAT_API.md](CONTRAT_API.md) divergent, **c'est CONTRAT_API qui fait foi** : il est écrit à partir du code.
 
 ## Table des matières
 
@@ -24,19 +26,17 @@ VOLO est une application e-commerce skincare construite sur une architecture **d
 |---|---|---|
 | **API REST** | Symfony 7, contrôleurs écrits à la main | Exposition des données et logique métier |
 | **Front-end SPA** | React 19 + Vite | Interface utilisateur |
-| **Base de données** | MariaDB 10.4 en dev (XAMPP) | Persistance des données |
+| **Base de données** | MySQL 8.0 | Persistance des données |
 | **Auth** | JWT (LexikJWTBundle), en cookie `HttpOnly` | Authentification stateless |
-| **Infra** | XAMPP (Apache) + proxy Vite | Développement local |
+| **Infra** | XAMPP (Apache) + proxy Vite en dev ; Nginx + Docker en cible | Développement local et production |
 
 > **❌ API Platform n'est pas utilisé.** Il ne figure pas dans `composer.json`. Chaque endpoint est un contrôleur Symfony écrit à la main qui construit sa réponse avec `JsonResponse`. Toute affirmation contraire — y compris [CONTRAT_API.md](CONTRAT_API.md) §8, qui suggère de générer le contrat depuis les attributs d'entités — repose sur une brique absente.
 >
-> **La base est MariaDB, pas MySQL 8.** XAMPP livre MariaDB (10.4.32 sur le poste de dev), alors que `backend/compose.yaml` épingle `mysql:8.0` et que [TECHNOLOGIES.md](TECHNOLOGIES.md) §2 argumente le choix de « MySQL 8 ». Ce sont trois moteurs pour un même projet. Ce n'est pas théorique : `RENAME INDEX` existe en MySQL 5.7+ et seulement à partir de MariaDB 10.5.2 — une migration l'a appris en échouant.
->
-> **Docker et Nginx ne servent à rien aujourd'hui.** Voir §6.
+> **Le SGBD est unifié sur MySQL 8.0 depuis le 01/09/2026.** `DATABASE_URL` cible explicitement `serverVersion=8.0`, et les deux fichiers Compose épinglent `mysql:8.0`. Auparavant XAMPP livrait MariaDB 10.4 en dev face à MySQL 8 en conteneur : ce n'était pas théorique, `RENAME INDEX` existe en MySQL 5.7+ mais seulement à partir de MariaDB 10.5.2 — une migration l'a appris en échouant.
 
-Principe fondamental : **le front-end ne contient aucune logique métier.** Toute règle métier (prix, validation de commande) appartient aux Services Symfony.
+Principe fondamental : **le front-end ne contient aucune logique métier.** Toute règle métier (prix, stock, validation de commande) appartient aux Services Symfony.
 
-> Attention : « stock » figurait dans cette phrase. Il n'y a **aucune gestion de stock** dans VOLO, seulement un booléen `isAvailable` — cf. [MODELE_DONNEES.md](MODELE_DONNEES.md) §6.4.
+> La gestion de stock existe depuis la migration `Version20260901120000` : colonne `stock` sur `Product`, vérifiée et décrémentée par `OrderService` à la création de commande. `isAvailable` subsiste comme interrupteur manuel côté admin — cf. [MODELE_DONNEES.md](MODELE_DONNEES.md) §6.4.
 
 ---
 
@@ -54,21 +54,25 @@ volo/
 │   │   ├── DataFixtures/        # Données de test
 │   │   ├── Entity/              # Entités Doctrine
 │   │   ├── Enum/                # OrderStatus, PaymentStatus, UserRole…
+│   │   ├── Doctrine/Filter/     # SoftDeleteFilter (exclut les enregistrements supprimés)
 │   │   ├── Event/               # VIDE — ⬜ aucun événement métier
-│   │   ├── EventSubscriber/     # CsrfProtection, SecurityHeaders
-│   │   ├── Form/                # VIDE
+│   │   ├── EventSubscriber/     # Audit, CsrfProtection, Exception,
+│   │   │                        #   SecurityHeaders, StatusTransition,
+│   │   │                        #   WorkflowValidationListener (⚠ doublon, cf. §3)
 │   │   ├── Repository/          # Requêtes BDD
-│   │   ├── Security/            # VIDE — ⬜ aucun Voter (roadmap 2.5)
+│   │   ├── Security/            # OrderVoter, ProductVoter
 │   │   └── Service/             # Logique métier + PaymentGateway/
 │   │
 │   ├── migrations/              # Migrations Doctrine
-│   ├── tests/                   # 26 tests / 88 assertions au total
-│   │   ├── Controller/          # AuthControllerTest
+│   ├── public/admin-theme/      # Thème VOLO du back-office (CSS + favicon)
+│   ├── tests/                   # 36 tests / 108 assertions au total
+│   │   ├── Controller/          # AuthControllerTest, WebhookStripeTest
 │   │   ├── Entity/              # OrderPaymentTest
 │   │   ├── Security/            # CsrfProtectionTest
 │   │   └── Service/             # ContactNotificationTest
 │   │
-│   ├── compose.yaml             # volo-db + mailer SEULEMENT (cf. §6)
+│   ├── compose.yaml             # db + mailer seulement — la pile complète
+│   │                            #   est à la racine du dépôt (cf. §6)
 │   ├── phpstan.neon             # niveau max + baseline
 │   ├── config/  public/  .env
 │
@@ -76,13 +80,17 @@ volo/
 │   ├── src/
 │   │   ├── api/                 # api.js, contactApi.js, productApi.js
 │   │   ├── assets/
-│   │   ├── components/          # NavBar, Footer, ProductCard, PaymentForm, Skeleton
-│   │   ├── contexts/            # AuthContext, CartContext
+│   │   ├── components/          # NavBar, Footer, ProductCard, PaymentForm,
+│   │   │                        #   PrivateRoute, ConfirmDialog, ErrorBoundary,
+│   │   │                        #   FormField, PasswordStrength, Skeleton
+│   │   ├── contexts/            # AuthContext, CartContext, ToastContext
 │   │   ├── pages/               # Une page par route
+│   │   ├── test/                # Configuration Vitest
 │   │   └── utils/               # validators.js
 │   │
 │   ├── index.html
-│   └── vite.config.js           # proxy /api → 127.0.0.1:8000 (pièce d'architecture)
+│   └── vite.config.js           # proxy /api, /admin, /bundles, /admin-theme
+│                                #   → 127.0.0.1:8000 (pièce d'architecture)
 │
 ├── docs/
 └── .gitignore                   # .env / .env.* / !.env.example
@@ -92,12 +100,11 @@ volo/
 
 | Annoncé | Réalité |
 |---|---|
-| `backend/src/DTO/` | ❌ Jamais créé. Les contrôleurs construisent leurs tableaux à la main et les passent à `JsonResponse` — il n'existe aucun `ResponseDTO` (cf. §3) |
-| `backend/src/Security/` | Le dossier existe mais est **vide** : aucun Voter |
-| `backend/src/Event/` | Idem : aucun événement métier |
-| `backend/tests/{Unit,Integration}/` | ⬜ Seul `tests/Controller/` existe |
-| `frontend/src/{hooks,layouts,services,tests}/` | ❌ Aucun des quatre |
-| `docker-compose.yml` (racine) | ❌ Seul `backend/compose.yaml` existe, et il est partiel (§6) |
+| `backend/src/DTO/` | ❌ Jamais créé. Les contrôleurs construisent leurs tableaux à la main et les passent à `JsonResponse` — il n'existe aucun `ResponseDTO` (cf. §3). [convention_de_nommage.md](convention_de_nommage.md) §11 prescrit pourtant la règle inverse : c'est la convention qui est à corriger, pas le code |
+| `backend/src/Form/` | ❌ Le dossier n'existe pas. Les formulaires du back-office sont générés par EasyAdmin depuis les entités |
+| `backend/src/Event/` | Le dossier existe mais est **vide** : aucun événement métier |
+| `backend/tests/{Unit,Integration,Functional}/` | ❌ L'arborescence réelle suit les couches : `Controller/`, `Entity/`, `Security/`, `Service/`. [convention_de_nommage.md](convention_de_nommage.md) §12 décrit l'autre découpage |
+| `frontend/src/{hooks,layouts,services}/` | ❌ Aucun des trois |
 
 Il n'y a pas non plus de `.env` à la racine : la configuration vit dans `backend/.env`.
 
@@ -140,6 +147,7 @@ Règle absolue : **un Controller ne contient jamais de logique métier.** Il app
 | `OrderItem` | `order_item` | Ligne de commande |
 | `Payment` | `payment` | Paiement associé à une commande |
 | `ContactMessage` | `contact_message` | Message du formulaire de contact |
+| `AuditLog` | `audit_log` | Trace des changements de statut et des modifications sensibles, alimentée par `AuditSubscriber` |
 
 ### Enums
 
@@ -159,11 +167,10 @@ Règle absolue : **un Controller ne contient jamais de logique métier.** Il app
 - Routes protégées `ROLE_USER` : `POST /api/orders`, `GET /api/orders`, `POST /api/payments`, `GET /api/auth/me`
 - Deux firewalls disjoints (`api` stateless, `admin` par session) — [CONTRAT_API.md](CONTRAT_API.md) §3
 
-> ⚠️ **Les Voters n'existent pas** (roadmap 2.5 ⬜ 🟠). `src/Security/` est vide. Ce document affirmait l'inverse.
->
-> Conséquence : rien ne vérifie la **propriété** d'une ressource. `access_control` sait dire « il faut `ROLE_USER` », pas « il faut être le propriétaire de cette commande ». Chaque contrôleur doit le faire à la main — et une route qui l'oublie est une fuite de données. Voir [CONTRAT_API.md](CONTRAT_API.md) §4.
->
-> ⚠️ **`POST`/`PUT`/`DELETE /api/products` n'existent pas non plus** (roadmap 2.6 🔴). `security.yaml` déclare des règles `ROLE_ADMIN` pour ces méthodes, et `api_specification.md` §3 les documente — mais aucun contrôleur ne les implémente. Les produits ne se créent aujourd'hui que par EasyAdmin. Une règle d'`access_control` qui protège une route inexistante ne protège rien : elle donne juste l'impression que la route existe.
+- Autorisation fine par **Voters** : `OrderVoter` (VIEW réservé au propriétaire ou à un admin, CREATE à tout authentifié, EDIT à l'admin) et `ProductVoter` (VIEW public, CREATE/EDIT/DELETE réservés à `ROLE_ADMIN`). C'est ce qui manquait à l'`access_control`, incapable d'exprimer « être le propriétaire de cette commande ».
+- **`POST`/`PUT`/`DELETE /api/products`** sont implémentés (`ProductController::create/update/delete`), doublement protégés par `access_control` et par `ProductVoter`.
+
+> ⚠️ **Deux écouteurs Doctrine font le même travail.** `StatusTransitionSubscriber` et `WorkflowValidationListener` portent tous deux `#[AsDoctrineListener(preUpdate)]`, injectent les deux mêmes machines à états et valident les mêmes transitions. Les deux sont enregistrés et se déclenchent à chaque mise à jour. Il faut en supprimer un — c'est une duplication, pas une redondance voulue.
 
 **Une leçon payée comptant** : un CRUD Twig généré par `make:crud` traînait sur `/user`, hors des périmètres `^/admin` et `^/api`. Aucune règle ne le couvrait, son formulaire exposait `roles` et `password` en clair : n'importe qui pouvait se créer un compte administrateur. Supprimé le 17/07/2026, avec une règle `^/user → ROLE_ADMIN` en filet. Ce qu'il faut en retenir : **`access_control` est une liste d'autorisations, pas une politique par défaut.** Tout chemin non listé est ouvert.
 
@@ -173,26 +180,33 @@ Règle absolue : **un Controller ne contient jamais de logique métier.** Il app
 
 ### Organisation des composants
 
-Réalité au 17/07/2026. Le motif « un dossier par composant avec son `index.js` » n'a pas été suivi : les composants sont des fichiers plats, avec leur CSS Module à côté.
+Réalité au 13/09/2026. Le motif « un dossier par composant avec son `index.js` » n'a pas été suivi : les composants sont des fichiers plats, avec leur CSS Module à côté.
 
 ```
-components/                      pages/                     (⬜ = prévu, absent)
-├── NavBar.jsx                   ├── HomePage.jsx           ⬜ OrderConfirmationPage
-├── Footer.jsx                   ├── ProductListPage.jsx    ⬜ AccountPage
-├── ProductCard.jsx              ├── ProductDetailPage.jsx  ⬜ OrderHistoryPage
-├── ProductCard.module.css       ├── CartPage.jsx           ⬜ SkinConcernPage
-├── PaymentForm.jsx              ├── CheckoutPage.jsx       ⬜ RoutinesPage
-└── Skeleton.jsx                 ├── LoginPage.jsx
-                                 ├── RegisterPage.jsx
-utils/                           └── ContactPage.jsx
-└── validators.js
+components/                      pages/
+├── NavBar.jsx                   ├── HomePage.jsx
+├── Footer.jsx                   ├── ProductListPage.jsx
+├── ProductCard.jsx              ├── ProductDetailPage.jsx
+├── PaymentForm.jsx              ├── CartPage.jsx
+├── PrivateRoute.jsx             ├── CheckoutPage.jsx
+├── ConfirmDialog.jsx            ├── OrderConfirmationPage.jsx
+├── ErrorBoundary.jsx            ├── OrderHistoryPage.jsx
+├── FormField.jsx                ├── AccountPage.jsx
+├── PasswordStrength.jsx         ├── LoginPage.jsx
+└── Skeleton.jsx                 ├── RegisterPage.jsx
+                                 ├── ContactPage.jsx
+utils/                           ├── MentionsLegalesPage.jsx
+└── validators.js                ├── CGVPage.jsx
+                                 └── NotFoundPage.jsx
 ```
 
-**Les noms diffèrent de ceux annoncés** : `CataloguePage` s'appelle `ProductListPage`, `ProductPage` s'appelle `ProductDetailPage`. Les routes réelles, déclarées dans `App.jsx`, sont en français : `/`, `/soins`, `/soins/:id`, `/panier`, `/connexion`, `/inscription`, `/commande`, `/contact`.
+**Les noms diffèrent de ceux annoncés à l'origine** : `CataloguePage` s'appelle `ProductListPage`, `ProductPage` s'appelle `ProductDetailPage`. Les routes réelles, déclarées dans `App.jsx`, sont en français : `/`, `/soins`, `/soins/:id`, `/panier`, `/connexion`, `/inscription`, `/commande`, `/confirmation`, `/mes-commandes`, `/mon-compte`, `/contact`, plus les pages légales.
 
 **Il n'y a aucun `layouts/`** : ni `MainLayout`, ni `AdminLayout`. Le back-office est du Twig servi par Symfony ([CONTRAT_API.md](CONTRAT_API.md) §7) — un `AdminLayout` React n'a donc pas d'objet.
 
-`OrderConfirmationPage` est la plus coûteuse des absences : le parcours d'achat s'arrête aujourd'hui sur une `alert()` (roadmap 3.13 ⬜ 🔴), ce qui empêche aussi d'écrire le test E2E du parcours complet ([STRATEGIE_TESTS.md](STRATEGIE_TESTS.md) §6).
+Les quatre routes privées (`/commande`, `/confirmation`, `/mes-commandes`, `/mon-compte`) sont enveloppées dans `PrivateRoute`, qui consulte `useAuth()` et redirige vers `/connexion`. Cette garde est un confort d'affichage : **la protection réelle reste côté serveur**, le firewall JWT refusant la requête quoi qu'il arrive.
+
+⬜ Restent absentes : `SkinConcernPage` et `RoutinesPage` — le filtrage par problématique se fait via `/soins?skin_concern=`.
 
 ### Gestion d'état
 
@@ -274,34 +288,29 @@ Le nommage des colonnes est bien en `snake_case` (`image_url`, `postal_code`, `c
 
 ---
 
-## 6. Architecture Docker — ⬜ largement inexistante
+## 6. Architecture Docker
 
-> ⚠️ **Rien de ce qui suivait n'existe, sauf deux services.** Ce document décrivait cinq conteneurs et un reverse proxy Nginx. Le développement se fait sur **XAMPP**, et le seul fichier Compose du projet est `backend/compose.yaml` :
+Deux fichiers Compose coexistent, avec des rôles distincts :
 
-```yaml
-# backend/compose.yaml — ce qui existe VRAIMENT
-services:
-  volo-db:       # MySQL 8.0 (image Docker) — port 3306
-  mailer:        # Mailpit — ports 1025 / 8025
-```
+| Fichier | Contenu | Usage |
+|---|---|---|
+| `docker-compose.yml` (racine) | 5 services : `nginx`, `backend`, `frontend`, `db`, `mailer` | Pile complète, cible de production |
+| `backend/compose.yaml` | `db` + `mailer` seulement | Dépendances d'appoint quand on développe le back sur XAMPP |
 
-| Service annoncé | État |
-|---|---|
-| `volo-db` | ✅ Existe — mais **inutilisé en pratique** : le dev tape sur le MariaDB de XAMPP |
-| `volo-mailer` | ✅ Existe (nommé `mailer`) — **et désormais utilisé** : `MAILER_DSN` vise Mailpit pour les notifications de contact (§7, [TECHNOLOGIES.md](TECHNOLOGIES.md) §2) |
-| `volo-api` | ❌ Absent — Symfony tourne sous l'Apache de XAMPP |
-| `volo-react` | ❌ Absent — Vite tourne en direct sur le poste |
-| `volo-nginx` | ❌ Absent — **aucun reverse proxy n'a jamais tourné** |
+> ⚠️ **Les noms de services ne sont pas préfixés `volo-`** — c'est le `container_name` qui l'est. [convention_de_nommage.md](convention_de_nommage.md) §7 et [roadmap.md](roadmap.md) 1.1 annoncent `volo-api`, `volo-react`, `volo-nginx` : ces noms n'existent nulle part. Conséquence concrète : `scripts/backup-db.sh` cible `volo-db`, alors que `backend/compose.yaml` nomme son conteneur `volo-mysql` — la sauvegarde ne fonctionne que sur la pile racine.
 
-Le rôle attribué ici à Nginx est tenu en développement par le **proxy Vite**, en trois lignes de `vite.config.js`. Ce n'est pas un pis-aller : c'est ce qui fait tenir les cookies `HttpOnly` en dev, en ramenant React et l'API à une **origine unique**. Le détail est dans [DIAGRAMME_DEPLOIEMENT.md](DIAGRAMME_DEPLOIEMENT.md) §1.
+En développement, le rôle de Nginx est tenu par le **proxy Vite**, en quelques lignes de `vite.config.js`. Ce n'est pas un pis-aller : c'est ce qui fait tenir les cookies `HttpOnly`, en ramenant React et l'API à une **origine unique**. Le détail est dans [DIAGRAMME_DEPLOIEMENT.md](DIAGRAMME_DEPLOIEMENT.md) §1.
 
 ```
 Navigateur → localhost:5173 (Vite)
-                ├── /api/*  → proxy → 127.0.0.1:8000 (Apache/Symfony) → MariaDB
-                └── /*      → React
+                ├── /api/*          → proxy → 127.0.0.1:8000 (Symfony) → MySQL 8
+                ├── /admin, /bundles, /admin-theme → proxy → back-office EasyAdmin
+                └── /*              → React
 ```
 
-**La conséquence à retenir** : les configurations Nginx du projet n'ont **jamais été exécutées une seule fois**. Pour de la configuration d'infrastructure, cela revient à dire qu'elles sont probablement fausses par endroits — voir [DIAGRAMME_DEPLOIEMENT.md](DIAGRAMME_DEPLOIEMENT.md) §3.
+En production, Nginx tient ce rôle avec le même découpage : `/api`, `/admin`, `/bundles`, `/admin-theme`, `/sitemap.xml` et les images uploadées vont à PHP-FPM, tout le reste à la SPA.
+
+> **Réserve à énoncer** : la pile Docker est définie et cohérente, mais elle n'a pas été déployée sur un serveur réel. Pour de la configuration d'infrastructure, cela signifie qu'elle reste à éprouver — voir [DIAGRAMME_DEPLOIEMENT.md](DIAGRAMME_DEPLOIEMENT.md) §3.
 
 ---
 
@@ -323,8 +332,9 @@ Navigateur → localhost:5173 (Vite)
     │  vérifie $this->getUser(), désérialise, délègue
     ▼
 [OrderService]
-    │  RECALCULE le total côté serveur (RG4) — un total reçu du client est ignoré
-    │  crée Order + OrderItems
+    │  vérifie le stock disponible, RECALCULE le total côté serveur (RG4)
+    │  — un total reçu du client est ignoré
+    │  crée Order + OrderItems, décrémente le stock
     ▼
 [Doctrine / EntityManager]
     │  persiste en BDD
@@ -332,18 +342,23 @@ Navigateur → localhost:5173 (Vite)
 [OrderController]
     │  compose son tableau à la main → JsonResponse 201
     ▼
-[React]  ⬜ alert() — OrderConfirmationPage n'existe pas (roadmap 3.13)
+[React CheckoutPage]  → paiement Stripe Elements → /confirmation
+    ▼
+[Stripe]  webhook payment_intent.succeeded
+    ▼
+[WebhookController]  signature HMAC vérifiée, idempotent
+    │  Payment → CAPTURED, Order → PAID (via les machines à états)
+    │  email de confirmation (OrderConfirmationService, best-effort)
 ```
 
-Quatre étapes du flux d'origine n'existent pas :
+Deux étapes du flux d'origine n'existent toujours pas :
 
 | Étape annoncée | Réalité |
 |---|---|
 | « JWT dans header » | ❌ Le jeton est dans un cookie `HttpOnly` ([CONTRAT_API.md](CONTRAT_API.md) §1) |
-| « valide le stock » | ❌ Il n'y a pas de stock ([MODELE_DONNEES.md](MODELE_DONNEES.md) §6.4) |
-| « déclenche `OrderCreatedEvent` » → « envoie l'email » | ❌ `src/Event/` est vide. **Aucun email de confirmation n'est envoyé** (roadmap 4.2 ⬜ 🟠) |
+| « déclenche `OrderCreatedEvent` » | ❌ `src/Event/` est vide : l'email part directement depuis `WebhookController`, sans événement métier intermédiaire |
 | « retourne `OrderResponseDTO` » | ❌ Aucun DTO — tableau construit à la main |
 
 Ce que le schéma d'origine **ne montrait pas** et qui est pourtant l'essentiel : le firewall et le contrôle CSRF, c'est-à-dire les deux étapes qui décident si la requête a le droit d'exister.
 
-Et le flux s'arrête là. **Aucune commande ne passe jamais à `paid`** : le webhook Stripe n'existe pas, donc VOLO ne saura jamais que le client a payé ([DIAGRAMME_ETATS.md](DIAGRAMME_ETATS.md) §2). C'est le manque fonctionnel le plus important du projet.
+Le parcours va désormais jusqu'au bout : une commande payée passe bien à `paid` par le webhook, et le passage est couvert par `WebhookStripeTest` (10 tests, dont l'idempotence du rejeu).

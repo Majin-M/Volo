@@ -119,7 +119,7 @@ VOLO (/)
 | **Phase 2 — Back-end** | Semaines 2-4 | ~3 sem | Entités Doctrine + migrations, auth JWT (Lexik), contrôleurs API REST, fixtures, EasyAdmin, Voters, services métier |
 | **Phase 3 — Front-end** | Semaines 5-7 | ~3 sem | React Router, pages (catalogue, détail, panier, auth, commande, contact, profil, historique), contextes (Auth, Cart), intégration API, CSS Modules |
 | **Phase 4 — Fonctionnalités avancées** | Semaines 8-9 | ~2 sem | Stripe (PaymentGateway, webhook), upload images (VichUploader), emails (Mailer + Mailpit), rate limiting, CSRF, security headers |
-| **Phase 5 — Finalisation** | Semaines 10-12 | ~2-3 sem | Tests (PHPUnit 26 tests / Vitest), PHPStan, documentation, corrections, Docker production |
+| **Phase 5 — Finalisation** | Semaines 10-12 | ~2-3 sem | Tests (PHPUnit 36 tests / Vitest), PHPStan, documentation, corrections, Docker production |
 
 ---
 
@@ -408,7 +408,7 @@ Plus un lien « Retour au site » vers la SPA.
 | Back-office | EasyAdmin 5 | — | CRUD généré depuis les entités Doctrine en quelques classes |
 | Email | Symfony Mailer + Mailpit (dev) | — | Emails synchrones — Mailpit capture en dev |
 | Upload images | VichUploaderBundle | — | Upload avec validation MIME, SmartUniqueNamer |
-| Tests backend | PHPUnit 13 | — | 26 tests, 88 assertions |
+| Tests backend | PHPUnit 13 | — | 36 tests, 108 assertions |
 | Tests frontend | Vitest + Testing Library | — | Tests des contextes, validators, pages |
 | Analyse statique | PHPStan level max | — | 0 erreur (avec baseline pour l'existant) |
 | Linting front | ESLint 10 | — | 0 erreur |
@@ -605,7 +605,7 @@ Permissions-Policy: camera=(), microphone=(), geolocation=()
 
 ### Résultat global
 
-**26 tests, 88 assertions** (PHPUnit 13) — tous verts.
+**36 tests, 108 assertions** (PHPUnit 13) — tous verts.
 
 ### Tests backend (PHPUnit)
 
@@ -615,6 +615,7 @@ Permissions-Policy: camera=(), microphone=(), geolocation=()
 | `CsrfProtectionTest` | Fonctionnel (WebTestCase) | POST sans header → 403, mauvais token → 403, bon token → passe, GET non bloqué, login/register exemptés, contact public exempt (8 tests) |
 | `OrderPaymentTest` | Intégration (KernelTestCase) | Dérivation du statut Payment→Order, contrat d'API préservé (clés JSON), clientSecret non exposé, ON DELETE CASCADE, suppression paiement ≠ suppression commande |
 | `ContactNotificationTest` | Fonctionnel (WebTestCase) | Message persisté en BDD, email admin envoyé, From ≠ visiteur, Reply-To = visiteur, échec SMTP ne perd pas le message, données invalides → rien persisté, HTML strippé |
+| `WebhookStripeTest` | Fonctionnel (WebTestCase) | Sans signature → 400, signature invalide → 400, `payment_intent.succeeded` capture le paiement, `payment_intent.payment_failed` marque l'échec, **idempotence des deux événements** (rejeu sans double effet), événement inconnu → 200, `intentId` inconnu → 200, webhook exempt du contrôle CSRF, refus de transiter une commande déjà expédiée (10 tests) |
 
 ### Tests frontend (Vitest + Testing Library)
 
@@ -665,8 +666,8 @@ $client->request('POST', '/api/orders', [], [], [
 
 ### Analyse statique
 
-- **PHPStan** : `level: max` (le plus strict), 0 erreur (avec baseline de ~128 entrées, régénéré le 02/09/2026)
-- **ESLint** : 0 erreur
+- **PHPStan** : `level: max` (le plus strict), 0 erreur (avec baseline de 102 entrées)
+- **ESLint** : 1 erreur restante — `react-hooks/set-state-in-effect` dans `NavBar.jsx`, sur l'effet qui referme le menu au changement de route
 - **React Doctor** : score **100/100** (0 issue). Analyse statique frontend : bugs, sécurité, performance, accessibilité. CI GitHub Actions sur les PRs
 
 ---
@@ -941,7 +942,7 @@ Dependencies:
 
 ### 15.3 Documentation du projet
 
-12 fichiers de documentation dans `docs/`, organisés par thème :
+13 fichiers de documentation dans `docs/` (hors ce plan de présentation), organisés par thème :
 
 **Architecture et conception :**
 
@@ -991,8 +992,8 @@ Dependencies:
 - Audit trail automatique (`AuditSubscriber`) traçant les changements de statut et les modifications sensibles
 - Soft Delete sur `Order` et `Payment` via `SoftDeleteFilter` Doctrine
 - `ExceptionSubscriber` unifiant les réponses d'erreur JSON sur `/api/*`
-- 26 tests backend + tests frontend (Vitest) couvrant l'authentification, le CSRF, le paiement, le contact, le panier et les validateurs
-- PHPStan level max à 0 erreur (baseline ~128 entrées)
+- 36 tests backend + tests frontend (Vitest) couvrant l'authentification, le CSRF, le paiement, le webhook Stripe, le contact, le panier et les validateurs
+- PHPStan level max à 0 erreur (baseline de 102 entrées)
 - UI/UX soignée : toast notifications animées (gradients, SVG, progress bar), `ConfirmDialog` avec backdrop blur et icônes contextuelles, page de confirmation avec animations cascade et check SVG animé, images de problématiques de peau sur la page d'accueil
 - Pages légales conformes au droit français du e-commerce : CGV (17 articles, formulaire de rétractation, règlement cosmétiques CE 1223/2009, médiation, force majeure), mentions légales (LCEN + CGU intégrées), politique de confidentialité (RGPD, transferts internationaux Stripe US, profilage, mineurs, violation de données)
 - Documentation exhaustive et auto-critique

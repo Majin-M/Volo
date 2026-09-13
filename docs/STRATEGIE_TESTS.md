@@ -1,6 +1,8 @@
 # Stratégie de tests
 
-> **État au 02/09/2026** : PHPUnit 13, **26 tests, 88 assertions**, verts. Répartis sur quatre fichiers : `AuthControllerTest` (inscription, cookies), `OrderPaymentTest` (dérivation du statut, contrat d'API, cascade), `CsrfProtectionTest` (double-submit), `ContactNotificationTest` (persistance + notification email). **Tests front présents** : Vitest + Testing Library, 3 fichiers (`LoginPage.test.jsx`, `CartContext.test.jsx`, `validators.test.js`). PHPStan `level: max` à 0 erreur (baseline ~128 entrées, régénéré 02/09/2026), ESLint à 0 erreur, React Doctor **100/100** (0 issue — bugs, performance, accessibilité), mais aucune CI ne les exécute automatiquement.
+> **État au 13/09/2026** : PHPUnit 13, **36 tests, 108 assertions**, verts. Répartis sur cinq fichiers : `AuthControllerTest` (inscription, cookies — 3 tests), `CsrfProtectionTest` (double-submit — 8), `OrderPaymentTest` (dérivation du statut, contrat d'API, cascade — 9), `ContactNotificationTest` (persistance + notification email — 6), `WebhookStripeTest` (signature HMAC, idempotence, transitions de statut — 10). **Tests front présents** : Vitest + Testing Library, 3 fichiers (`LoginPage.test.jsx`, `CartContext.test.jsx`, `validators.test.js`). PHPStan `level: max` à 0 erreur (baseline de 102 entrées). React Doctor **100/100** (0 issue — bugs, performance, accessibilité).
+>
+> **Deux réserves à énoncer telles quelles** : ESLint ne sort pas 0 erreur — il en signale une, `react-hooks/set-state-in-effect` dans `frontend/src/components/NavBar.jsx` (l'effet qui referme le menu au changement de route). Et aucune CI n'exécute ces outils : le seul workflow du dépôt, `frontend/.github/workflows/react-doctor.yml`, est placé hors de `<racine>/.github/workflows/` et n'est donc jamais déclenché par GitHub.
 >
 > Ce document existe pour deux raisons : dire quoi écrire quand on s'y mettra, et **nommer précisément ce qui est aujourd'hui non vérifié** — parce que « ça marche quand je clique » n'est pas une vérification.
 >
@@ -177,12 +179,12 @@ Viser 100% partout produit un faux sentiment de sécurité : on finit par tester
 
 ## 9. Pipeline CI (à créer)
 
-Il n'existe aucune CI sur ce projet (roadmap 5.5 ⬜ 🟡). Étapes cibles, GitHub Actions :
+Aucune CI ne s'exécute sur ce projet (roadmap 5.5 ⬜ 🟡). Nuance à énoncer plutôt que de dire « il n'y en a pas » : un workflow **existe**, `frontend/.github/workflows/react-doctor.yml`, mais GitHub ne découvre les workflows que dans `<racine>/.github/workflows/` — or ce dossier n'existe pas à la racine du dépôt. Le fichier est donc inerte, et le déplacer est la première étape. Étapes cibles, GitHub Actions :
 
 1. Checkout.
 2. `composer install` + `npm ci` (avec cache).
 3. Lint : `php-cs-fixer --dry-run`, ESLint.
-4. Analyse statique : PHPStan niveau 6 minimum.
+4. Analyse statique : PHPStan `level: max` — le niveau déjà atteint aujourd'hui. Viser plus bas ferait de la CI une régression.
 5. **Tests unitaires** — rapides, échouent vite.
 6. MySQL éphémère (service container).
 7. `doctrine:migrations:migrate` puis **tests d'intégration**.
@@ -195,7 +197,7 @@ Le point 4 mérite d'être noté : PHPStan aurait probablement signalé seul le 
 
 ## 10. Par où commencer, concrètement
 
-La suite tourne désormais (`php vendor/bin/phpunit` — 26 tests, 88 assertions). Reste, dans cet ordre :
+La suite tourne désormais (`php bin/phpunit` — 36 tests, 108 assertions). Reste, dans cet ordre :
 
 1. ~~`POST /api/orders` sans `X-Csrf-Token` → 403~~ — ✅ **fait** (`CsrfProtectionTest`). Ce test a payé immédiatement : il a révélé que `/api/contact`, route publique, était bloquée en 403 pour tout visiteur anonyme. **Le formulaire de contact ne fonctionnait pas.**
 2. **`PasswordValidator`** — test pur, aucune infrastructure, écrit en 10 minutes. Désormais le moins cher des tests restants.

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="VOLO">
+  <rect width="64" height="64" rx="14" fill="#5F4C42"/>
+  <path d="M18 20 L32 46 L46 20" fill="none" stroke="#F8F0E8" stroke-width="7"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="32" cy="52" r="3.5" fill="#9CB997"/>
+</svg>

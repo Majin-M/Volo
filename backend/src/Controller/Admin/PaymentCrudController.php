@@ -70,6 +70,8 @@ final class PaymentCrudController extends AbstractCrudController
     public function configureCrud(Crud $crud): Crud
     {
         return $crud
+            ->setEntityLabelInSingular('Paiement')
+            ->setEntityLabelInPlural('Paiements')
             ->setPageTitle(Crud::PAGE_INDEX, 'Paiements')
             ->setPageTitle(Crud::PAGE_EDIT, 'Modifier le paiement')
             ->setPageTitle(Crud::PAGE_DETAIL, 'Détail du paiement')
