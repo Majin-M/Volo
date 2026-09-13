@@ -94,15 +94,14 @@ Toutes les réponses suivent la même enveloppe :
 ```
 
 > `code` est le **statut HTTP en entier**, pas un symbole métier : il n'existe aucun identifiant du
-> type `PRODUCT_NOT_FOUND` dans le code. Cette enveloppe est produite par `ExceptionSubscriber`,
-> qui intercepte les exceptions sur `/api/*` ; en production les messages des erreurs 500 sont
-> remplacés par un texte générique.
+> type `PRODUCT_NOT_FOUND` dans le code.
 >
-> ⚠️ **Cette enveloppe n'est pas encore universelle.** Les contrôleurs qui renvoient une erreur
-> directement, sans lever d'exception, court-circuitent le subscriber et produisent la forme plate
-> `{"error": "message"}` — c'est le cas de plusieurs points dans `ProductController`,
-> `OrderController`, `AuthController` et `CsrfProtectionSubscriber`. Uniformiser ces retours est
-> un correctif identifié.
+> **Cette enveloppe est universelle sur `/api/*`** depuis le 14/09/2026, quelle que soit l'origine
+> de l'erreur : retour direct d'un contrôleur, exception interceptée par `ExceptionSubscriber`,
+> rejet CSRF, ou requête non authentifiée arrêtée par le firewall. Toutes passent par la même
+> fabrique, `App\Http\ApiError` — c'est le seul endroit du code où la forme est décidée.
+>
+> En production, les messages des erreurs 500 sont remplacés par un texte générique.
 
 ### Authentification
 

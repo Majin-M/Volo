@@ -37,6 +37,7 @@ Dependances :
 
 namespace App\Controller;
 
+use App\Http\ApiError;
 use App\Repository\PaymentRepository;
 use App\Service\OrderConfirmationService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -77,7 +78,7 @@ class WebhookController extends AbstractController
         $sigHeader = $request->headers->get('Stripe-Signature');
 
         if (!$sigHeader) {
-            return new JsonResponse(['error' => 'En-tete Stripe-Signature manquant.'], 400);
+            return ApiError::response('En-tete Stripe-Signature manquant.', 400);
         }
 
         try {
@@ -86,12 +87,12 @@ class WebhookController extends AbstractController
             $this->logger->warning('Webhook Stripe : signature invalide.', [
                 'error' => $e->getMessage(),
             ]);
-            return new JsonResponse(['error' => 'Signature invalide.'], 400);
+            return ApiError::response('Signature invalide.', 400);
         } catch (\UnexpectedValueException $e) {
             $this->logger->warning('Webhook Stripe : payload invalide.', [
                 'error' => $e->getMessage(),
             ]);
-            return new JsonResponse(['error' => 'Payload invalide.'], 400);
+            return ApiError::response('Payload invalide.', 400);
         }
 
         return match ($event->type) {

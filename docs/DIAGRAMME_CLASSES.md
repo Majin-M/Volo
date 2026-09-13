@@ -14,22 +14,21 @@ classDiagram
 
     class OrderController {
         <<Controller>>
+        +index(Request) JsonResponse
         +create(Request) JsonResponse
-        +list(Request) JsonResponse
-        +show(int id) JsonResponse
     }
     class PaymentController {
         <<Controller>>
-        +createIntent(Request) JsonResponse
+        +createPaymentIntent(Request) JsonResponse
     }
 
     class OrderService {
         <<Service>>
-        +createFromCart(User, array, Address) Order
+        +createOrder(array orderData, object user) Order
     }
     class PaymentService {
         <<Service>>
-        +createIntent(Order, PaymentMethod) PaymentIntentResult
+        +initiatePayment(Order, PaymentMethod) Payment
     }
 
     class PaymentGatewayResolver {
@@ -136,12 +135,12 @@ Cette méthode change si : Stripe modifie son SDK, la devise change, le calcul d
 classDiagram
     class PaymentController {
         <<Controller>>
-        +createIntent(Request) JsonResponse
+        +createPaymentIntent(Request) JsonResponse
         note "Traduit HTTP ↔ objets. Rien d'autre."
     }
     class PaymentService {
         <<Service>>
-        +createIntent(Order, PaymentMethod) PaymentIntentResult
+        +initiatePayment(Order, PaymentMethod) Payment
         note "Règle métier : quel montant, quelle devise."
     }
     class PaymentGatewayResolver {

@@ -106,8 +106,8 @@ sequenceDiagram
     participant Logger
 
     Client->>React: Saisit email + mot de passe
-    React->>Proxy: POST /api/login_check<br/>(email, password)
-    Proxy->>Auth: POST /api/auth/login
+    React->>Proxy: POST /api/auth/login<br/>(username, password)
+    Proxy->>Auth: POST /api/auth/login<br/>(transmis tel quel)
 
     Auth->>Limiter: consume(1) pour l'IP cliente
     alt Trop de tentatives (> 5 / 15 min)

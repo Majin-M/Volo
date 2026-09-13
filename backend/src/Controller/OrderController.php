@@ -24,6 +24,7 @@ Dépendances :
 
 namespace App\Controller;
 
+use App\Http\ApiError;
 use App\Entity\User;
 use App\Repository\OrderRepository;
 use App\Security\OrderVoter;
@@ -91,7 +92,7 @@ class OrderController extends AbstractController
         $data = json_decode($request->getContent(), true);
 
         if (!$data) {
-            return $this->json(['error' => 'Format JSON invalide.'], 400);
+            return ApiError::response('Format JSON invalide.', 400);
         }
 
         try {
@@ -105,9 +106,9 @@ class OrderController extends AbstractController
             );
 
         } catch (\InvalidArgumentException $e) {
-            return $this->json(['error' => $e->getMessage()], 400);
+            return ApiError::response($e->getMessage(), 400);
         } catch (\Exception $e) {
-            return $this->json(['error' => 'Erreur interne du serveur.'], 500);
+            return ApiError::response('Erreur interne du serveur.', 500);
         }
     }
 }

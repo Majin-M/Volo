@@ -240,6 +240,6 @@ class AuthControllerTest extends WebTestCase
         // mb_strtolower et non strtolower : strtolower() est octet par octet et
         // ne connaît pas l'UTF-8. Il laisserait 'É' intact tout en abaissant le
         // reste, et la comparaison échouerait sur un message pourtant correct.
-        $this->assertStringContainsString('déjà utilisé', mb_strtolower($response['error'], 'UTF-8'));
+        $this->assertStringContainsString('déjà utilisé', mb_strtolower($response['error']['message'], 'UTF-8'));
     }
 }

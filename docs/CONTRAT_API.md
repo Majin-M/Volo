@@ -125,7 +125,16 @@ Aucune traduction n'est donc nécessaire entre la base et l'API — contrairemen
 
 **Erreurs** : `api_specification.md` documente une enveloppe `{ error: { code, message } }`.
 
-> ✅ **`ExceptionSubscriber` est implémenté.** Il écoute `kernel.exception` et retourne un JSON unifié `{"error": {"code": N, "message": "..."}}` pour toutes les routes `/api/*`. En prod, les messages d'erreur 500 sont masqués (message générique) ; en dev, le message original est conservé pour le débogage. Les erreurs 500 sont journalisées via `LoggerInterface`. Le contrat et l'implémentation sont désormais cohérents.
+> ✅ **L'enveloppe est unique et universelle sur `/api/*`** depuis le 14/09/2026. Quatre chemins produisaient auparavant trois formes différentes ; ils passent tous désormais par la fabrique `App\Http\ApiError`, seul endroit du code où la forme est décidée :
+>
+> | Origine de l'erreur | Avant | Maintenant |
+> |---|---|---|
+> | Exception interceptée (`ExceptionSubscriber`) | `{"error":{"code","message"}}` | inchangé — c'était la référence |
+> | Retour direct d'un contrôleur (41 points) | `{"error":"message"}` | aligné |
+> | Rejet CSRF (`CsrfProtectionSubscriber`) | `{"error":"message"}` | aligné |
+> | Requête non authentifiée (firewall JWT) | `{"code":401,"message":"JWT Token not found"}` | aligné, et en français, via `ApiEntryPoint` |
+>
+> En prod, les messages d'erreur 500 sont masqués (message générique) ; en dev, le message original est conservé pour le débogage. Les erreurs 500 sont journalisées via `LoggerInterface`.
 
 **Pagination** : `?page` et `?limit` (défaut 20, max 50), réponse enveloppée `{ data: [...], meta: { page, limit, total } }`. La clé est bien `meta`, pas `pagination`.
 

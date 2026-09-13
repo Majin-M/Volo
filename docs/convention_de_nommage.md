@@ -1,5 +1,17 @@
 # Convention de nommage — Projet VOLO
 
+> **Audit du 13/09/2026 — cinq règles de ce document ne correspondent pas au code.** Elles sont conservées ici, mais signalées à leur emplacement : une convention affichée et non suivie est pire qu'une convention absente, parce qu'elle laisse croire que le code la respecte.
+>
+> | Règle | Statut |
+> |---|---|
+> | §2 et §11 — sérialiser via un `ResponseDTO` | ⬜ **Jamais appliquée.** Aucun `src/DTO/`. Les contrôleurs composent leurs tableaux à la main. Intention à tenir ou à retirer |
+> | §8 — feuilles de style en `kebab-case.css` | ❌ **Contredite par un choix assumé.** Le projet utilise des CSS Modules (`ProductCard.module.css`) : c'est la règle qu'il faut réécrire, pas le code |
+> | §7 — services Docker `volo-api`, `volo-react` | ❌ **Faux.** Les services s'appellent `nginx`, `backend`, `frontend`, `db`, `mailer` ; seuls les `container_name` portent le préfixe `volo-` |
+> | §12 — `tests/{Unit,Integration,Functional}` | ❌ **Faux.** L'arborescence réelle suit les couches : `Controller/`, `Entity/`, `Security/`, `Service/` |
+> | §3 — `hooks/`, `services/`, `api/orderApi.js`, `api/authApi.js` | ❌ **Inexistants.** `api/` contient `api.js`, `productApi.js`, `contactApi.js` |
+>
+> Le nommage `testX_Scenario_Resultat` (§12) est par ailleurs respecté dans `AuthControllerTest` mais pas dans `OrderPaymentTest`, dont les méthodes sont rédigées en français.
+
 ## Table des matières
 
 1. [Principes généraux](#1-principes-généraux)

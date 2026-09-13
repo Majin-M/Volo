@@ -57,8 +57,7 @@ volo/
 │   │   ├── Doctrine/Filter/     # SoftDeleteFilter (exclut les enregistrements supprimés)
 │   │   ├── Event/               # VIDE — ⬜ aucun événement métier
 │   │   ├── EventSubscriber/     # Audit, CsrfProtection, Exception,
-│   │   │                        #   SecurityHeaders, StatusTransition,
-│   │   │                        #   WorkflowValidationListener (⚠ doublon, cf. §3)
+│   │   │                        #   SecurityHeaders, StatusTransition
 │   │   ├── Repository/          # Requêtes BDD
 │   │   ├── Security/            # OrderVoter, ProductVoter
 │   │   └── Service/             # Logique métier + PaymentGateway/
@@ -170,7 +169,9 @@ Règle absolue : **un Controller ne contient jamais de logique métier.** Il app
 - Autorisation fine par **Voters** : `OrderVoter` (VIEW réservé au propriétaire ou à un admin, CREATE à tout authentifié, EDIT à l'admin) et `ProductVoter` (VIEW public, CREATE/EDIT/DELETE réservés à `ROLE_ADMIN`). C'est ce qui manquait à l'`access_control`, incapable d'exprimer « être le propriétaire de cette commande ».
 - **`POST`/`PUT`/`DELETE /api/products`** sont implémentés (`ProductController::create/update/delete`), doublement protégés par `access_control` et par `ProductVoter`.
 
-> ⚠️ **Deux écouteurs Doctrine font le même travail.** `StatusTransitionSubscriber` et `WorkflowValidationListener` portent tous deux `#[AsDoctrineListener(preUpdate)]`, injectent les deux mêmes machines à états et valident les mêmes transitions. Les deux sont enregistrés et se déclenchent à chaque mise à jour. Il faut en supprimer un — c'est une duplication, pas une redondance voulue.
+- **Transitions de statut** contraintes par `StatusTransitionSubscriber` sur l'événement Doctrine `preUpdate` : c'est le seul point de passage commun à toutes les écritures, donc le seul endroit qu'EasyAdmin ne peut pas contourner. Une transition interdite lève une `LogicException` dont le message énumère les états réellement atteignables.
+
+> **Nettoyage du 13/09/2026** : un second écouteur, `WorkflowValidationListener`, faisait exactement le même travail sur le même événement — les deux étaient enregistrés et se déclenchaient à chaque mise à jour. Il a été supprimé, après avoir reporté ses deux apports (message d'erreur détaillé, en-tête documentaire) dans `StatusTransitionSubscriber`.
 
 **Une leçon payée comptant** : un CRUD Twig généré par `make:crud` traînait sur `/user`, hors des périmètres `^/admin` et `^/api`. Aucune règle ne le couvrait, son formulaire exposait `roles` et `password` en clair : n'importe qui pouvait se créer un compte administrateur. Supprimé le 17/07/2026, avec une règle `^/user → ROLE_ADMIN` en filet. Ce qu'il faut en retenir : **`access_control` est une liste d'autorisations, pas une politique par défaut.** Tout chemin non listé est ouvert.
 

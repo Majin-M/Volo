@@ -177,9 +177,13 @@ PRODUIT ────< INCLUT >──── ROUTINE
  (0,N)                      (0,N)
 
 MESSAGE_CONTACT            (entité isolée — aucune association)
+
+JOURNAL_AUDIT              (entité isolée — aucune association)
 ```
 
 > L'association `TRAITE` entre `UTILISATEUR` et `MESSAGE_CONTACT` a été **retirée le 17/07/2026** avec RG12 : le traitement d'un message se fait par email, pas en base (§6.5). `MESSAGE_CONTACT` n'a plus aucune association — c'est une archive, pas un objet de travail.
+>
+> `JOURNAL_AUDIT` est la seconde entité isolée. Elle ne porte **volontairement** aucune clé étrangère : une trace d'audit doit survivre à la suppression de l'enregistrement qu'elle décrit, et elle référence donc son sujet par `entityType` + `entityId`, et son auteur par `userIdentifier` (l'email, pas l'`id`). Une association Doctrine réintroduirait la cascade que l'on cherche précisément à éviter.
 
 Deux associations sont **porteuses de cardinalités N-N** et deviendront des tables de jointure au MLD : `CIBLE` et `INCLUT`.
 
@@ -194,16 +198,17 @@ Deux associations sont **porteuses de cardinalités N-N** et deviendront des tab
 Les associations 1-N deviennent des clés étrangères, les N-N deviennent des tables.
 
 ```
-UTILISATEUR (#id, email, password, roles, firstName, lastName, createdAt)
+UTILISATEUR (#id, email, password, roles, firstName, lastName,
+             createdAt, updatedAt)
 
-MARQUE (#id, name, logoUrl, createdAt)
+MARQUE (#id, name, logoUrl, createdAt, updatedAt)
 
-PRODUIT (#id, name, description, price, isAvailable, imageUrl,
+PRODUIT (#id, name, description, price, stock, isAvailable, imageUrl,
          createdAt, updatedAt, brand_id→MARQUE)
 
-PROBLEMATIQUE (#id, name, slug, description)
+PROBLEMATIQUE (#id, name, slug, description, createdAt, updatedAt)
 
-ROUTINE (#id, name, level, description)
+ROUTINE (#id, name, level, description, createdAt, updatedAt)
 
 PRODUIT_PROBLEMATIQUE (#product_id→PRODUIT, #skin_concern_id→PROBLEMATIQUE)
 
@@ -216,8 +221,9 @@ COMMANDE (#id, reference, status, total, street, city, postalCode, country, note
 LIGNE_COMMANDE (#id, quantity, unitPrice, productName,
                 order_id→COMMANDE, product_id→PRODUIT)
 
-PAIEMENT (#id, status, method, clientSecret, amount, deletedAt,
-          createdAt, updatedAt, order_id→COMMANDE UNIQUE)
+PAIEMENT (#id, status, method, clientSecret, stripePaymentIntentId UNIQUE,
+          amount, deletedAt, createdAt, updatedAt,
+          order_id→COMMANDE UNIQUE)
 
 MESSAGE_CONTACT (#id, firstName, email, subject, message, isProcessed,
                  createdAt, updatedAt)
@@ -267,7 +273,7 @@ Cette section affirmait que deux index UNIQUE « manquent » et qu'ils étaient 
 | `user` | `email` | `UNIQ_8D93D649E7927C74` | Unicité de l'identifiant de connexion |
 | `skin_concern` | `slug` | `UNIQ_DBD33427989D9B62` | RG9 — identifiant public dans les URL |
 | `payment` | `order_id` | `UNIQ_6D28840D8D9F6D38` | RG8 — cardinalité (0,1) : un seul paiement par commande |
-| `shop_order` | `reference` | `UNIQ_323FC9CAAEA34913` | Unicité de la référence UUID publique |
+| `shop_order` | `reference` | `UNIQ_338B4B18AEA34913` | Unicité de la référence UUID publique |
 | `audit_log` | `(entity_type, entity_id)` | `idx_audit_entity` | Recherche rapide de l'historique d'une entité |
 | `audit_log` | `created_at` | `idx_audit_date` | Requêtes chronologiques sur le journal |
 

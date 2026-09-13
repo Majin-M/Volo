@@ -18,7 +18,6 @@ BACKUP_FILE="${BACKUP_DIR}/volo_${TIMESTAMP}.sql.gz"
 DB_NAME="volo"
 DB_USER="volo_user"
 DB_PASS="volo_password"
-DB_CONTAINER="volo-db"
 
 mkdir -p "$BACKUP_DIR"
 
@@ -27,7 +26,24 @@ if [ "${1:-}" = "--local" ]; then
     MYSQLDUMP="${MYSQLDUMP:-mysqldump}"
     "$MYSQLDUMP" -u root "$DB_NAME" | gzip > "$BACKUP_FILE"
 else
-    # Docker container mysqldump
+    # Le conteneur de base s'appelle volo-db dans docker-compose.yml (pile
+    # complete) mais volo-mysql dans backend/compose.yaml (pile d'appoint).
+    # On retient celui qui tourne ; DB_CONTAINER permet de forcer le choix.
+    if [ -z "${DB_CONTAINER:-}" ]; then
+        for candidate in volo-db volo-mysql; do
+            if docker ps --format '{{.Names}}' | grep -qx "$candidate"; then
+                DB_CONTAINER="$candidate"
+                break
+            fi
+        done
+    fi
+
+    if [ -z "${DB_CONTAINER:-}" ]; then
+        echo "Aucun conteneur de base trouve (volo-db, volo-mysql). Demarrez la pile," >&2
+        echo "definissez DB_CONTAINER, ou utilisez --local pour sauvegarder via XAMPP." >&2
+        exit 1
+    fi
+
     docker exec "$DB_CONTAINER" \
         mysqldump -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" \
         | gzip > "$BACKUP_FILE"

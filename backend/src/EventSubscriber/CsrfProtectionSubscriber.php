@@ -53,6 +53,7 @@ Verification :
 
 namespace App\EventSubscriber;
 
+use App\Http\ApiError;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
@@ -123,7 +124,7 @@ class CsrfProtectionSubscriber implements EventSubscriberInterface
         $headerToken = $request->headers->get(self::HEADER_NAME);
 
         if (!$cookieToken || !$headerToken || !hash_equals($cookieToken, $headerToken)) {
-            $event->setResponse(new JsonResponse(['error' => 'Jeton CSRF invalide ou manquant.'], 403));
+            $event->setResponse(ApiError::response('Jeton CSRF invalide ou manquant.', 403));
         }
     }
 }

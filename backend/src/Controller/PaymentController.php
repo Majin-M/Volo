@@ -22,6 +22,7 @@ Securite :
 
 namespace App\Controller;
 
+use App\Http\ApiError;
 use App\Enum\PaymentMethod;
 use App\Repository\OrderRepository;
 use App\Service\PaymentService;
@@ -60,23 +61,23 @@ class PaymentController extends AbstractController
         $methodValue = $data['method'] ?? PaymentMethod::CARD->value;
 
         if (!$orderId) {
-            return new JsonResponse(['error' => 'orderId manquant.'], 400);
+            return ApiError::response('orderId manquant.', 400);
         }
 
         $order = $this->orderRepository->find($orderId);
         if (!$order) {
-            return new JsonResponse(['error' => 'Commande non trouvee.'], 404);
+            return ApiError::response('Commande non trouvee.', 404);
         }
 
         // Verification de propriete : seul le proprietaire peut payer sa commande
         $user = $this->getUser();
         if (!$user || $order->getUser() !== $user) {
-            return new JsonResponse(['error' => 'Acces refuse.'], 403);
+            return ApiError::response('Acces refuse.', 403);
         }
 
         $method = PaymentMethod::tryFrom($methodValue);
         if (!$method) {
-            return new JsonResponse(['error' => 'Moyen de paiement invalide.'], 400);
+            return ApiError::response('Moyen de paiement invalide.', 400);
         }
 
         try {
@@ -94,7 +95,7 @@ class PaymentController extends AbstractController
                 'order_id' => $orderId,
                 'exception' => $e->getMessage(),
             ]);
-            return new JsonResponse(['error' => 'Une erreur est survenue lors du paiement.'], 500);
+            return ApiError::response('Une erreur est survenue lors du paiement.', 500);
         }
     }
 }

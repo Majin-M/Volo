@@ -1,11 +1,36 @@
 <?php
 
+/*
+===============================================================================
+Listener : StatusTransitionSubscriber
+===============================================================================
+Objectif :
+    Empecher toute transition de statut invalide sur Order et Payment,
+    quelle que soit l'origine de la modification (EasyAdmin, API, CLI).
+
+Fonctionnement :
+    - Ecoute l'evenement Doctrine preUpdate.
+    - Si le champ 'status' a change, verifie que la transition est autorisee
+      par la machine a etats definie dans config/packages/workflow.yaml.
+    - Leve une LogicException si la transition est interdite, ce qui empeche
+      le flush et affiche un message d'erreur dans EasyAdmin. Le message
+      enumere les etats reellement atteignables, pour que l'administrateur
+      sache quoi faire plutot que seulement ce qui est interdit.
+
+Pourquoi ici plutot que dans les services :
+    C'est le seul point de passage commun a toutes les ecritures. Une
+    validation placee dans OrderService laisserait EasyAdmin la contourner.
+
+Dependances :
+    - state_machine.order   : Machine a etats des commandes.
+    - state_machine.payment : Machine a etats des paiements.
+===============================================================================
+*/
+
 namespace App\EventSubscriber;
 
 use App\Entity\Order;
 use App\Entity\Payment;
-use App\Enum\OrderStatus;
-use App\Enum\PaymentStatus;
 use Doctrine\Bundle\DoctrineBundle\Attribute\AsDoctrineListener;
 use Doctrine\ORM\Event\PreUpdateEventArgs;
 use Doctrine\ORM\Events;
@@ -42,6 +67,11 @@ class StatusTransitionSubscriber
         }
     }
 
+    /**
+     * Doctrine restitue tantot un BackedEnum, tantot la chaine brute selon le
+     * contexte d'hydratation. Une valeur inattendue rend null : on laisse
+     * alors passer plutot que d'echouer sur un cas qu'on ne sait pas juger.
+     */
     private function extractStatusValue(mixed $status): ?string
     {
         if ($status instanceof \BackedEnum) {
@@ -63,18 +93,35 @@ class StatusTransitionSubscriber
             return;
         }
 
-        foreach ($stateMachine->getDefinition()->getTransitions() as $transition) {
+        $definition = $stateMachine->getDefinition();
+
+        foreach ($definition->getTransitions() as $transition) {
             if (\in_array($from, $transition->getFroms(), true)
                 && \in_array($to, $transition->getTos(), true)) {
                 return;
             }
         }
 
+        // getTos() n'est pas type par le composant Workflow : on ne retient
+        // que les valeurs exploitables comme nom d'etat.
+        $reachable = [];
+        foreach ($definition->getTransitions() as $transition) {
+            if (\in_array($from, $transition->getFroms(), true)) {
+                foreach ($transition->getTos() as $target) {
+                    if (\is_string($target)) {
+                        $reachable[$target] = true;
+                    }
+                }
+            }
+        }
+
         throw new \LogicException(sprintf(
-            'Transition de statut invalide pour %s : "%s" vers "%s" n\'est pas autorisee.',
+            'Transition de statut invalide pour %s : "%s" vers "%s" n\'est pas autorisee. Etats accessibles depuis "%s" : %s.',
             $entityLabel,
             $from,
             $to,
+            $from,
+            implode(', ', array_keys($reachable)) ?: 'aucun (etat terminal)',
         ));
     }
 }

@@ -22,6 +22,7 @@ Securite :
 
 namespace App\Controller;
 
+use App\Http\ApiError;
 use App\Service\ContactService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -53,13 +54,13 @@ class ContactController extends AbstractController
     {
         $limiter = $this->contactAttemptsLimiter->create($request->getClientIp());
         if (!$limiter->consume(1)->isAccepted()) {
-            return new JsonResponse(['error' => 'Trop de tentatives. Veuillez reessayer plus tard.'], 429);
+            return ApiError::response('Trop de tentatives. Veuillez reessayer plus tard.', 429);
         }
 
         $data = json_decode($request->getContent(), true);
 
         if (!$data) {
-            return new JsonResponse(['error' => 'Format JSON invalide.'], 400);
+            return ApiError::response('Format JSON invalide.', 400);
         }
 
         try {
@@ -71,7 +72,7 @@ class ContactController extends AbstractController
                 ],
             ], JsonResponse::HTTP_CREATED);
         } catch (\InvalidArgumentException $e) {
-            return new JsonResponse(['error' => $e->getMessage()], 400);
+            return ApiError::response($e->getMessage(), 400);
         }
     }
 }

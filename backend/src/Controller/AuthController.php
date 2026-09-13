@@ -46,6 +46,7 @@ Configuration requise :
 
 namespace App\Controller;
 
+use App\Http\ApiError;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\PasswordValidator;
@@ -140,13 +141,13 @@ class AuthController extends AbstractController
     {
         $limiter = $this->registerAttemptsLimiter->create($request->getClientIp());
         if (!$limiter->consume(1)->isAccepted()) {
-            return new JsonResponse(['error' => 'Trop de tentatives. Veuillez réessayer plus tard.'], 429);
+            return ApiError::response('Trop de tentatives. Veuillez réessayer plus tard.', 429);
         }
 
         $data = json_decode($request->getContent(), true);
 
         if (empty($data['email']) || empty($data['password'])) {
-            return new JsonResponse(['error' => 'Email et mot de passe requis.'], 400);
+            return ApiError::response('Email et mot de passe requis.', 400);
         }
 
         $email = trim($data['email']);
@@ -155,24 +156,24 @@ class AuthController extends AbstractController
         $lastName = strip_tags(trim($data['lastName'] ?? ''));
 
         if (mb_strlen($firstName) > 255) {
-            return new JsonResponse(['error' => 'Le prenom est trop long (max 255 caracteres).'], 400);
+            return ApiError::response('Le prenom est trop long (max 255 caracteres).', 400);
         }
 
         if (mb_strlen($lastName) > 255) {
-            return new JsonResponse(['error' => 'Le nom est trop long (max 255 caracteres).'], 400);
+            return ApiError::response('Le nom est trop long (max 255 caracteres).', 400);
         }
 
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            return new JsonResponse(['error' => 'L\'adresse email est invalide.'], 400);
+            return ApiError::response('L\'adresse email est invalide.', 400);
         }
 
         $passwordErrors = $this->passwordValidator->validate($password);
         if (!empty($passwordErrors)) {
-            return new JsonResponse(['error' => implode(' ', $passwordErrors)], 400);
+            return ApiError::response(implode(' ', $passwordErrors), 400);
         }
 
         if ($this->userRepository->findOneBy(['email' => $email])) {
-            return new JsonResponse(['error' => 'Cet email est déjà utilisé.'], 400);
+            return ApiError::response('Cet email est déjà utilisé.', 400);
         }
 
         $user = new User();
@@ -217,7 +218,7 @@ class AuthController extends AbstractController
     {
         $limiter = $this->loginAttemptsLimiter->create($request->getClientIp());
         if (!$limiter->consume(1)->isAccepted()) {
-            return new JsonResponse(['error' => 'Trop de tentatives. Veuillez réessayer dans quelques minutes.'], 429);
+            return ApiError::response('Trop de tentatives. Veuillez réessayer dans quelques minutes.', 429);
         }
 
         $data = json_decode($request->getContent(), true);
@@ -225,7 +226,7 @@ class AuthController extends AbstractController
         $password = $data['password'] ?? null;
 
         if (!$email || !$password) {
-            return new JsonResponse(['error' => 'Email et mot de passe requis.'], 400);
+            return ApiError::response('Email et mot de passe requis.', 400);
         }
 
         $user = $this->userRepository->findOneBy(['email' => $email]);
@@ -238,7 +239,7 @@ class AuthController extends AbstractController
                 'ip' => $request->getClientIp(),
             ]);
 
-            return new JsonResponse(['error' => 'Identifiants invalides.'], 401);
+            return ApiError::response('Identifiants invalides.', 401);
         }
 
         $token = $this->jwtManager->create($user);
@@ -304,7 +305,7 @@ class AuthController extends AbstractController
         $user = $this->getUser();
 
         if (!$user) {
-            return new JsonResponse(['error' => 'Non authentifié.'], 401);
+            return ApiError::response('Non authentifié.', 401);
         }
 
         return new JsonResponse([
@@ -336,29 +337,29 @@ class AuthController extends AbstractController
         $user = $this->getUser();
 
         if (!$user) {
-            return new JsonResponse(['error' => 'Non authentifié.'], 401);
+            return ApiError::response('Non authentifié.', 401);
         }
 
         // Rate limiting : empeche les modifications de profil trop frequentes
         $limiter = $this->profileUpdateLimiter->create($request->getClientIp());
         if (!$limiter->consume(1)->isAccepted()) {
-            return new JsonResponse(['error' => 'Trop de tentatives. Veuillez reessayer plus tard.'], 429);
+            return ApiError::response('Trop de tentatives. Veuillez reessayer plus tard.', 429);
         }
 
         $data = json_decode($request->getContent(), true);
 
         if (!$data) {
-            return new JsonResponse(['error' => 'Format JSON invalide.'], 400);
+            return ApiError::response('Format JSON invalide.', 400);
         }
 
         // Mise a jour du prenom
         if (isset($data['firstName'])) {
             $firstName = strip_tags(trim($data['firstName']));
             if ($firstName === '') {
-                return new JsonResponse(['error' => 'Le prénom ne peut pas être vide.'], 400);
+                return ApiError::response('Le prénom ne peut pas être vide.', 400);
             }
             if (mb_strlen($firstName) > 255) {
-                return new JsonResponse(['error' => 'Le prenom est trop long (max 255 caracteres).'], 400);
+                return ApiError::response('Le prenom est trop long (max 255 caracteres).', 400);
             }
             $user->setFirstName($firstName);
         }
@@ -367,10 +368,10 @@ class AuthController extends AbstractController
         if (isset($data['lastName'])) {
             $lastName = strip_tags(trim($data['lastName']));
             if ($lastName === '') {
-                return new JsonResponse(['error' => 'Le nom ne peut pas être vide.'], 400);
+                return ApiError::response('Le nom ne peut pas être vide.', 400);
             }
             if (mb_strlen($lastName) > 255) {
-                return new JsonResponse(['error' => 'Le nom est trop long (max 255 caracteres).'], 400);
+                return ApiError::response('Le nom est trop long (max 255 caracteres).', 400);
             }
             $user->setLastName($lastName);
         }
@@ -378,16 +379,16 @@ class AuthController extends AbstractController
         // Changement de mot de passe (necessite le mot de passe actuel)
         if (isset($data['newPassword'])) {
             if (empty($data['currentPassword'])) {
-                return new JsonResponse(['error' => 'Le mot de passe actuel est requis pour en définir un nouveau.'], 400);
+                return ApiError::response('Le mot de passe actuel est requis pour en définir un nouveau.', 400);
             }
 
             if (!$this->passwordHasher->isPasswordValid($user, $data['currentPassword'])) {
-                return new JsonResponse(['error' => 'Mot de passe actuel incorrect.'], 400);
+                return ApiError::response('Mot de passe actuel incorrect.', 400);
             }
 
             $passwordErrors = $this->passwordValidator->validate($data['newPassword']);
             if (!empty($passwordErrors)) {
-                return new JsonResponse(['error' => implode(' ', $passwordErrors)], 400);
+                return ApiError::response(implode(' ', $passwordErrors), 400);
             }
 
             $user->setPassword($this->passwordHasher->hashPassword($user, $data['newPassword']));

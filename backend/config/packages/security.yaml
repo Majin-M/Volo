@@ -38,6 +38,9 @@ security:
             stateless: true
             provider: app_user_provider
             jwt: ~
+            # Sans cela, Lexik repond {"code":401,"message":"JWT Token not
+            # found"} : ni l'enveloppe du contrat, ni le francais.
+            entry_point: App\Security\ApiEntryPoint
 
         main:
             lazy: true

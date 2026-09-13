@@ -2,9 +2,9 @@
 
 namespace App\EventSubscriber;
 
+use App\Http\ApiError;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\HttpKernel\KernelEvents;
@@ -54,11 +54,6 @@ class ExceptionSubscriber implements EventSubscriberInterface
             default => $exception->getMessage(),
         };
 
-        $event->setResponse(new JsonResponse([
-            'error' => [
-                'code' => $statusCode,
-                'message' => $message,
-            ],
-        ], $statusCode));
+        $event->setResponse(ApiError::response($message, $statusCode));
     }
 }

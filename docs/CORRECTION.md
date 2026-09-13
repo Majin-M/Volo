@@ -218,3 +218,99 @@ Les deux derniers restent manuels : ils portent sur le rendu d'EasyAdmin, qui de
 > **Mise à jour du 02/09/2026** : le webhook Stripe est implémenté (`WebhookController`). Les commandes passent automatiquement à `paid` après capture du paiement via `payment_intent.succeeded`. Le parcours d'achat est complet de bout en bout.
 
 Cette correction en était le prérequis — le webhook n'a qu'**une seule** colonne à mettre à jour, ce qui était l'objectif de tout ce travail.
+
+---
+
+## ✅ Connexion au back-office impossible — CSRF stateless
+
+> **Corrigé le 13/09/2026.**
+
+**Symptôme** : toute tentative de connexion sur `/admin/login` échouait sur « Invalid CSRF token. », quel que soit le mot de passe. Le back-office était donc **entièrement inaccessible**.
+
+**Cause** : `config/packages/csrf.yaml` déclarait `authenticate` parmi les `stateless_token_ids`. Dans ce mode (Symfony 7.2+), `csrf_token('authenticate')` ne rend pas un jeton mais le littéral `csrf-token`, qu'un contrôleur Stimulus est censé remplacer côté navigateur. Or `templates/admin/security/login.html.twig` est une page autonome, sans pipeline d'assets ni Stimulus : le placeholder partait tel quel et la validation le rejetait.
+
+**Correction** : `authenticate` retiré des `stateless_token_ids`. Le jeton de session classique fonctionne sans JavaScript. `submit` y reste : les formulaires EasyAdmin, eux, chargent bien le contrôleur Stimulus.
+
+**Leçon** : une option de sécurité activée globalement doit être confrontée à **chaque** page qui en dépend. Ici, une seule page sur deux avait le prérequis JavaScript, et rien ne le signalait — pas d'erreur au démarrage, juste un refus à l'usage.
+
+---
+
+## ✅ Page de connexion admin sans aucun style — CSP
+
+> **Corrigé le 13/09/2026.**
+
+**Symptôme** : `/admin/login` s'affichait en HTML brut, sans mise en forme.
+
+**Cause** : ses styles vivaient dans un bloc `<style>` inline, que la `Content-Security-Policy` du site interdit (`default-src 'self'`, sans `style-src 'unsafe-inline'`). Les pages EasyAdmin, qui chargent une feuille externe de même origine, n'étaient pas concernées — d'où un défaut invisible tant qu'on ne regardait pas cette page précise.
+
+**Correction** : styles déportés dans `public/admin-theme/volo-login.css`, servi depuis la même origine.
+
+---
+
+## ✅ Doublon d'écouteurs de transition de statut
+
+> **Corrigé le 13/09/2026.**
+
+`StatusTransitionSubscriber` et `WorkflowValidationListener` portaient tous deux `#[AsDoctrineListener(preUpdate)]`, injectaient les deux mêmes machines à états et validaient les mêmes transitions. Les deux étaient enregistrés et se déclenchaient à chaque mise à jour.
+
+`WorkflowValidationListener` a été supprimé, après report de ses deux apports dans le subscriber conservé : l'en-tête documentaire et le message d'erreur qui énumère les états réellement atteignables depuis l'état courant.
+
+---
+
+## ✅ Squelettes de génération oubliés
+
+> **Corrigé le 13/09/2026.**
+
+`templates/product/index.html.twig` (la page « Hello ProductController! » de `make:controller`) et le `templates/base.html.twig` qu'elle étendait n'étaient rendus par aucun contrôleur. Le premier référençait encore un ancien chemin de projet `voloskin`, le second chargeait deux scripts CDN que la CSP bloque. Tous deux supprimés.
+
+C'est la même classe d'oubli que le CRUD `/user` : **un générateur laisse des fichiers derrière lui, et ce qui n'est pas relu n'est pas inoffensif.**
+
+---
+
+## ✅ Script de sauvegarde inopérant sur la pile backend
+
+> **Corrigé le 13/09/2026.**
+
+`scripts/backup-db.sh` ciblait en dur le conteneur `volo-db`, qui n'existe que dans le `docker-compose.yml` racine — `backend/compose.yaml` nomme le sien `volo-mysql`. Le script détecte désormais celui qui tourne, accepte une variable `DB_CONTAINER` pour forcer le choix, et échoue avec un message explicite si aucun n'est trouvé.
+
+---
+
+## ✅ Back-office en anglais et sans identité visuelle
+
+> **Fait le 13/09/2026.**
+
+Trois défauts d'affichage cumulés sur `/admin` :
+
+- **Libellés en anglais** (« Product », « Add », « Search », « 2 results ») : `default_locale` valait `en` alors qu'EasyAdmin fournit `EasyAdminBundle.fr.php`. Locale passée à `fr`, plus libellés d'entité français sur les six contrôleurs CRUD. Les 36 tests restent verts.
+- **Colonnes dupliquées** dans la liste des produits : `ProductCrudController::configureFields()` retournait deux fois le même jeu de champs — un bloc « liste » puis un bloc « formulaire » — sans filtrer sur `$pageName`. Chaque colonne apparaissait donc en double, une fois en français, une fois avec le libellé par défaut. Remplacé par un jeu unique dont la visibilité est réglée par page.
+- **Logo cassé** : `setTitle()` pointait vers `/volo-logo.svg` et `setFaviconPath()` vers `favicon.svg`, deux fichiers absents de `public/`. Le logo de la SPA est réutilisé (même URL en dev et en prod) et un favicon a été créé.
+
+Un thème aux couleurs VOLO a été ajouté (`public/admin-theme/volo-admin.css`), chargé via `configureAssets()`. Il surcharge 167 variables CSS d'EasyAdmin sans un seul `!important` : le bundle déclare tout son style dans `@layer ea`, et une feuille non-layered l'emporte sur une couche quelle que soit sa spécificité. Aucune police distante n'est chargée, la CSP l'interdirait.
+
+Le menu du dashboard pointait par ailleurs vers une route `app_home` **inexistante** : le rendu du menu aurait levé une `RouteNotFoundException` dès l'ouverture du back-office. Remplacé par une URL directe.
+
+---
+
+## ✅ Enveloppe d'erreur unifiée sur toute l'API
+
+> **Corrigé le 14/09/2026.**
+
+**Constat** : la documentation annonçait une enveloppe unique `{"error":{"code","message"}}`. Le code en produisait **trois**, selon le chemin emprunté :
+
+| Origine | Forme produite |
+|---|---|
+| Exception interceptée par `ExceptionSubscriber` | `{"error":{"code":404,"message":"..."}}` — la forme documentée |
+| Retour écrit directement dans un contrôleur (41 points) | `{"error":"message"}` — plate |
+| Requête non authentifiée, arrêtée par le firewall JWT | `{"code":401,"message":"JWT Token not found"}` — ni enveloppe, ni français |
+
+La troisième était la plus visible : tout appel sans session la déclenche, et le message technique anglais remontait jusqu'à l'utilisateur.
+
+**Correction** :
+
+- Nouvelle fabrique `App\Http\ApiError::response(string $message, int $status)` — **seul** endroit du code où l'enveloppe est construite. C'est ce point unique qui empêche l'écart de se reformer, pas la correction ponctuelle des 41 appels.
+- Les 41 retours directs, `CsrfProtectionSubscriber` et `ExceptionSubscriber` l'utilisent tous.
+- Nouveau `App\Security\ApiEntryPoint`, déclaré en `entry_point` du firewall `api`, qui remplace la réponse de LexikJWTAuthenticationBundle par `{"error":{"code":401,"message":"Authentification requise."}}`.
+
+**Ce qui a rendu le changement sûr** : `apiCall()` côté React lisait déjà les deux formes (chaîne ou objet imbriqué), et aucun composant ne court-circuite ce wrapper ni ne lit `error` directement — vérifié avant de toucher au backend. Le contrat est désormais épinglé par deux tests existants (`AuthControllerTest`, `CsrfProtectionTest`) qui lisent `error.message` sur des chemins de retour direct.
+
+**Non modifiés, volontairement** : les tableaux de contexte passés au logger dans `WebhookController` et le paramètre `error` du template Twig de connexion admin, qui portent la même clé sans être des réponses d'API.

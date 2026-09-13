@@ -146,7 +146,7 @@ class CsrfProtectionTest extends WebTestCase
 
         $data = json_decode($this->client->getResponse()->getContent(), true);
         $this->assertArrayHasKey('error', $data);
-        $this->assertStringContainsString('CSRF', $data['error']);
+        $this->assertStringContainsString('CSRF', $data['error']['message']);
     }
 
     /**
