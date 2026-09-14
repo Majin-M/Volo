@@ -23,7 +23,9 @@ Dépendances :
 
 namespace App\Controller;
 
+use App\Entity\Product;
 use App\Http\ApiError;
+use App\Repository\ProductRepository;
 use App\Security\ProductVoter;
 use App\Service\ProductService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -34,10 +36,33 @@ use Symfony\Component\Routing\Attribute\Route;
 class ProductController extends AbstractController
 {
     private ProductService $productService;
+    private ProductRepository $productRepository;
 
-    public function __construct(ProductService $productService)
-    {
+    public function __construct(
+        ProductService $productService,
+        ProductRepository $productRepository,
+    ) {
         $this->productService = $productService;
+        $this->productRepository = $productRepository;
+    }
+
+    /**
+     * Recupere le produit vise par une route, pour le soumettre au Voter.
+     *
+     * ProductVoter::supports() exige un sujet de type Product sur EDIT et
+     * DELETE. Appeler denyAccessUnlessGranted() sans ce sujet fait abstenir
+     * le Voter, et une abstention vaut refus : les routes repondaient 403 a
+     * tout le monde, administrateurs compris.
+     */
+    private function findProductOr404(int $id): Product
+    {
+        $product = $this->productRepository->find($id);
+
+        if ($product === null) {
+            throw $this->createNotFoundException('Produit introuvable.');
+        }
+
+        return $product;
     }
 
     /**
@@ -150,7 +175,7 @@ class ProductController extends AbstractController
     #[Route('/api/products/{id}', name: 'api_product_update', methods: ['PUT'])]
     public function update(int $id, Request $request): JsonResponse
     {
-        $this->denyAccessUnlessGranted(ProductVoter::EDIT);
+        $this->denyAccessUnlessGranted(ProductVoter::EDIT, $this->findProductOr404($id));
 
         $data = json_decode($request->getContent(), true);
 
@@ -181,7 +206,7 @@ class ProductController extends AbstractController
     #[Route('/api/products/{id}', name: 'api_product_delete', methods: ['DELETE'])]
     public function delete(int $id): JsonResponse
     {
-        $this->denyAccessUnlessGranted(ProductVoter::DELETE);
+        $this->denyAccessUnlessGranted(ProductVoter::DELETE, $this->findProductOr404($id));
 
         $this->productService->deleteProduct($id);
 

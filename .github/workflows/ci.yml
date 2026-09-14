@@ -1,0 +1,148 @@
+# =============================================================================
+# CI VOLO — verifie les affirmations de la documentation
+# =============================================================================
+# Chaque etape correspond a une affirmation que docs/STRATEGIE_TESTS.md et
+# docs/TECHNOLOGIES.md enoncent : « les tests passent », « PHPStan level max
+# est a 0 erreur », « le front compile ». Tant que rien ne les executait, ces
+# phrases etaient des declarations d'intention. Ce fichier les rend verifiees
+# a chaque push.
+#
+# Note sur PHP : le projet declare `>=8.2` et son image Docker de production
+# utilise 8.2 — ce qui fonctionne, car elle installe avec --no-dev. Mais
+# PHPUnit 13.3.2 exige PHP >= 8.4.1 : la suite de tests ne peut donc PAS
+# tourner sous 8.2. La CI cible 8.4, qui est le vrai plancher pour developper.
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+
+# Une seule execution par branche : un nouveau push annule la precedente.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend — PHPUnit + PHPStan
+    runs-on: ubuntu-latest
+
+    services:
+      database:
+        image: mysql:8.0
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+          MYSQL_DATABASE: volo
+        ports:
+          - 3306:3306
+        # Sans ce healthcheck, les etapes demarrent avant que MySQL accepte
+        # les connexions et la premiere requete echoue.
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Installer PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: intl, pdo_mysql, zip, mbstring
+          coverage: none
+
+      - name: Cache des dependances Composer
+        uses: actions/cache@v4
+        with:
+          path: backend/vendor
+          key: composer-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: composer-
+
+      - name: Preparer l'environnement
+        # `.env` n'est pas versionne : sur un clone neuf il n'existe pas, et
+        # c'est lui qui porte les chemins des cles JWT et la passphrase.
+        # On part donc du modele, exactement comme un developpeur qui clone.
+        # Effet de bord utile : si `.env.example` devient incomplet, la CI
+        # casse — le modele est ainsi verifie, pas seulement promis.
+        # `.env.test` reste prioritaire en environnement de test.
+        run: cp .env.example .env
+
+      - name: Installer les dependances
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Generer les cles JWT
+        # Les tests d'authentification signent de vrais jetons : sans cette
+        # paire de cles, AuthControllerTest echoue des le premier test.
+        # La passphrase est celle de .env.example, copiee ci-dessus.
+        run: php bin/console lexik:jwt:generate-keypair --skip-if-exists
+
+      - name: Creer la base de test
+        # Doctrine ajoute `dbname_suffix: _test` en environnement de test
+        # (config/packages/doctrine.yaml) : la base visee est donc volo_test,
+        # pas volo. C'est ce qui isole les tests des donnees de developpement.
+        run: php bin/console doctrine:database:create --if-not-exists --env=test
+
+      - name: Appliquer les migrations
+        run: php bin/console doctrine:migrations:migrate --no-interaction --env=test
+
+      - name: PHPUnit
+        run: php bin/phpunit
+
+      - name: Prechauffer le conteneur
+        # PHPStan lit le conteneur compile (containerXmlPath dans
+        # phpstan.neon) : sans ce prechauffage, il refuse de demarrer.
+        run: php bin/console cache:warmup --env=dev
+
+      - name: PHPStan (level max)
+        # --memory-limit=1G : 128 Mo ne suffisent pas, l'analyse s'arrete en
+        # cours de route.
+        run: vendor/bin/phpstan analyse --no-progress --memory-limit=1G
+
+  frontend:
+    name: Frontend — Vitest + build
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Installer Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Installer les dependances
+        run: npm ci
+
+      - name: ESLint
+        # NON BLOQUANT volontairement. Quatre erreurs
+        # `react-hooks/set-state-in-effect` preexistent (api.js, NavBar.jsx,
+        # ToastContext.jsx, ProductDetailPage.jsx). Les rendre bloquantes
+        # mettrait la CI au rouge des sa mise en place, et une CI rouge en
+        # permanence finit par etre ignoree — ce qui la rend inutile.
+        # A basculer en bloquant des que ces quatre erreurs sont traitees :
+        # supprimer simplement la ligne continue-on-error.
+        continue-on-error: true
+        run: npx eslint src
+
+      - name: Vitest
+        run: npx vitest run
+
+      - name: Build de production
+        # Verifie que le front compile. La cle Stripe n'est pas necessaire
+        # ici : on teste la compilation, pas le paiement.
+        run: npm run build

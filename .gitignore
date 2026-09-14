@@ -9,6 +9,11 @@
 .env.*
 !.env.example
 !*/.env.example
+# Exception : .env.test ne contient que des valeurs de test (base locale,
+# DSN null, cles Stripe factices). Il doit etre versionne, sinon la CI n'a
+# aucune configuration pour executer la suite de tests. Les vrais secrets
+# vivent dans .env.local, toujours ignore.
+!*/.env.test
 
 ###> symfony/framework-bundle ###
 backend/var/

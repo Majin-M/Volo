@@ -7,7 +7,7 @@ Corrige les deux défauts 🔴 identifiés dans `docs/MODELE_DONNEES.md` §6.1 e
 > - **La migration ne s'est jamais exécutée.** Elle plantait dès sa première requête (`Unknown column 'p.order_id'`). `Version20260717120000` n'était dans le `doctrine_migration_versions` d'aucune base, et `shop_order` portait toujours `payment_status` / `payment_method`. Le code des entités était corrigé, le schéma non — donc **l'application était cassée** contre la base de dev : Doctrine mappait `Payment.orderEntity` sur une colonne inexistante.
 > - **Les résultats affichés plus bas n'ont pas été obtenus.** La sortie d'exemple (« Commandes à reprendre en Payment : 3 ») ne pouvait pas être produite par une migration qui échouait avant. Et `verifier.php`, dont ce document annonce « 20 réussis, 0 échoués », **n'existe pas dans le dépôt**.
 >
-> **✅ Réparée, appliquée et vérifiée le 17/07/2026.** La migration a tourné sur `volo` après sauvegarde ; `doctrine:schema:validate` est vert sur les deux bases. Les vérifications que ce document demandait de « contrôler à la main » sont désormais des tests : `tests/Entity/OrderPaymentTest.php` (9 tests), dans une suite qui en compte 36 (108 assertions).
+> **✅ Réparée, appliquée et vérifiée le 17/07/2026.** La migration a tourné sur `volo` après sauvegarde ; `doctrine:schema:validate` est vert sur les deux bases. Les vérifications que ce document demandait de « contrôler à la main » sont désormais des tests : `tests/Entity/OrderPaymentTest.php`, dans la suite PHPUnit du projet.
 
 ---
 
@@ -179,7 +179,7 @@ php bin/console doctrine:migrations:migrate --no-interaction   # 8 migrations, O
 php bin/console doctrine:migrations:migrate prev               # down(), OK
 php bin/console doctrine:schema:validate                       # 2x [OK]
 
-php bin/phpunit                                                # OK (36 tests, 108 assertions)
+php bin/phpunit                                                # OK — suite verte
 ```
 
 L'aller-retour a été contrôlé colonne par colonne : après `down()`, `payment.order_entity_id`, `shop_order.payment_status` / `payment_method` et le nom d'index d'origine sont restaurés à l'identique.
@@ -281,13 +281,64 @@ C'est la même classe d'oubli que le CRUD `/user` : **un générateur laisse des
 
 Trois défauts d'affichage cumulés sur `/admin` :
 
-- **Libellés en anglais** (« Product », « Add », « Search », « 2 results ») : `default_locale` valait `en` alors qu'EasyAdmin fournit `EasyAdminBundle.fr.php`. Locale passée à `fr`, plus libellés d'entité français sur les six contrôleurs CRUD. Les 36 tests restent verts.
+- **Libellés en anglais** (« Product », « Add », « Search », « 2 results ») : `default_locale` valait `en` alors qu'EasyAdmin fournit `EasyAdminBundle.fr.php`. Locale passée à `fr`, plus libellés d'entité français sur les contrôleurs CRUD. La suite de tests reste verte.
 - **Colonnes dupliquées** dans la liste des produits : `ProductCrudController::configureFields()` retournait deux fois le même jeu de champs — un bloc « liste » puis un bloc « formulaire » — sans filtrer sur `$pageName`. Chaque colonne apparaissait donc en double, une fois en français, une fois avec le libellé par défaut. Remplacé par un jeu unique dont la visibilité est réglée par page.
 - **Logo cassé** : `setTitle()` pointait vers `/volo-logo.svg` et `setFaviconPath()` vers `favicon.svg`, deux fichiers absents de `public/`. Le logo de la SPA est réutilisé (même URL en dev et en prod) et un favicon a été créé.
 
 Un thème aux couleurs VOLO a été ajouté (`public/admin-theme/volo-admin.css`), chargé via `configureAssets()`. Il surcharge 167 variables CSS d'EasyAdmin sans un seul `!important` : le bundle déclare tout son style dans `@layer ea`, et une feuille non-layered l'emporte sur une couche quelle que soit sa spécificité. Aucune police distante n'est chargée, la CSP l'interdirait.
 
 Le menu du dashboard pointait par ailleurs vers une route `app_home` **inexistante** : le rendu du menu aurait levé une `RouteNotFoundException` dès l'ouverture du back-office. Remplacé par une URL directe.
+
+---
+
+## ✅ Écritures produits inaccessibles — Voter appelé sans son sujet
+
+> **Corrigé le 14/09/2026.**
+
+**Constat** : `PUT` et `DELETE /api/products/{id}` renvoyaient **403 à tout le monde**, administrateur compris. Vérifié avec un compte `ROLE_ADMIN`. La documentation les présentait pourtant comme implémentés.
+
+**Cause** : `denyAccessUnlessGranted(ProductVoter::EDIT)` était appelé **sans passer le produit**. Or `ProductVoter::supports()` exige `$subject instanceof Product` pour `EDIT` et `DELETE`. Le Voter s'abstenait, et une abstention vaut refus.
+
+Le défaut échouait du bon côté — fermé, jamais ouvert — mais deux conséquences : l'endpoint ne servait à rien, et ce n'était pas le Voter qui protégeait la route (seul l'`access_control` le faisait), alors que toute la documentation présente le Voter comme le mécanisme d'autorisation fine.
+
+**Correction** : une méthode `findProductOr404()` récupère l'entité et la transmet au Voter. Bénéfice secondaire : un produit inexistant rend désormais 404 au lieu de 403.
+
+**Matrice vérifiée après correction** :
+
+| Appelant | Résultat |
+|---|---|
+| `ROLE_ADMIN` | **200** — la modification s'applique |
+| `ROLE_USER` | 403 |
+| Anonyme | 401 |
+| Produit inexistant | 404 |
+
+---
+
+## ✅ Démarrage impossible sur un clone neuf
+
+> **Corrigé le 14/09/2026.**
+
+**Constat** : `.gitignore` ignore `.env` et `.env.*` dans tout le dépôt. `backend/.env` n'était donc pas versionné — et aucun `backend/.env.example` n'existait pour le remplacer. Un clone neuf n'avait ni `DATABASE_URL`, ni `JWT_*`, ni `MAILER_DSN`, ni les clés Stripe : l'application ne démarrait pas, sans indication de ce qui manquait.
+
+Le `.env.example` de la racine ne couvrait que 9 clés, aucune liée à la base ou au JWT.
+
+**Correction** : ajout de `backend/.env.example` (17 variables, toutes commentées) et de `frontend/.env.example`. L'exception `!*/.env.example` déjà présente dans `.gitignore` les rend versionnés.
+
+Les commentaires portent les pièges appris en cours de projet : `serverVersion` indique une plateforme à Doctrine et ne choisit pas le serveur ; les variables `VITE_*` sont figées au build et non au démarrage ; la clé Stripe publique finit dans le bundle, la secrète jamais.
+
+---
+
+## ✅ Clés d'API tierces retirées du disque
+
+> **Fait le 14/09/2026.**
+
+Deux clés de services tiers (DeepSeek, Groq) traînaient dans `.env`, `frontend/.env` et `backend/.env`. **Aucune n'était lue par le code** — vérifié sur `backend/src`, `frontend/src` et `backend/config` — et celle du frontend n'aurait de toute façon pas été exposée par Vite, faute de préfixe `VITE_`.
+
+Elles n'ont **jamais été versionnées** : aucun fichier `.env` n'est suivi par git ni présent dans l'historique. Rien n'a donc fuité par le dépôt.
+
+Les quatre lignes ont été retirées. L'application démarre et répond normalement après coup (API, back-office, connexion), et les trois clés Stripe restent en place.
+
+> **À faire hors dépôt** : révoquer ces deux clés chez leurs fournisseurs. Une clé inutilisée qui traîne sur un poste reste une clé valide.
 
 ---
 

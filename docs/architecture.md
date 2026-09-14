@@ -68,7 +68,7 @@ volo/
 │   │
 │   ├── migrations/              # Migrations Doctrine
 │   ├── public/admin-theme/      # Thème VOLO du back-office (CSS + favicon)
-│   ├── tests/                   # 36 tests / 108 assertions au total
+│   ├── tests/                   # suite PHPUnit — chiffres : docs/STRATEGIE_TESTS.md
 │   │   ├── Controller/          # AuthControllerTest, WebhookStripeTest
 │   │   ├── Entity/              # OrderPaymentTest
 │   │   ├── Security/            # CsrfProtectionTest

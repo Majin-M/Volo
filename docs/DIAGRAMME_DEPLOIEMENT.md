@@ -136,7 +136,7 @@ Google, lui, exécute le JS — le référencement pur fonctionne sans ce dispos
 | `docker-compose.yml` complet | ✅ Présent (5 services) | L'environnement devient reproductible ; reste à l'éprouver sur une machine autre que le poste de développement |
 | Déploiement réel | Inexistant | La configuration Nginx n'a jamais tourné ailleurs qu'en local : pour de l'infrastructure, elle est donc à considérer comme non éprouvée |
 | Environnement de staging | Inexistant | Rien n'est testé dans des conditions proches de la production avant d'y arriver |
-| CI/CD | ⚠️ Un workflow existe mais ne s'exécute pas | `frontend/.github/workflows/react-doctor.yml` est hors de `<racine>/.github/workflows/` : GitHub ne le découvre pas. Ni absent, ni fonctionnel — à déplacer |
+| CI/CD | ✅ En place (14/09/2026) | `.github/workflows/ci.yml` : PHPUnit sur MySQL 8, PHPStan `level: max`, Vitest, build. ESLint signalant mais non bloquant (4 erreurs préexistantes). Déploiement toujours manuel |
 | Sauvegardes | ✅ Script présent, cron non activé | `scripts/backup-db.sh` (mysqldump gzip, rétention 30 j) est prêt et testé ; sa planification sur le serveur cible reste à faire |
 | Variables d'environnement de prod | Inexistantes | Les secrets de prod n'ont jamais été définis |
 

@@ -1,14 +1,24 @@
 # Stratégie de tests
 
-> **État au 13/09/2026** : PHPUnit 13, **36 tests, 108 assertions**, verts. Répartis sur cinq fichiers : `AuthControllerTest` (inscription, cookies — 3 tests), `CsrfProtectionTest` (double-submit — 8), `OrderPaymentTest` (dérivation du statut, contrat d'API, cascade — 9), `ContactNotificationTest` (persistance + notification email — 6), `WebhookStripeTest` (signature HMAC, idempotence, transitions de statut — 10). **Tests front présents** : Vitest + Testing Library, 3 fichiers (`LoginPage.test.jsx`, `CartContext.test.jsx`, `validators.test.js`). PHPStan `level: max` à 0 erreur (baseline de 102 entrées). React Doctor **100/100** (0 issue — bugs, performance, accessibilité).
+> **Ce document est le seul endroit du dépôt qui chiffre la suite de tests.** Partout ailleurs, les autres documents renvoient ici plutôt que de recopier un nombre. Raison : un nombre recopié à dix endroits est faux à neuf dès le test suivant — c'est ainsi que « 26 tests » a survécu des mois alors qu'il y en avait 36 (§9). Les chiffres ci-dessous sont un **relevé daté**, pas une propriété du projet ; l'autorité, c'est la CI, qui les recalcule à chaque push.
 >
-> **Tests front** : `npx vitest run` → **32 tests sur 3 fichiers**, verts. `npm run build` passe (80 modules).
+> **Relevé du 14/09/2026** — reproductible par `cd backend && php bin/phpunit` et `cd frontend && npx vitest run` :
 >
-> **Deux réserves à énoncer telles quelles** : ESLint ne sort pas 0 erreur — `npx eslint src` en signale **4**, toutes `react-hooks/set-state-in-effect`, dans `api/api.js`, `components/NavBar.jsx`, `contexts/ToastContext.jsx` et `pages/ProductDetailPage.jsx`. Et aucune CI n'exécute ces outils : le seul workflow du dépôt, `frontend/.github/workflows/react-doctor.yml`, est placé hors de `<racine>/.github/workflows/` et n'est donc jamais déclenché par GitHub.
+> | Ce qui est mesuré | Valeur relevée | Commande |
+> |---|---|---|
+> | Suite backend | 51 tests, 144 assertions, verts | `php bin/phpunit` |
+> | Suite frontend | 32 tests sur 3 fichiers, verts | `npx vitest run` |
+> | Build frontend | passe | `npm run build` |
+> | PHPStan `level: max` | 0 erreur hors baseline | `vendor/bin/phpstan analyse` |
+> | ESLint | **4 erreurs** — voir réserve ci-dessous | `npx eslint src` |
+>
+> **Couverture backend, par fichier** : `AuthControllerTest` (inscription, cookies), `CsrfProtectionTest` (double-submit), `OrderPaymentTest` (dérivation du statut, contrat d'API, cascade), `ContactNotificationTest` (persistance + notification email), `WebhookStripeTest` (signature HMAC, idempotence, transitions de statut), `StockReleaseTest` (réservation et restitution du stock, balayage des commandes abandonnées), `AuditSubscriberTest` (traçabilité des modifications). **Frontend** : `LoginPage.test.jsx`, `CartContext.test.jsx`, `validators.test.js`.
+>
+> **Une réserve à énoncer telle quelle** : ESLint ne sort pas 0 erreur. Les quatre erreurs sont toutes `react-hooks/set-state-in-effect`, dans `api/api.js`, `components/NavBar.jsx`, `contexts/ToastContext.jsx` et `pages/ProductDetailPage.jsx`. Elles sont signalées par la CI sans la faire échouer (§9), le temps qu'elles soient traitées.
 >
 > Ce document existe pour deux raisons : dire quoi écrire quand on s'y mettra, et **nommer précisément ce qui est aujourd'hui non vérifié** — parce que « ça marche quand je clique » n'est pas une vérification.
 >
-> **Trois obstacles ont dû être levés pour que ces 3 tests tournent** — à connaître avant d'en écrire d'autres :
+> **Trois obstacles ont dû être levés pour que la suite tourne** — à connaître avant d'écrire de nouveaux tests :
 >
 > 1. **La base `volo_test` n'existait pas** (Doctrine ajoute le suffixe `_test` via `dbname_suffix`). Il a fallu la créer à la main : `doctrine:database:create` échoue ici, il tente de se connecter à la base avant de la créer.
 > 2. **La migration `Version20260717120000` était cassée** et n'avait jamais pu s'appliquer nulle part — donc aucun schéma de test conforme n'était possible avant de la réparer.
@@ -181,7 +191,28 @@ Viser 100% partout produit un faux sentiment de sécurité : on finit par tester
 
 ## 9. Pipeline CI (à créer)
 
-Aucune CI ne s'exécute sur ce projet (roadmap 5.5 ⬜ 🟡). Nuance à énoncer plutôt que de dire « il n'y en a pas » : un workflow **existe**, `frontend/.github/workflows/react-doctor.yml`, mais GitHub ne découvre les workflows que dans `<racine>/.github/workflows/` — or ce dossier n'existe pas à la racine du dépôt. Le fichier est donc inerte, et le déplacer est la première étape. Étapes cibles, GitHub Actions :
+✅ **La CI est en place depuis le 14/09/2026** — `.github/workflows/ci.yml`.
+
+Elle existe pour une raison précise : les affirmations de ce document (« les tests passent », « PHPStan est à 0 erreur », « le front compile ») n'étaient que des déclarations tant que rien ne les exécutait. C'est ainsi que le chiffre « 26 tests » a survécu des mois dans la documentation alors que la suite en comptait dix de plus. Le dépôt vérifie désormais ces affirmations à chaque push — et les chiffres ne sont plus écrits qu'à un seul endroit, en tête de ce document.
+
+| Étape | Bloquante |
+|---|---|
+| PHPUnit (MySQL 8 en service, base `volo_test`) | Oui |
+| PHPStan `level: max` | Oui |
+| Vitest + build de production | Oui |
+| ESLint | **Non** — voir ci-dessous |
+| React Doctor | Non (consultatif) |
+
+**Pourquoi ESLint n'est pas bloquant** : quatre erreurs `react-hooks/set-state-in-effect` préexistent. Les rendre bloquantes mettrait la CI au rouge dès sa mise en place, et une CI durablement rouge finit par être ignorée — ce qui la rend inutile. Elle reste donc signalante. Retirer `continue-on-error` dès que ces quatre erreurs sont traitées.
+
+**Deux pièges rencontrés en la construisant**, qui valent d'être connus :
+
+- Le workflow React Doctor existait mais n'avait **jamais tourné** : il était placé dans `frontend/.github/workflows/`, alors que GitHub ne lit que `<racine>/.github/workflows/`. Il ciblait en outre la branche `main` quand le dépôt est sur `master`. Deux raisons indépendantes pour un même silence.
+- La CI part de `.env.example` pour reconstituer `.env`, comme le ferait quelqu'un qui clone. Effet de bord voulu : **si le modèle devient incomplet, la CI casse**. Le modèle est ainsi vérifié, pas seulement promis. C'est d'ailleurs ce mécanisme qui a révélé l'absence de `DEFAULT_URI` dans la première version du modèle.
+
+**Note sur la version de PHP** : la CI cible **8.4**, pas 8.2. Le projet déclare `>=8.2` et son image Docker de production utilise 8.2 — ce qui fonctionne, celle-ci installant avec `--no-dev`. Mais PHPUnit 13.3.2 exige `>= 8.4.1` : **la suite de tests ne peut pas tourner sous 8.2**. « PHP 8.2+ » vaut pour exécuter l'application, pas pour la développer.
+
+Étapes restant à ajouter :
 
 1. Checkout.
 2. `composer install` + `npm ci` (avec cache).
@@ -199,12 +230,13 @@ Le point 4 mérite d'être noté : PHPStan aurait probablement signalé seul le 
 
 ## 10. Par où commencer, concrètement
 
-La suite tourne désormais (`php bin/phpunit` — 36 tests, 108 assertions). Reste, dans cet ordre :
+La suite tourne désormais (`php bin/phpunit`, relevé en tête de document). Reste, dans cet ordre :
 
 1. ~~`POST /api/orders` sans `X-Csrf-Token` → 403~~ — ✅ **fait** (`CsrfProtectionTest`). Ce test a payé immédiatement : il a révélé que `/api/contact`, route publique, était bloquée en 403 pour tout visiteur anonyme. **Le formulaire de contact ne fonctionnait pas.**
-2. **`PasswordValidator`** — test pur, aucune infrastructure, écrit en 10 minutes. Désormais le moins cher des tests restants.
-3. **Rate limiting** : la 6ᵉ tentative → 429. Constaté à l'usage, jamais figé par un test.
-4. **Un inventaire, pas un test** : `debug:router` confronté à l'`access_control` de `security.yaml`. Quelle route ne tombe sous aucune règle ? C'est ce qui aurait attrapé `/user`, et rien dans la pyramide de tests ne le remplace.
+2. ~~**Les chemins d'échec**~~ — ✅ **fait le 14/09/2026** (`StockReleaseTest`, `AuditSubscriberTest`). Voir §11.
+3. **`PasswordValidator`** — test pur, aucune infrastructure, écrit en 10 minutes. Désormais le moins cher des tests restants.
+4. **Rate limiting** : la 6ᵉ tentative → 429. Constaté à l'usage, jamais figé par un test.
+5. **Un inventaire, pas un test** : `debug:router` confronté à l'`access_control` de `security.yaml`. Quelle route ne tombe sous aucune règle ? C'est ce qui aurait attrapé `/user`, et rien dans la pyramide de tests ne le remplace.
 
 > **Ce que l'écriture du test CSRF a appris**, et qui vaut pour tous les suivants :
 >
@@ -215,3 +247,34 @@ La suite tourne désormais (`php bin/phpunit` — 36 tests, 108 assertions). Res
 > Le point 3 de la version précédente proposait `GET /api/orders/{id}` d'un autre utilisateur, « le plus utile précisément parce qu'il échouera ». Il n'aurait pas échoué : **il aurait produit un 404**, la route n'existant pas. On aurait conclu à tort que la propriété était vérifiée.
 >
 > L'intuition restait juste : un test qui échoue apprend quelque chose, un test qui passe du premier coup confirme ce qu'on croyait déjà. Mais elle valait pour une route imaginée. **Vérifier qu'une route existe coûte trente secondes et doit précéder le raisonnement sur ce qu'elle protège.**
+
+---
+
+## 11. Les chemins d'échec — ce que la suite ne regardait pas
+
+Ajouté le 14/09/2026 : `tests/Service/StockReleaseTest.php` et `tests/EventSubscriber/AuditSubscriberTest.php`.
+
+**Le constat qui les a motivés.** Tous les tests précédents suivaient le chemin qui réussit : le client paie, le webhook arrive, la commande passe à `paid`. Or les deux défauts les plus coûteux du projet vivaient sur le chemin d'à côté :
+
+| Défaut | Ce que la suite voyait | Ce qui se passait |
+|---|---|---|
+| Le stock réservé n'était jamais restitué quand le client ne payait pas | Rien — aucun test n'abandonnait de panier | 19 commandes `pending` immobilisaient 22 unités, la plus ancienne datant de juin |
+| `AuditSubscriber` persistait depuis `preUpdate`, trop tard pour que Doctrine insère | Rien — la table contenait bien des lignes `create` | **Aucune modification n'a jamais été tracée.** Pas d'erreur, pas d'avertissement |
+
+Les deux ont la même signature : **l'absence a la même apparence que le bon fonctionnement**. Une piste d'audit qui ne trace rien ressemble à une piste d'audit calme ; un stock qui ne revient pas ressemble à un stock qui se vend.
+
+**Ces tests ont été éprouvés par mutation**, comme le demande §10 :
+
+| Mutation appliquée | Résultat |
+|---|---|
+| `incrementStock()` retiré de `releaseStock()` | Rouge |
+| `computeChangeSet()` retiré de `AuditSubscriber::onFlush()` — le bug historique exact | 5 des 7 tests d'audit en erreur |
+
+Le code a été restauré ensuite (`git diff` vide sur les deux fichiers).
+
+**Deux choses apprises en les écrivant**, qui valent pour les tests suivants :
+
+1. **PHP tourne en UTC, MySQL en heure locale.** Vieillir une commande avec `DATE_SUB(NOW(), INTERVAL 120 MINUTE)` était exactement annulé par les deux heures d'écart, et donnait l'apparence d'un bug dans `findStalePending`. L'application ne mélange jamais les deux horloges — Doctrine écrit `created_at` depuis PHP et la requête le compare à un `DateTimeImmutable` PHP. Un test qui introduit `NOW()` mesure le fuseau du serveur, pas le code.
+2. **Une garde défensive peut protéger d'un état impossible.** `releaseStock()` ignore une ligne de commande sans produit ; la contrainte `FK_52EA1F094584665A` interdit cet état, `OrderItem::$product` étant `nullable: false`. La branche est donc couverte en mémoire, pas en base, et le test le dit. Elle garde son intérêt pour un futur `ON DELETE SET NULL` — mais il ne faut pas la présenter comme protégeant d'un scénario réel aujourd'hui.
+
+**Un contrat volontairement figé** : `testReleaseStockNestPasIdempotent` vérifie qu'un double appel restitue deux fois. Ce n'est pas un comportement souhaitable, c'est le contrat documenté du service — l'idempotence est déléguée à la machine à états, dont la garde ne laisse passer `cancel_pending` qu'une fois. Si ce test devient rouge, une garde a été ajoutée dans le service, et il faut alors vérifier que les appelants ne comptent plus sur la machine à états pour cela.

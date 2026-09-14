@@ -71,7 +71,7 @@ Traduit les objets PHP en SQL. Le vrai bénéfice n'est pas le confort : **Doctr
 
 **Le piège** : Doctrine mappe `decimal` sur une **`string` PHP**, jamais un `float`. D'où `private ?string $price = null;`, qui surprend mais est délibéré ([MODELE_DONNEES.md](MODELE_DONNEES.md) §5).
 
-**Patterns Doctrine exploités** : `SoftDeleteFilter` (SQL Filter qui exclut transparemment les enregistrements `deletedAt IS NOT NULL`), `AuditSubscriber` (listener `postPersist` / `preUpdate` traçant les changements sensibles dans `audit_log`).
+**Patterns Doctrine exploités** : `SoftDeleteFilter` (SQL Filter qui exclut transparemment les enregistrements `deletedAt IS NOT NULL`), `AuditSubscriber` (listener `onFlush` / `postPersist` / `postFlush` traçant les changements sensibles dans `audit_log`).
 
 ### MySQL 8 — ✅ unifié
 
@@ -97,7 +97,7 @@ JWT signé par paire de clés RSA. Le firewall `api` est **stateless** : aucune 
 
 ### EasyAdmin
 
-Back-office CRUD généré depuis les entités Doctrine. Cinq contrôleurs de quelques lignes couvrent produits, marques, commandes, problématiques et utilisateurs.
+Back-office CRUD généré depuis les entités Doctrine. Sept contrôleurs de quelques lignes couvrent produits, marques, problématiques, routines, commandes, paiements et clients.
 
 **Le piège majeur** : EasyAdmin ne fournit **aucun écran de connexion**. Il faut l'écrire (`Admin/SecurityController` + template Twig avec `_csrf_token`). Sans lui, `/admin` renvoie vers une route inexistante et casse en 500.
 
@@ -204,19 +204,19 @@ Dépôt monorepo à la racine (`backend/` + `frontend/`). Le dépôt initial ne 
 
 | Outil | État | Ce que ça coûte |
 |---|---|---|
-| PHPUnit | ✅ **Présent** — 36 tests / 108 assertions, 5 fichiers | Couverture partielle, ciblée sécurité et paiement : [STRATEGIE_TESTS.md](STRATEGIE_TESTS.md) §1 |
+| PHPUnit | ✅ **Présent** — 5 fichiers, exécutés par la CI | Couverture partielle, ciblée sécurité et paiement. Chiffres relevés dans [STRATEGIE_TESTS.md](STRATEGIE_TESTS.md), seul endroit qui les porte |
 | Vitest | ✅ **Présent** — 3 fichiers de tests (LoginPage, CartContext, validators) | Couverture partielle, ciblée auth, panier et validation |
-| PHPStan | ✅ **Présent** — `level: max` + baseline (102 entrées) | Voir ci-dessous |
+| PHPStan | ✅ **Présent** — `level: max` + baseline | Voir ci-dessous |
 | CI/CD | Absent | Rien ne vérifie qu'une branche compile avant fusion |
 | OpenAPI | Absent | `api_specification.md` peut mentir sans que rien ne le signale — et [le fait massivement](api_specification.md) |
 
 > ⚠️ **Ce tableau annonçait « Aucun test » et « PHPStan absent ». Les deux sont faux**, et l'étaient déjà quand ces lignes ont été écrites : `backend/phpunit.dist.xml`, `backend/tests/` et `backend/phpstan.neon` sont dans le dépôt.
 >
-> **PHPStan tourne en `level: max`** — le niveau le plus strict. Le `phpstan-baseline.neon` compte **102 entrées** ; il a été régénéré le 02/09/2026 après les modifications de `StripePaymentGateway` (cast explicite `(string)` sur `order_id`, type `metadata` corrigé). **0 erreur hors baseline**, revérifié le 13/09/2026.
+> **PHPStan tourne en `level: max`** — le niveau le plus strict. Le `phpstan-baseline.neon` comptait **102 entrées** au 02/09/2026 — chiffre daté, vérifiable par `grep -c 'message:' phpstan-baseline.neon` ; il a été régénéré à cette date après les modifications de `StripePaymentGateway` (cast explicite `(string)` sur `order_id`, type `metadata` corrigé). **0 erreur hors baseline**, revérifié le 13/09/2026.
 >
 > Deux pièges appris à l'usage : PHPStan a besoin du conteneur `dev` compilé (`cache:warmup` avant, sinon il refuse de démarrer), et de `--memory-limit=1G` (128M ne suffisent pas, il s'arrête en cours d'analyse).
 
-PHPStan reste le meilleur rapport effort/trouvailles du projet — mais un analyseur qu'aucune CI n'exécute ne trouve rien. C'est le vrai argument pour la tâche 5.5.
+PHPStan reste le meilleur rapport effort/trouvailles du projet. Il est exécuté à chaque push depuis la mise en place de la CI le 14/09/2026 (`.github/workflows/ci.yml`) — un analyseur que personne ne lance ne trouve rien.
 
 **Ce que les tests ont réellement révélé** (17/07/2026), et qui illustre pourquoi « ça marche quand je clique » ne suffit pas :
 

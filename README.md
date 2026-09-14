@@ -149,7 +149,8 @@ git clone <url-du-repo>
 cd Volo
 
 # Variables d'environnement (à adapter : APP_SECRET, clés Stripe, etc.)
-cp backend/.env backend/.env.local   # si nécessaire
+cp backend/.env.example backend/.env.local     # puis renseigner les valeurs
+cp frontend/.env.example frontend/.env.local   # clé publique Stripe
 
 docker compose up -d --build
 ```
@@ -175,7 +176,8 @@ docker compose down       # -v pour supprimer aussi les volumes (données)
 ```bash
 cd backend
 composer install
-cp .env .env.local            # renseigner DATABASE_URL, APP_SECRET, STRIPE_*, JWT_PASSPHRASE…
+cp .env.example .env.local              # puis renseigner les valeurs
+php bin/console lexik:jwt:generate-keypair   # cles JWT (obligatoire)
 php bin/console doctrine:database:create
 php bin/console doctrine:migrations:migrate
 php bin/console doctrine:fixtures:load
@@ -184,14 +186,18 @@ symfony server:start
 php -S localhost:8000 -t public
 ```
 
+> `backend/.env` n'est pas versionné : `.env.example` en est le modèle, et chaque variable y est commentée. Le copier est donc la **première** étape, pas une option — sans lui l'application ne démarre pas.
+
 Variables clés à renseigner (`backend/.env.local`) :
 - `APP_SECRET`
-- `DATABASE_URL`
+- `DATABASE_URL` — attention, `serverVersion` doit décrire le **vrai** serveur (`mariadb-10.4.32` sous XAMPP, `8.0` sous Docker)
 - `MAILER_DSN`
-- `JWT_PASSPHRASE` (authentification JWT)
+- `JWT_PASSPHRASE` (celle utilisée pour générer la paire de clés ci-dessus)
 - `STRIPE_SECRET_KEY` / `STRIPE_PUBLIC_KEY` / `STRIPE_WEBHOOK_SECRET`
 - `CORS_ALLOW_ORIGIN`
 - `ADMIN_EMAIL` / `MAILER_FROM`
+
+Côté frontend, `cp frontend/.env.example frontend/.env.local` et y placer `VITE_STRIPE_PUBLIC_KEY`, sans quoi le paiement ne s'initialise pas.
 
 #### Frontend (React + Vite)
 ```bash

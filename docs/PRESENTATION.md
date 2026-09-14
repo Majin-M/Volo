@@ -119,7 +119,7 @@ VOLO (/)
 | **Phase 2 — Back-end** | Semaines 2-4 | ~3 sem | Entités Doctrine + migrations, auth JWT (Lexik), contrôleurs API REST, fixtures, EasyAdmin, Voters, services métier |
 | **Phase 3 — Front-end** | Semaines 5-7 | ~3 sem | React Router, pages (catalogue, détail, panier, auth, commande, contact, profil, historique), contextes (Auth, Cart), intégration API, CSS Modules |
 | **Phase 4 — Fonctionnalités avancées** | Semaines 8-9 | ~2 sem | Stripe (PaymentGateway, webhook), upload images (VichUploader), emails (Mailer + Mailpit), rate limiting, CSRF, security headers |
-| **Phase 5 — Finalisation** | Semaines 10-12 | ~2-3 sem | Tests (PHPUnit 36 tests / Vitest), PHPStan, documentation, corrections, Docker production |
+| **Phase 5 — Finalisation** | Semaines 10-12 | ~2-3 sem | Tests (PHPUnit / Vitest), PHPStan, CI GitHub Actions, documentation, corrections, Docker production |
 
 ---
 
@@ -413,17 +413,17 @@ Plus un lien « Retour au site » vers la SPA.
 | Build tool | Vite | 8 | HMR instantané + proxy `/api` (pièce d'architecture pour les cookies HttpOnly) |
 | Back-end | Symfony | 7.4 | Écosystème sécurité (firewalls, voters, rate limiter), EasyAdmin, Mailer |
 | ORM | Doctrine | — | Paramétrage systématique des requêtes → injection SQL structurellement impossible |
-| BDD | MySQL 8.0 | — | Unifié dev/prod. Compatibilité hébergements mutualisés français |
+| BDD | MySQL 8.0 (Docker, CI) / MariaDB 10.4 (XAMPP, dev) | — | **Non unifié** : les deux fichiers Compose épinglent `mysql:8.0`, le poste de développement tourne sur le MariaDB de XAMPP. L'écart est connu et documenté ([DIAGRAMME_DEPLOIEMENT.md](DIAGRAMME_DEPLOIEMENT.md)) |
 | Auth | LexikJWTBundle | — | JWT RSA signé, stocké en cookie HttpOnly (jamais en localStorage) |
 | Paiement | Stripe (SDK PHP + React Elements) | — | Le numéro de carte ne transite jamais par VOLO (conformité PCI-DSS légère) |
 | Back-office | EasyAdmin 5 | — | CRUD généré depuis les entités Doctrine en quelques classes |
 | Email | Symfony Mailer + Mailpit (dev) | — | Emails synchrones — Mailpit capture en dev |
 | Upload images | VichUploaderBundle | — | Upload avec validation MIME, SmartUniqueNamer |
-| Tests backend | PHPUnit 13 | — | 36 tests, 108 assertions |
+| Tests backend | PHPUnit 13 | — | Sécurité, paiement, webhook, contact — chiffres relevés dans [STRATEGIE_TESTS.md](STRATEGIE_TESTS.md) |
 | Tests frontend | Vitest + Testing Library | — | Tests des contextes, validators, pages |
-| Analyse statique | PHPStan level max | — | 0 erreur (avec baseline pour l'existant) |
-| Linting front | ESLint 10 | — | 0 erreur |
-| Qualité React | React Doctor 0.9 | — | Score 100/100, 0 issue (bugs, perf, a11y) |
+| Analyse statique | PHPStan level max | — | 0 erreur hors baseline (la baseline gèle l'existant) |
+| Linting front | ESLint 10 | — | **4 erreurs restantes** (`react-hooks/set-state-in-effect`), signalées sans bloquer la CI |
+| Qualité React | React Doctor 0.9 | — | Configuré sur les PRs. **Aucune exécution à ce jour** : le workflow était mal placé, corrigé le 14/09/2026 |
 | SEO | react-helmet-async + SitemapController | — | Meta par page + sitemap XML dynamique |
 
 ### Architecture de communication (développement)
@@ -616,17 +616,17 @@ Permissions-Policy: camera=(), microphone=(), geolocation=()
 
 ### Résultat global
 
-**36 tests, 108 assertions** (PHPUnit 13) — tous verts.
+Suite backend PHPUnit 13 verte, suite frontend Vitest verte, vérifiées à chaque push par la CI. Les **chiffres exacts sont relevés dans un seul endroit du dépôt** — [STRATEGIE_TESTS.md](STRATEGIE_TESTS.md) — daté et reproductible par une commande. Les recopier ici garantirait qu'ils soient faux au test suivant.
 
 ### Tests backend (PHPUnit)
 
 | Fichier | Type | Ce qui est testé |
 |---|---|---|
 | `AuthControllerTest` | Fonctionnel (WebTestCase) | Inscription réussie, données manquantes, doublon email, cookie JWT HttpOnly, cookie CSRF non HttpOnly, pas de mot de passe dans la réponse |
-| `CsrfProtectionTest` | Fonctionnel (WebTestCase) | POST sans header → 403, mauvais token → 403, bon token → passe, GET non bloqué, login/register exemptés, contact public exempt (8 tests) |
+| `CsrfProtectionTest` | Fonctionnel (WebTestCase) | POST sans header → 403, mauvais token → 403, bon token → passe, GET non bloqué, login/register exemptés, contact public exempt |
 | `OrderPaymentTest` | Intégration (KernelTestCase) | Dérivation du statut Payment→Order, contrat d'API préservé (clés JSON), clientSecret non exposé, ON DELETE CASCADE, suppression paiement ≠ suppression commande |
 | `ContactNotificationTest` | Fonctionnel (WebTestCase) | Message persisté en BDD, email admin envoyé, From ≠ visiteur, Reply-To = visiteur, échec SMTP ne perd pas le message, données invalides → rien persisté, HTML strippé |
-| `WebhookStripeTest` | Fonctionnel (WebTestCase) | Sans signature → 400, signature invalide → 400, `payment_intent.succeeded` capture le paiement, `payment_intent.payment_failed` marque l'échec, **idempotence des deux événements** (rejeu sans double effet), événement inconnu → 200, `intentId` inconnu → 200, webhook exempt du contrôle CSRF, refus de transiter une commande déjà expédiée (10 tests) |
+| `WebhookStripeTest` | Fonctionnel (WebTestCase) | Sans signature → 400, signature invalide → 400, `payment_intent.succeeded` capture le paiement, `payment_intent.payment_failed` marque l'échec, **idempotence des deux événements** (rejeu sans double effet), événement inconnu → 200, `intentId` inconnu → 200, webhook exempt du contrôle CSRF, refus de transiter une commande déjà expédiée |
 
 ### Tests frontend (Vitest + Testing Library)
 
@@ -677,10 +677,9 @@ $client->request('POST', '/api/orders', [], [], [
 
 ### Analyse statique
 
-- **PHPStan** : `level: max` (le plus strict), 0 erreur (avec baseline de 102 entrées)
-- **ESLint** : 4 erreurs restantes, toutes `react-hooks/set-state-in-effect` (`api/api.js`, `components/NavBar.jsx`, `contexts/ToastContext.jsx`, `pages/ProductDetailPage.jsx`) — une règle de React 19 sur les `setState` synchrones dans un effet
-- **Tests frontend** : 32 tests sur 3 fichiers (Vitest), verts
-- **React Doctor** : score **100/100** (0 issue). Analyse statique frontend : bugs, sécurité, performance, accessibilité. CI GitHub Actions sur les PRs
+- **PHPStan** : `level: max` (le plus strict), 0 erreur hors baseline. La baseline gèle les erreurs préexistantes : elle empêche d'en ajouter de nouvelles, elle ne dit pas que le code est propre
+- **ESLint** : 4 erreurs restantes, toutes `react-hooks/set-state-in-effect` (`api/api.js`, `components/NavBar.jsx`, `contexts/ToastContext.jsx`, `pages/ProductDetailPage.jsx`) — une règle de React 19 sur les `setState` synchrones dans un effet. Signalées par la CI sans la faire échouer, le temps d'être traitées
+- **React Doctor** : workflow configuré sur les PRs (bugs, sécurité, performance, accessibilité). **Il n'a encore jamais tourné** : il était placé dans `frontend/.github/workflows/` — GitHub ne lit que `<racine>/.github/workflows/` — et ciblait `main` quand le dépôt est sur `master`. Corrigé le 14/09/2026 ; aucun score ne peut donc être annoncé pour l'instant
 
 ---
 
@@ -1004,8 +1003,8 @@ Dependencies:
 - Audit trail automatique (`AuditSubscriber`) traçant les changements de statut et les modifications sensibles
 - Soft Delete sur `Order` et `Payment` via `SoftDeleteFilter` Doctrine
 - `ExceptionSubscriber` unifiant les réponses d'erreur JSON sur `/api/*`
-- 36 tests backend + tests frontend (Vitest) couvrant l'authentification, le CSRF, le paiement, le webhook Stripe, le contact, le panier et les validateurs
-- PHPStan level max à 0 erreur (baseline de 102 entrées)
+- Suites de tests backend (PHPUnit) et frontend (Vitest) couvrant l'authentification, le CSRF, le paiement, le webhook Stripe, le contact, le panier et les validateurs — chiffres dans [STRATEGIE_TESTS.md](STRATEGIE_TESTS.md)
+- PHPStan level max à 0 erreur hors baseline, exécuté à chaque push par la CI
 - UI/UX soignée : toast notifications animées (gradients, SVG, progress bar), `ConfirmDialog` avec backdrop blur et icônes contextuelles, page de confirmation avec animations cascade et check SVG animé, images de problématiques de peau sur la page d'accueil
 - Pages légales conformes au droit français du e-commerce : CGV (17 articles, formulaire de rétractation, règlement cosmétiques CE 1223/2009, médiation, force majeure), mentions légales (LCEN + CGU intégrées), politique de confidentialité (RGPD, transferts internationaux Stripe US, profilage, mineurs, violation de données)
 - Documentation exhaustive et auto-critique
@@ -1027,7 +1026,7 @@ Dependencies:
 |---|---|
 | ~~**Contraindre les transitions de statut**~~ | ✅ **Implémenté** — Le composant Workflow de Symfony est configuré (`workflow.yaml`) avec deux state machines (`order` : pending→paid→shipped→delivered, annulable depuis pending/paid/shipped ; `payment` : pending→captured/failed, captured→refunded). `WebhookController` utilise `$workflow->can()` / `$workflow->apply()`. Un `StatusTransitionSubscriber` (Doctrine `preUpdate`) valide chaque changement de statut contre les transitions autorisées — y compris depuis EasyAdmin. Toute transition invalide lève une `LogicException` |
 | **Implémenter PayPal** | Le stub `PayPalPaymentGateway` est prêt — l'architecture OCP permet d'ajouter PayPal sans toucher à `PaymentService` |
-| **CI/CD complète** | PHPStan et PHPUnit existent mais rien ne les exécute automatiquement. Pipeline GitHub Actions cible prête |
+| ~~**CI/CD complète**~~ | 🟠 **Partiel (14/09/2026).** `.github/workflows/ci.yml` exécute à chaque push PHPUnit (MySQL 8 en service), PHPStan `level: max`, Vitest et le build front. Deux réserves assumées : ESLint est signalant mais non bloquant (4 erreurs préexistantes), et **le déploiement reste manuel** — c'est de l'intégration continue, pas de la livraison continue |
 | **Worker Messenger** | Les emails sont synchrones (pas de worker `messenger:consume`). Prérequis pour basculer en asynchrone sans perdre de messages |
 | **Fichier OpenAPI** | `api_specification.md` est du Markdown à la main — peut dériver silencieusement. Un `openapi.yaml` permettrait des tests de contrat automatisés et une documentation interactive (Swagger UI) |
 | ~~**Notifications et communication**~~ | ✅ **Implémenté** — `WelcomeEmailService` envoie un email de bienvenue à l'inscription (best-effort, même pattern que `OrderConfirmationService`). Axes restants : notifications push, email de réinitialisation de mot de passe, notifications admin |
@@ -1040,5 +1039,5 @@ Dependencies:
 | ~~**Sauvegardes automatisées**~~ | ✅ **Implémenté** — Script `scripts/backup-db.sh` : `mysqldump` compressé (gzip), rétention 30 jours avec purge automatique, mode Docker (`volo-db`) ou local XAMPP (`--local`). Prêt pour cron (`0 3 * * *`). Axe restant : monitoring et alerting conteneurs |
 | ~~**Composant PrivateRoute**~~ | ✅ **Implémenté** — `PrivateRoute.jsx` wraps les routes protégées (`/commande`, `/confirmation`, `/mes-commandes`, `/mon-compte`) dans `App.jsx`. Utilise `useAuth()` : redirige vers `/connexion` si non authentifié, affiche un loader pendant la restauration de session. Suppression du guard ad hoc dans `AccountPage` |
 | **Unifier le SGBD** | 🟠 **Partiel.** Les deux `compose.yaml` utilisent `mysql:8.0`, mais le développement tourne toujours sur le MariaDB 10.4.32 de XAMPP — `SELECT VERSION()` fait foi. `DATABASE_URL` déclare `serverVersion=8.0` : Doctrine génère donc du SQL MySQL 8 contre MariaDB, ce qui rend la panne `RENAME INDEX` plus probable, pas moins. À trancher : développer sur le conteneur, ou déclarer `serverVersion=mariadb-10.4.32` en `.env.local` |
-| ~~**React Doctor 100/100**~~ | ✅ **Corrigé** — 6 issues identifiées et résolues : `ConfirmDialog` migré vers `<dialog>` natif (accessibilité + suppression de la gestion manuelle d'Escape/focus), `ToastContext` stabilisé avec `useMemo` (évite les re-renders inutiles des consommateurs), `AccountPage` refactoré avec `useReducer` (9 `useState` liés consolidés), `HomePage` clés stables sans index de tableau, `ProductDetailPage` pattern `AbortController` + `.then()` au lieu de `async/await` dans `useEffect` |
+| ~~**Issues React Doctor**~~ | ✅ **Corrigé** — 6 issues identifiées et résolues : `ConfirmDialog` migré vers `<dialog>` natif (accessibilité + suppression de la gestion manuelle d'Escape/focus), `ToastContext` stabilisé avec `useMemo` (évite les re-renders inutiles des consommateurs), `AccountPage` refactoré avec `useReducer` (9 `useState` liés consolidés), `HomePage` clés stables sans index de tableau, `ProductDetailPage` pattern `AbortController` + `.then()` au lieu de `async/await` dans `useEffect` |
 | **Backlog v2** | Programme de fidélité, diagnostic peau (questionnaire → routine personnalisée), blog skincare, avis produits, wishlist, application mobile (React Native sur la même API), multi-langue |

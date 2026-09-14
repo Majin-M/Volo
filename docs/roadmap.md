@@ -14,7 +14,7 @@
 > | 2.6 | API REST produits | ✅ `GET` + `POST` + `PUT` + `DELETE` (Voters) |
 > | 2.9 | API REST routines | ✅ `RoutineController` (`GET /api/routines`, filtres `level` et `skin_concern`), CRUD EasyAdmin et fixtures — 14/09/2026 |
 > | 2.11 | API REST compte utilisateur | ✅ `GET /api/auth/me` + `PATCH /api/auth/me` (rate limited) |
-> | 2.15 | Tests unitaires et fonctionnels | 🟠 36 tests / 108 assertions (`AuthController`, `Order`↔`Payment`, CSRF, contact, webhook Stripe), verts — **pas zéro** |
+> | 2.15 | Tests unitaires et fonctionnels | 🟠 Suite verte (`AuthController`, `Order`↔`Payment`, CSRF, contact, webhook Stripe) — **pas zéro**, mais partielle. Chiffres : [STRATEGIE_TESTS.md](STRATEGIE_TESTS.md) |
 > | 3.13 | `OrderConfirmationPage` | ✅ Page de confirmation fonctionnelle (`OrderConfirmationPage.jsx`) |
 > | 4.1 | Stripe + **webhook** | ✅ `WebhookController` implémenté — `payment_intent.succeeded` → CAPTURED/PAID, `payment_intent.payment_failed` → FAILED |
 > | 4.2 | Email de confirmation | ✅ `OrderConfirmationService` — email envoyé après capture webhook (best-effort) |
