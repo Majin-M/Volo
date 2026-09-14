@@ -89,7 +89,16 @@ jobs:
         # Doctrine ajoute `dbname_suffix: _test` en environnement de test
         # (config/packages/doctrine.yaml) : la base visee est donc volo_test,
         # pas volo. C'est ce qui isole les tests des donnees de developpement.
-        run: php bin/console doctrine:database:create --if-not-exists --env=test
+        #
+        # ON N'UTILISE PAS `doctrine:database:create` ICI, et c'est deliberé :
+        # docs/STRATEGIE_TESTS.md le consigne depuis longtemps — la commande
+        # tente de se connecter a la base AVANT de la creer, et echoue donc
+        # exactement quand elle servirait, c'est-a-dire quand la base n'existe
+        # pas encore. C'est ce qui a mis la CI au rouge a son premier passage
+        # (exit 255) : en local l'etape semblait passer, mais seulement parce
+        # que volo_test existait deja et que --if-not-exists n'avait rien a
+        # faire. Le client mysql, lui, n'a pas besoin que la base existe.
+        run: mysql -h 127.0.0.1 -P 3306 -u root -e "CREATE DATABASE IF NOT EXISTS volo_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
 
       - name: Appliquer les migrations
         run: php bin/console doctrine:migrations:migrate --no-interaction --env=test
