@@ -60,7 +60,8 @@ class OrderController extends AbstractController
         $user = $this->getUser();
 
         $page = max(1, $request->query->getInt('page', 1));
-        $limit = min($request->query->getInt('limit', 20), 100);
+        // Plancher autant que plafond : `?limit=-5` descendait jusqu'a Doctrine.
+        $limit = max(1, min($request->query->getInt('limit', 20), 100));
 
         $orders = $this->orderRepository->findByUser($user, $page, $limit);
         $total = $this->orderRepository->countByUser($user);

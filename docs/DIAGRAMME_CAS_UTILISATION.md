@@ -236,7 +236,11 @@ sequenceDiagram
 **Points clés à retenir :**
 
 - **Le total n'est jamais fait confiance côté client** (RG4) : `OrderService::createOrder()` recalcule intégralement le montant à partir des prix en base, ligne par ligne.
-- **Le stock est vérifié et décrémenté de façon atomique** dans la même transaction que la création de la commande — pas de fenêtre de survente entre la vérification et la décrémentation (`Product::decrementStock()` lève une exception si insuffisant).
+- **Le stock est vérifié puis décrémenté dans la même transaction** que la création de la commande (`Product::decrementStock()` lève une exception si insuffisant).
+
+  ⚠️ **Cela ne supprime pas la survente, et il faut le dire ainsi.** Une transaction garantit le « tout ou rien » : si l'écriture échoue, rien n'est écrit. Elle ne garantit **pas** l'isolation entre deux commandes simultanées. Aucun verrou n'est posé sur la ligne produit — ni `SELECT ... FOR UPDATE`, ni verrou optimiste par numéro de version. Deux clients qui commandent la dernière unité au même instant lisent tous deux `stock = 1`, passent tous deux la vérification, et décrémentent tous deux : le stock finit à `-1`.
+
+  La fenêtre est étroite et ne s'est jamais matérialisée à l'échelle du projet, mais elle est réelle. La corriger demande un verrou pessimiste (`LockMode::PESSIMISTIC_WRITE` sur le produit) ou une colonne de version en verrouillage optimiste. **Ce n'est pas fait** — c'est une limite connue et assumée, pas un oubli.
 - **La confirmation visuelle côté client et la validation métier sont deux choses différentes** : `stripe.confirmCardPayment()` donne un retour immédiat à l'utilisateur, mais c'est **uniquement le webhook signé** qui fait passer `Order` à `PAID`. Un client qui fermerait l'onglet juste après le paiement verrait quand même sa commande validée.
 - **Le numéro de carte ne transite jamais par les serveurs VOLO** — Stripe Elements l'encapsule dans un iframe cross-origin.
 

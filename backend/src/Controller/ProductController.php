@@ -79,9 +79,17 @@ class ProductController extends AbstractController
         // 1. Récupération des paramètres de requête avec valeurs par défaut
         $page = $request->query->getInt('page', 1);
         $limit = $request->query->getInt('limit', 20);
-        
-        // Sécurité : on limite le 'limit' à 50 max pour éviter de surcharger la BDD
-        if ($limit > 50) $limit = 50;
+
+        // Les DEUX bornes comptent, pas seulement le plafond.
+        //
+        // Le plafond a 50 protege la base d'un `?limit=100000`. Mais rien ne
+        // gardait le plancher, et le service calcule `($page - 1) * $limit` :
+        // `?limit=-5` et `?page=0` produisaient donc des valeurs negatives qui
+        // descendaient jusqu'a Doctrine. Une requete malformee doit rendre un
+        // resultat vide ou par defaut, jamais une erreur serveur — un 500 sur
+        // une entree publique, c'est une surface d'attaque autant qu'un bug.
+        $limit = max(1, min($limit, 50));
+        $page = max(1, $page);
 
         // Récupération de tous les autres paramètres (brand, skin_concern, etc.)
         $filters = $request->query->all();

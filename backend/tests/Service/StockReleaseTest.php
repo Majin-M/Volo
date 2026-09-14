@@ -280,6 +280,67 @@ class StockReleaseTest extends KernelTestCase
     }
 
     /**
+     * Le trou que StockReleaseSubscriber bouche.
+     *
+     * Une annulation faite a la main — c'est le geste naturel d'un
+     * administrateur dans EasyAdmin — ne passait ni par la commande de
+     * balayage ni par le webhook, donc ne restituait rien. Ce test reproduit
+     * ce geste au plus pres : on change le statut sur l'entite, puis on
+     * flushe. Aucun appel a releaseStock(), exactement comme EasyAdmin.
+     */
+    public function testUneAnnulationManuelleRestitueLeStock(): void
+    {
+        $product = $this->creerProduit(stock: 10);
+        $user = $this->creerUtilisateur();
+        $order = $this->commander($user, [['productId' => $product->getId(), 'quantity' => 3]]);
+
+        self::assertSame(7, $this->stockEnBase($product->getId()), 'Reservation faite a la commande.');
+
+        $order->setStatus(OrderStatus::CANCELLED);
+        $this->em->flush();
+
+        self::assertSame(10, $this->stockEnBase($product->getId()), 'L\'annulation doit restituer, quelle que soit son origine.');
+    }
+
+    /**
+     * L'idempotence ne vient pas du listener mais de la machine a etats :
+     * 'cancelled' est terminal, on n'y entre qu'une fois. Ce test verifie que
+     * la barriere tient, plutot que de le supposer.
+     */
+    public function testUneCommandeDejaAnnuleeNeRestituePasUneSecondeFois(): void
+    {
+        $product = $this->creerProduit(stock: 10);
+        $user = $this->creerUtilisateur();
+        $order = $this->commander($user, [['productId' => $product->getId(), 'quantity' => 3]]);
+
+        $order->setStatus(OrderStatus::CANCELLED);
+        $this->em->flush();
+
+        // Re-flusher sans changement de statut ne doit rien declencher.
+        $order->setNotes('Annulee par le service client.');
+        $this->em->flush();
+
+        self::assertSame(10, $this->stockEnBase($product->getId()), 'Pas de seconde restitution.');
+    }
+
+    /**
+     * Garde-fou sur la regression la plus probable : si un jour la commande de
+     * balayage rappelle releaseStock() en plus de la transition, le stock
+     * serait restitue deux fois et ce test virerait au rouge.
+     */
+    public function testLeBalayageNeRestituePasEnDouble(): void
+    {
+        $product = $this->creerProduit(stock: 10);
+        $user = $this->creerUtilisateur();
+        $order = $this->commander($user, [['productId' => $product->getId(), 'quantity' => 4]]);
+
+        $this->vieillir($order, minutes: 120);
+        $this->executerBalayage([]);
+
+        self::assertSame(10, $this->stockEnBase($product->getId()), 'Exactement une restitution, pas deux.');
+    }
+
+    /**
      * `Order::$createdAt` est posé au constructeur et n'a pas de setter — c'est
      * voulu. Pour tester le balayage il faut donc vieillir la ligne en SQL.
      *

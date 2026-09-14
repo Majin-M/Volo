@@ -33,7 +33,6 @@ namespace App\Command;
 
 use App\Entity\Order;
 use App\Repository\OrderRepository;
-use App\Service\OrderService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -54,7 +53,6 @@ class ReleaseStaleOrdersCommand extends Command
 
     public function __construct(
         private OrderRepository $orderRepository,
-        private OrderService $orderService,
         private EntityManagerInterface $entityManager,
         #[Autowire(service: 'state_machine.order')] private WorkflowInterface $orderStateMachine,
     ) {
@@ -123,9 +121,12 @@ class ReleaseStaleOrdersCommand extends Command
                 continue;
             }
 
-            $unites = $dryRun
-                ? $this->compterUnites($order)
-                : $this->orderService->releaseStock($order);
+            // La restitution n'est PLUS declenchee ici. Elle est portee par
+            // StockReleaseSubscriber, qui reagit au passage a 'cancelled'
+            // quelle que soit l'origine de l'annulation — y compris EasyAdmin,
+            // qui y echappait. Appeler releaseStock() ici EN PLUS de la
+            // transition restituerait donc deux fois.
+            $unites = $this->compterUnites($order);
 
             if (!$dryRun) {
                 $this->orderStateMachine->apply($order, 'cancel_pending');

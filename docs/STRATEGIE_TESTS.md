@@ -2,18 +2,18 @@
 
 > **Ce document est le seul endroit du dépôt qui chiffre la suite de tests.** Partout ailleurs, les autres documents renvoient ici plutôt que de recopier un nombre. Raison : un nombre recopié à dix endroits est faux à neuf dès le test suivant — c'est ainsi que « 26 tests » a survécu des mois alors qu'il y en avait 36 (§9). Les chiffres ci-dessous sont un **relevé daté**, pas une propriété du projet ; l'autorité, c'est la CI, qui les recalcule à chaque push.
 >
-> **Relevé du 14/09/2026** — reproductible par `cd backend && php bin/phpunit` et `cd frontend && npx vitest run` :
+> **Relevé du 14/09/2026 (dernière mise à jour du jour)** — reproductible par `cd backend && php bin/phpunit` et `cd frontend && npx vitest run` :
 >
 > | Ce qui est mesuré | Valeur relevée | Commande |
 > |---|---|---|
-> | Suite backend | 51 tests, 144 assertions, verts | `php bin/phpunit` |
+> | Suite backend | 64 tests, 170 assertions, verts | `php bin/phpunit` |
 > | Suite frontend | 32 tests sur 3 fichiers, verts | `npx vitest run` |
 > | Build frontend | passe | `npm run build` |
 > | PHPStan `level: max` | 0 erreur hors baseline | `vendor/bin/phpstan analyse` |
 > | ESLint | **4 erreurs** — voir réserve ci-dessous | `npx eslint src` |
 > | React Doctor 0.9.12 | **94/100**, 2 avertissements | `npm run doctor` |
 >
-> **Couverture backend, par fichier** : `AuthControllerTest` (inscription, cookies), `CsrfProtectionTest` (double-submit), `OrderPaymentTest` (dérivation du statut, contrat d'API, cascade), `ContactNotificationTest` (persistance + notification email), `WebhookStripeTest` (signature HMAC, idempotence, transitions de statut), `StockReleaseTest` (réservation et restitution du stock, balayage des commandes abandonnées), `AuditSubscriberTest` (traçabilité des modifications). **Frontend** : `LoginPage.test.jsx`, `CartContext.test.jsx`, `validators.test.js`.
+> **Couverture backend, par fichier** : `AuthControllerTest` (inscription, cookies), `CsrfProtectionTest` (double-submit), `OrderPaymentTest` (dérivation du statut, contrat d'API, cascade), `ContactNotificationTest` (persistance + notification email), `WebhookStripeTest` (signature HMAC, idempotence, transitions de statut), `StockReleaseTest` (réservation et restitution du stock, balayage des commandes abandonnées), `AuditSubscriberTest` (traçabilité des modifications), `PaginationBoundsTest` (bornes des paramètres publics). **Frontend** : `LoginPage.test.jsx`, `CartContext.test.jsx`, `validators.test.js`.
 >
 > **Une réserve à énoncer telle quelle** : ESLint ne sort pas 0 erreur. Les quatre erreurs sont toutes `react-hooks/set-state-in-effect`, dans `api/api.js`, `components/NavBar.jsx`, `contexts/ToastContext.jsx` et `pages/ProductDetailPage.jsx`. Elles sont signalées par la CI sans la faire échouer (§9), le temps qu'elles soient traitées.
 >
@@ -40,7 +40,7 @@ C'est la section la plus importante du document. Chacun de ces mécanismes est *
 | Hachage EasyAdmin | Le mot de passe créé en back-office est bien haché | ⚠️ Toujours jamais vérifié en base |
 | Cookie `HttpOnly` | Le JWT est inaccessible au JS | ✅ **Testé** — `testRegister_Success` |
 | Autorisation par ressource | Un client ne lit pas la commande d'un autre | 🟡 **Sans objet aujourd'hui** — voir ci-dessous |
-| Plafond de pagination | `?limit=100000` est ramené à 50 | ⚠️ Jamais testé, mais le code existe (`ProductController:53`) |
+| Bornes de pagination | `?limit=100000` ramené à 50, `?limit=-5` et `?page=0` ramenés au plancher | ✅ **Testé** — `PaginationBoundsTest`. Le plafond existait ; **le plancher, non** : les valeurs négatives descendaient jusqu'à Doctrine |
 
 **Sur le rate limiting** : il fonctionne. On l'a appris sans le vouloir — en relançant la suite plusieurs fois, `register_attempts` (5/heure) a rendu des 429 et fait échouer les tests. `setUp()` réinitialise désormais les compteurs. Le limiteur n'est délibérément **pas** neutralisé en environnement test : le neutraliser rendrait impossible de tester le 429 lui-même (§5).
 
@@ -48,7 +48,9 @@ C'est la section la plus importante du document. Chacun de ces mécanismes est *
 
 > C'est la leçon la plus utile de cette révision : **ce document désignait la mauvaise porte.** Pendant qu'il surveillait `GET /api/orders/{id}`, un CRUD Twig anonyme traînait sur `/user` et permettait à quiconque de se créer un compte `ROLE_ADMIN`, mot de passe en clair. Aucun test ne le couvrait, et aucune ligne de ce tableau ne le mentionnait. Un raisonnement sur ce qui est *probablement* cassé ne remplace pas un inventaire de ce qui est *réellement* exposé — `debug:router` confronté à `access_control` l'aurait montré en une minute.
 
-**Cette section reste un plan de travail, mais court** : deux mécanismes seulement restent non prouvés par un test — le **hachage EasyAdmin** (vérifié une fois à la main après correction, jamais figé) et le **plafond de pagination** (le code existe, `ProductController:53`, aucun test ne l'exerce). Le rate limiting est constaté à l'usage mais mériterait aussi son test dédié (§5). Les trois autres lignes sont désormais couvertes.
+**Cette section reste un plan de travail, mais court** : un seul mécanisme reste non prouvé par un test — le **hachage EasyAdmin** (vérifié une fois à la main après correction, jamais figé). Le rate limiting est constaté à l'usage mais mériterait aussi son test dédié (§5). Toutes les autres lignes sont désormais couvertes.
+
+> **Ce que la ligne « pagination » a appris, et qui vaut d'être gardé.** Elle disait « jamais testé, mais le code existe ». Le code existait effectivement — mais seulement à moitié : il plafonnait `limit` à 50 et ne planchait rien. `?limit=-5` et `?page=0` traversaient donc jusqu'à Doctrine. **« Le code existe » n'est pas « le code est correct »** : c'est précisément ce qu'un test départage, et c'est pour ça qu'une ligne « non testé » ne doit jamais être lue comme rassurante.
 
 ---
 

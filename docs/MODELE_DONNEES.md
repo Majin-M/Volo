@@ -353,7 +353,7 @@ Il ne donne pas accès au compte Stripe, la gravité est donc limitée — mais 
 
 ### 6.4 Gestion de stock — ✅ IMPLÉMENTÉ
 
-Colonne `stock` (integer, NOT NULL, défaut 0) ajoutée à `Product` par la migration `Version20260901120000`. `OrderService` vérifie le stock disponible et le décrémente atomiquement à la création de commande. `Product::decrementStock()` lève une `LogicException` si le stock est insuffisant.
+Colonne `stock` (integer, NOT NULL, défaut 0) ajoutée à `Product` par la migration `Version20260901120000`. `OrderService` vérifie le stock disponible et le décrémente dans la transaction de création de commande. `Product::decrementStock()` lève une `LogicException` si le stock est insuffisant. **Aucun verrou n'est posé sur la ligne produit** : la transaction assure le tout-ou-rien, pas l'isolation entre deux commandes concurrentes. La survente reste donc possible en cas d'accès simultané — limite connue, détaillée dans [DIAGRAMME_CAS_UTILISATION.md](DIAGRAMME_CAS_UTILISATION.md).
 
 Le front (`ProductDetailPage`) affiche « Rupture de stock » (bouton désactivé), « Plus que N en stock » (≤ 5, alerte visuelle), et plafonne le sélecteur de quantité au stock disponible. `isAvailable` est conservé comme interrupteur admin : un produit peut être désactivé même avec du stock restant.
 
