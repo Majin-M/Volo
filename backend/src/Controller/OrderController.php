@@ -25,6 +25,7 @@ Dépendances :
 namespace App\Controller;
 
 use App\Http\ApiError;
+use App\Http\JsonBody;
 use App\Entity\User;
 use App\Repository\OrderRepository;
 use App\Security\OrderVoter;
@@ -94,9 +95,11 @@ class OrderController extends AbstractController
 
         $this->denyAccessUnlessGranted(OrderVoter::CREATE);
 
-        $data = json_decode($request->getContent(), true);
+        // Objet JSON exige : un scalaire comme `"x"` passait `!$data` puis
+        // faisait planter le service en TypeError (500). Cf. App\Http\JsonBody.
+        $data = JsonBody::decode($request);
 
-        if (!$data) {
+        if ($data === null || $data === []) {
             return ApiError::response('Format JSON invalide.', 400);
         }
 

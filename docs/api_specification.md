@@ -125,13 +125,27 @@ X-Csrf-Token: <valeur du cookie volo_csrf>   ← requis sur POST/PUT/PATCH/DELET
 |---|---|---|
 | `200 OK` | Succès | GET, PUT, PATCH, et `DELETE /api/products/{id}` (qui renvoie un message) |
 | `201 Created` | Ressource créée | POST |
-| `400 Bad Request` | Données invalides | Validation échouée |
+| `400 Bad Request` | Données invalides | Validation échouée, corps qui n'est pas un objet JSON, champ de type inattendu |
 | `401 Unauthorized` | Non authentifié | Cookie JWT manquant ou expiré |
 | `403 Forbidden` | Non autorisé | Rôle insuffisant, ou jeton CSRF absent/incorrect |
-| `404 Not Found` | Ressource introuvable | ID inexistant |
-| `422 Unprocessable Entity` | Erreur métier | Contrainte BDD |
+| `404 Not Found` | Ressource introuvable | ID inexistant, ou identifiant impossible (`/api/products/abc`) |
+| `409 Conflict` | État incompatible | `POST /api/payments` sur une commande déjà payée, annulée, ou dont le paiement est finalisé |
 | `429 Too Many Requests` | Quota dépassé | Limitation de débit (connexion, inscription, contact, profil) |
-| `500 Internal Server Error` | Erreur serveur | Exception non gérée |
+| `500 Internal Server Error` | Erreur serveur | Défaillance interne — **jamais** une faute du client (voir ci-dessous) |
+
+> **Corrigé le 14/09/2026 :** ce tableau annonçait un `422 Unprocessable Entity` pour les « contraintes BDD ». Aucune route ne renvoie ce code : une violation de contrainte produisait en réalité un **500**, désormais évité par la validation en amont (400).
+
+### Validation des entrées
+
+Règles communes à toutes les routes, vérifiées le 14/09/2026 par un test de robustesse de 478 requêtes malformées (0 erreur 500) et figées dans `ApiInputRobustnessTest` :
+
+| Entrée | Comportement |
+|---|---|
+| Corps de requête | Doit être un **objet JSON**. Corps vide, JSON invalide, scalaire (`"x"`, `123`) ou liste → `400` |
+| Champ attendu en chaîne reçu dans un autre type (tableau, nombre…) | `400` |
+| Entier attendu (quantité, identifiant, stock) | Entier JSON ou chaîne de chiffres uniquement. `"12,50"`, `2.5`, `true` → `400` (ils étaient auparavant convertis silencieusement : `"12,50"` devenait 12) |
+| `{id}` de `/api/products/{id}` | Entier positif de 18 chiffres au plus ; sinon aucune route ne correspond → `404` |
+| Mot de passe (inscription, changement) | 4 096 caractères au plus → sinon `400` |
 
 ---
 
@@ -240,23 +254,29 @@ Liste paginée des produits.
 | `skin_concern` | string | Filtrer par slug de problématique | `?skin_concern=acne` |
 | `available` | bool | Filtrer les produits disponibles | `?available=true` |
 
-**Réponse 200 :**
+> Un filtre de type invalide (`?brand=abc`, `?brand[]=1`, `?skin_concern[]=x`) ne correspond à aucun produit : **`200` avec une liste vide**. Il rendait auparavant un `500`.
+
+**Réponse 200** (forme réelle, relevée le 14/09/2026) :
 ```json
 {
   "data": [
     {
       "id": 1,
       "name": "Hydrating Cleanser",
-      "price": 24.90,
-      "imageUrl": "hydrating-cleanser.webp",
+      "description": "Nettoyant doux pour peaux sèches...",
+      "price": "24.90",
       "isAvailable": true,
+      "stock": 12,
       "brand": {
         "id": 2,
-        "name": "CeraVe"
+        "name": "CeraVe",
+        "logoUrl": "cerave-logo.svg"
       },
       "skinConcerns": [
         { "id": 1, "name": "Sécheresse", "slug": "secheresse" }
-      ]
+      ],
+      "createdAt": "2026-01-15T10:30:00+00:00",
+      "imageUrl": "hydrating-cleanser.webp"
     }
   ],
   "meta": {
@@ -275,16 +295,16 @@ Détail d'un produit.
 
 **Accès :** Public
 
-**Réponse 200 :**
+**Réponse 200** (forme réelle, relevée le 14/09/2026) :
 ```json
 {
   "data": {
     "id": 1,
     "name": "Hydrating Cleanser",
     "description": "Nettoyant doux pour peaux sèches...",
-    "price": 24.90,
-    "imageUrl": "hydrating-cleanser.webp",
+    "price": "24.90",
     "isAvailable": true,
+    "stock": 12,
     "brand": {
       "id": 2,
       "name": "CeraVe",
@@ -293,13 +313,13 @@ Détail d'un produit.
     "skinConcerns": [
       { "id": 1, "name": "Sécheresse", "slug": "secheresse" }
     ],
-    "routines": [
-      { "id": 3, "name": "Routine hydratation débutant", "level": "beginner" }
-    ],
-    "createdAt": "2026-01-15T10:30:00Z"
+    "createdAt": "2026-01-15T10:30:00+00:00",
+    "imageUrl": "hydrating-cleanser.webp"
   }
 }
 ```
+
+> **Corrigé le 14/09/2026 :** l'exemple précédent montrait un `price` **numérique** et un champ **`routines`**. Le prix est une **chaîne** (Doctrine mappe `decimal` sur une `string` PHP), et aucun champ `routines` n'est exposé — il faut passer par `GET /api/routines`. Le champ `stock`, bien exposé, n'était pas mentionné.
 
 **Réponse 404 :**
 ```json
@@ -324,12 +344,25 @@ Création d'un produit. Protégé par `ProductVoter::CREATE` (`ROLE_ADMIN`).
 {
   "name": "Vitamin C Serum",
   "description": "Sérum à la vitamine C...",
-  "price": 34.90,
+  "price": "34.90",
+  "stock": 25,
   "isAvailable": true,
   "brandId": 2,
   "skinConcernIds": [1, 4]
 }
 ```
+
+**Règles de validation** (toute violation → `400`) :
+
+| Champ | Règle |
+|---|---|
+| `name` | **Obligatoire** à la création. Chaîne non vide, 255 caractères au plus |
+| `price` | **Obligatoire** à la création. Nombre ou chaîne numérique, entre 0,01 et 99 999 999,99 (colonne `DECIMAL(10,2)`) |
+| `brandId` | **Obligatoire** à la création. Entier désignant une marque existante |
+| `stock` | Entier entre 0 et 2 147 483 647 |
+| `isAvailable` | Booléen strict : `"false"` en chaîne est refusé (`(bool) "false"` valait `true`) |
+| `description` | Chaîne ou `null` |
+| `skinConcernIds` | Liste d'entiers ; un identifiant inconnu est ignoré |
 
 **Réponse 201 :** même structure que GET /api/products/{id}
 
@@ -341,7 +374,7 @@ Mise à jour d'un produit. Protégé par `ProductVoter::EDIT` (`ROLE_ADMIN`).
 
 **Accès :** `ROLE_ADMIN`
 
-**Corps de la requête :** même structure que POST
+**Corps de la requête :** mêmes champs et mêmes règles que POST, **tous facultatifs** : seuls les champs fournis sont modifiés. Malgré le verbe `PUT`, la mise à jour est donc partielle, comme un `PATCH`.
 
 **Réponse 200 :** même structure que GET /api/products/{id}
 
@@ -446,7 +479,7 @@ Liste des routines disponibles.
 | `level` | string | `beginner`, `intermediate`, `advanced` |
 | `skin_concern` | string | Slug de la problématique |
 
-**Réponse 200 :**
+**Réponse 200** (forme réelle, relevée le 14/09/2026) :
 ```json
 {
   "data": [
@@ -454,14 +487,29 @@ Liste des routines disponibles.
       "id": 1,
       "name": "Routine hydratation débutant",
       "level": "beginner",
-      "skinConcern": { "id": 1, "name": "Sécheresse" },
+      "description": "Deux étapes pour hydrater sans alourdir.",
       "products": [
-        { "id": 1, "name": "Hydrating Cleanser", "price": 24.90 }
+        {
+          "id": 1,
+          "name": "Hydrating Cleanser",
+          "description": "Nettoyant doux pour peaux sèches...",
+          "price": "24.90",
+          "isAvailable": true,
+          "stock": 12,
+          "brand": { "id": 2, "name": "CeraVe", "logoUrl": "cerave-logo.svg" },
+          "skinConcerns": [
+            { "id": 1, "name": "Sécheresse", "slug": "secheresse" }
+          ],
+          "createdAt": "2026-01-15T10:30:00+00:00",
+          "imageUrl": "hydrating-cleanser.webp"
+        }
       ]
     }
   ]
 }
 ```
+
+> **Corrigé le 14/09/2026 :** l'exemple précédent montrait un champ `skinConcern` qui **n'existe pas** dans la réponse, omettait `description`, et réduisait chaque produit à trois champs avec un prix numérique. Chaque produit est en réalité **l'objet complet** de `GET /api/products/{id}`, prix en chaîne. Le filtre `?skin_concern=` agit sur les problématiques des produits de la routine, pas sur un champ de la routine elle-même.
 
 ---
 
@@ -489,21 +537,37 @@ Création d'une commande depuis le panier.
 }
 ```
 
-**Réponse 201 :**
+**Règles** (toute violation → `400`) : `items` est une liste non vide ; `productId` et `quantity` sont des entiers stricts, la quantité entre 1 et 1 000 ; le produit doit exister, être disponible et avoir assez de stock. `street`, `city` et `postalCode` sont obligatoires ; `country` vaut `France` s'il est absent — ou s'il n'est pas une chaîne, ce qui est un laxisme connu. Le total est **recalculé côté serveur** : un prix envoyé par le client est ignoré.
+
+**Réponse 201** (forme réelle, relevée le 14/09/2026) :
 ```json
 {
   "data": {
     "id": 42,
     "status": "pending",
-    "total": 74.70,
+    "total": "74.70",
+    "user": [],
+    "notes": null,
+    "street": "12 rue de la Paix",
+    "city": "Paris",
+    "postalCode": "75001",
+    "country": "France",
     "items": [
-      { "productId": 1, "productName": "Hydrating Cleanser", "quantity": 2, "unitPrice": 24.90 },
-      { "productId": 5, "productName": "Vitamin C Serum", "quantity": 1, "unitPrice": 34.90 }
+      { "id": 81, "quantity": 2, "unitPrice": "24.90", "productName": "Hydrating Cleanser" },
+      { "id": 82, "quantity": 1, "unitPrice": "34.90", "productName": "Vitamin C Serum" }
     ],
-    "createdAt": "2026-06-10T14:30:00Z"
+    "reference": "dc529f08-046b-41aa-9cb5-dd058c1210a7",
+    "createdAt": "2026-06-10T14:30:00+00:00",
+    "updatedAt": "2026-06-10T14:30:00+00:00",
+    "paymentStatus": null,
+    "paymentMethod": null
   }
 }
 ```
+
+> **Corrigé le 14/09/2026 :** l'exemple précédent montrait des montants **numériques**, un `productId` dans chaque ligne et aucune adresse. En réalité, les montants sont des **chaînes**, l'adresse est **à plat** (pas d'objet `shippingAddress` en réponse, contrairement à la requête), les lignes n'exposent **pas** `productId`, et la réponse porte `reference` (UUID), `paymentStatus` et `paymentMethod`.
+>
+> **Bizarrerie connue :** `"user": []`. L'utilisateur est inclus dans le groupe de sérialisation sans qu'aucun de ses champs n'en fasse partie : il sort vide. Sans conséquence — aucune donnée n'est exposée — mais à retirer du groupe `order:read`.
 
 ---
 
@@ -513,20 +577,37 @@ Historique des commandes de l'utilisateur connecté.
 
 **Accès :** `ROLE_USER`
 
-**Réponse 200 :**
+**Query parameters :** `page` (défaut 1, plancher 1) et `limit` (défaut 20, borné entre 1 et 100).
+
+**Réponse 200 :** chaque élément de `data` a **exactement la forme de la réponse de `POST /api/orders`** (même groupe de sérialisation `order:read`), avec son statut de paiement réel.
 ```json
 {
   "data": [
     {
       "id": 42,
       "status": "delivered",
-      "total": 74.70,
-      "createdAt": "2026-06-10T14:30:00Z"
+      "total": "74.70",
+      "user": [],
+      "notes": null,
+      "street": "12 rue de la Paix",
+      "city": "Paris",
+      "postalCode": "75001",
+      "country": "France",
+      "items": [
+        { "id": 81, "quantity": 2, "unitPrice": "24.90", "productName": "Hydrating Cleanser" }
+      ],
+      "reference": "dc529f08-046b-41aa-9cb5-dd058c1210a7",
+      "createdAt": "2026-06-10T14:30:00+00:00",
+      "updatedAt": "2026-06-12T09:00:00+00:00",
+      "paymentStatus": "captured",
+      "paymentMethod": "card"
     }
   ],
   "meta": { "page": 1, "limit": 20, "total": 5 }
 }
 ```
+
+> **Corrigé le 14/09/2026 :** l'exemple précédent montrait un résumé de quatre champs avec un total numérique. La liste renvoie en réalité l'objet commande **complet** — la route utilise le même groupe de sérialisation que la création.
 
 ---
 

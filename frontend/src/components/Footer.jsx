@@ -15,6 +15,8 @@ Exemple d'utilisation :
 ===============================================================================
 */
 
+import { EDITEUR } from '../config/legalIdentity';
+
 // Styles statiques (ne dependent d'aucune prop/etat) : definis en portee
 // module pour ne pas etre reconstruits a chaque rendu.
 const footerStyle = {
@@ -75,7 +77,7 @@ const Footer = () => {
                     <h3 style={headingStyle}>Contact</h3>
                     <ul style={{ listStyle: 'none', padding: 0, lineHeight: 2 }}>
                         <li><a href="/contact" style={linkStyle}>Formulaire de contact</a></li>
-                        <li><a href="mailto:contact@volo-skin.fr" style={linkStyle}>contact@volo-skin.fr</a></li>
+                        <li><a href={`mailto:${EDITEUR.email}`} style={linkStyle}>{EDITEUR.email}</a></li>
                     </ul>
                 </div>
 

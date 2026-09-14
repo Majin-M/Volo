@@ -22,6 +22,8 @@ Exemple d'utilisation :
 import { Helmet } from 'react-helmet-async';
 import styles from './LegalPage.module.css';
 
+import { SITE, EDITEUR, HEBERGEUR, CREDITS } from '../config/legalIdentity';
+import LegalPreproductionNotice from '../components/LegalPreproductionNotice';
 const MentionsLegalesPage = () => (
     <div className={styles.container}>
         <Helmet>
@@ -31,43 +33,44 @@ const MentionsLegalesPage = () => (
 
         <h1 className={styles.pageTitle}>Mentions legales</h1>
         <p className={styles.lastUpdated}>Derniere mise a jour : 2 septembre 2026</p>
+        <LegalPreproductionNotice />
 
         <div className={styles.content}>
             <h2>1. Editeur du site</h2>
             <p>
-                Le site <strong>volo-skin.fr</strong> est edite par :
+                Le site <strong>{SITE.domaine}</strong> est edite par :
             </p>
             <ul>
-                <li><strong>Raison sociale :</strong> VOLO SAS</li>
-                <li><strong>Forme juridique :</strong> Societe par Actions Simplifiee</li>
-                <li><strong>Siege social :</strong> 12 rue de la Paix, 75001 Paris, France</li>
-                <li><strong>SIRET :</strong> 123 456 789 00001 (a completer)</li>
-                <li><strong>RCS :</strong> Paris B 123 456 789 (a completer)</li>
-                <li><strong>Capital social :</strong> 10 000 euros</li>
-                <li><strong>Numero de TVA intracommunautaire :</strong> FR XX 123456789 (a completer)</li>
-                <li><strong>Directeur de la publication :</strong> [Nom du responsable — a completer]</li>
-                <li><strong>Email :</strong> <a href="mailto:contact@volo-skin.fr">contact@volo-skin.fr</a></li>
-                <li><strong>Telephone :</strong> [Numero de telephone — a completer]</li>
+                <li><strong>Raison sociale :</strong> {EDITEUR.raisonSociale}</li>
+                <li><strong>Forme juridique :</strong> {EDITEUR.formeJuridique}</li>
+                <li><strong>Siege social :</strong> {EDITEUR.siege}</li>
+                <li><strong>SIRET :</strong> {EDITEUR.siret}</li>
+                <li><strong>RCS :</strong> {EDITEUR.villeRcs} B {EDITEUR.numeroRcs}</li>
+                <li><strong>Capital social :</strong> {EDITEUR.capital}</li>
+                <li><strong>Numero de TVA intracommunautaire :</strong> {EDITEUR.tva}</li>
+                <li><strong>Directeur de la publication :</strong> {EDITEUR.directeurPublication}</li>
+                <li><strong>Email :</strong> <a href={`mailto:${EDITEUR.email}`}>{EDITEUR.email}</a></li>
+                <li><strong>Telephone :</strong> {EDITEUR.telephone}</li>
             </ul>
             <p>
-                VOLO SAS exerce une activite de vente en ligne de produits cosmetiques
+                {EDITEUR.raisonSociale} exerce une activite de vente en ligne de produits cosmetiques
                 conformes au reglement (CE) n° 1223/2009 relatif aux produits cosmetiques.
             </p>
 
             <h2>2. Hebergeur</h2>
             <p>Le site est heberge par :</p>
             <ul>
-                <li><strong>Nom :</strong> [Nom de l'hebergeur — a completer]</li>
-                <li><strong>Raison sociale :</strong> [Raison sociale — a completer]</li>
-                <li><strong>Adresse :</strong> [Adresse de l'hebergeur — a completer]</li>
-                <li><strong>Telephone :</strong> [Telephone de l'hebergeur — a completer]</li>
-                <li><strong>Site web :</strong> [URL de l'hebergeur — a completer]</li>
+                <li><strong>Nom :</strong> {HEBERGEUR.nom}</li>
+                <li><strong>Raison sociale :</strong> {HEBERGEUR.raisonSociale}</li>
+                <li><strong>Adresse :</strong> {HEBERGEUR.adresse}</li>
+                <li><strong>Telephone :</strong> {HEBERGEUR.telephone}</li>
+                <li><strong>Site web :</strong> <a href={HEBERGEUR.siteWeb} target="_blank" rel="noopener noreferrer">{HEBERGEUR.siteWeb}</a></li>
             </ul>
 
             <h2>3. Conditions d'utilisation du site</h2>
             <p>
-                L'utilisation du site volo-skin.fr implique l'acceptation pleine et entiere
-                des conditions d'utilisation ci-apres decrites. VOLO SAS se reserve le droit de
+                L'utilisation du site {SITE.domaine} implique l'acceptation pleine et entiere
+                des conditions d'utilisation ci-apres decrites. {EDITEUR.raisonSociale} se reserve le droit de
                 modifier ces conditions a tout moment ; les modifications prennent effet des
                 leur publication sur le site.
             </p>
@@ -79,7 +82,7 @@ const MentionsLegalesPage = () => (
                 equipements necessaires a la connexion sont a la charge de l'utilisateur.
             </p>
             <p>
-                VOLO SAS met en oeuvre tous les moyens raisonnables pour assurer un acces de
+                {EDITEUR.raisonSociale} met en oeuvre tous les moyens raisonnables pour assurer un acces de
                 qualite au site mais n'est tenue a aucune obligation d'y parvenir. Le site peut
                 etre interrompu a tout moment pour raison de maintenance, de mise a jour ou pour
                 toute autre raison technique.
@@ -95,13 +98,13 @@ const MentionsLegalesPage = () => (
             <p>
                 Toute utilisation du compte avec les identifiants de l'utilisateur est
                 presumee emaner de ce dernier. En cas d'utilisation frauduleuse, l'utilisateur
-                doit en informer immediatement VOLO SAS a l'adresse{' '}
-                <a href="mailto:contact@volo-skin.fr">contact@volo-skin.fr</a>.
+                doit en informer immediatement {EDITEUR.raisonSociale} a l'adresse{' '}
+                <a href={`mailto:${EDITEUR.email}`}>{EDITEUR.email}</a>.
             </p>
             <p>
-                VOLO SAS se reserve le droit de suspendre ou de supprimer tout compte en cas de
+                {EDITEUR.raisonSociale} se reserve le droit de suspendre ou de supprimer tout compte en cas de
                 manquement aux presentes conditions d'utilisation, d'activite frauduleuse ou de
-                comportement portant atteinte aux interets de VOLO SAS ou de ses clients.
+                comportement portant atteinte aux interets de {EDITEUR.raisonSociale} ou de ses clients.
             </p>
 
             <h3>3.3 Comportements interdits</h3>
@@ -116,10 +119,10 @@ const MentionsLegalesPage = () => (
 
             <h2>4. Propriete intellectuelle</h2>
             <p>
-                L'ensemble des contenus presents sur le site volo-skin.fr (textes, images,
+                L'ensemble des contenus presents sur le site {SITE.domaine} (textes, images,
                 photographies, logos, marques, elements graphiques, logiciels, base de donnees,
                 architecture du site) est protege par le droit de la propriete intellectuelle
-                et appartient a VOLO SAS ou fait l'objet d'une autorisation d'utilisation.
+                et appartient a {EDITEUR.raisonSociale} ou fait l'objet d'une autorisation d'utilisation.
             </p>
             <p>
                 La marque VOLO et le logo associe sont des marques deposees. Toute reproduction
@@ -128,35 +131,35 @@ const MentionsLegalesPage = () => (
             <p>
                 Toute reproduction, representation, modification, publication, transmission ou
                 adaptation de tout ou partie des elements du site, quel que soit le moyen ou le
-                procede utilise, est interdite sans l'autorisation ecrite prealable de VOLO SAS.
+                procede utilise, est interdite sans l'autorisation ecrite prealable de {EDITEUR.raisonSociale}.
                 Toute exploitation non autorisee constitue une contrefacon sanctionnee par les
                 articles L335-2 et suivants du Code de la propriete intellectuelle.
             </p>
 
             <h2>5. Responsabilite</h2>
             <p>
-                VOLO SAS s'efforce de fournir sur le site des informations aussi precises que
+                {EDITEUR.raisonSociale} s'efforce de fournir sur le site des informations aussi precises que
                 possible. Toutefois, elle ne pourra etre tenue responsable des oublis, des
                 inexactitudes ou des carences dans la mise a jour, qu'elles soient de son fait
                 ou du fait de tiers partenaires qui lui fournissent ces informations.
             </p>
             <p>
                 L'utilisation des informations et contenus disponibles sur l'ensemble du site
-                ne saurait en aucun cas engager la responsabilite de VOLO SAS. L'utilisateur
+                ne saurait en aucun cas engager la responsabilite de {EDITEUR.raisonSociale}. L'utilisateur
                 est seul responsable de l'utilisation qu'il fait du contenu du site.
             </p>
 
             <h2>6. Liens hypertextes</h2>
             <p>
-                Le site volo-skin.fr peut contenir des liens hypertextes vers d'autres sites
-                (notamment Stripe pour le paiement). VOLO SAS ne dispose d'aucun moyen de
+                Le site {SITE.domaine} peut contenir des liens hypertextes vers d'autres sites
+                (notamment Stripe pour le paiement). {EDITEUR.raisonSociale} ne dispose d'aucun moyen de
                 controle du contenu de ces sites tiers et n'assume aucune responsabilite quant
                 a leur contenu ou aux eventuels traitements de donnees personnelles qu'ils
                 operent.
             </p>
             <p>
-                La mise en place de liens hypertextes vers le site volo-skin.fr necessite
-                l'autorisation prealable et ecrite de VOLO SAS.
+                La mise en place de liens hypertextes vers le site {SITE.domaine} necessite
+                l'autorisation prealable et ecrite de {EDITEUR.raisonSociale}.
             </p>
 
             <h2>7. Protection des donnees personnelles</h2>
@@ -171,8 +174,8 @@ const MentionsLegalesPage = () => (
                 <strong>Contact pour les questions relatives aux donnees personnelles :</strong>
             </p>
             <ul>
-                <li><strong>Email :</strong> <a href="mailto:dpo@volo-skin.fr">dpo@volo-skin.fr</a></li>
-                <li><strong>Courrier :</strong> VOLO SAS — Protection des donnees, 12 rue de la Paix, 75001 Paris</li>
+                <li><strong>Email :</strong> <a href={`mailto:${EDITEUR.emailDpo}`}>{EDITEUR.emailDpo}</a></li>
+                <li><strong>Courrier :</strong> {EDITEUR.raisonSociale} — Protection des donnees, {EDITEUR.siege}</li>
             </ul>
             <p>
                 En cas de difficulte en lien avec la gestion de vos donnees personnelles,
@@ -190,10 +193,10 @@ const MentionsLegalesPage = () => (
 
             <h2>9. Credits</h2>
             <ul>
-                <li><strong>Conception et developpement :</strong> [A completer]</li>
-                <li><strong>Design et identite visuelle :</strong> [A completer]</li>
-                <li><strong>Photographies produits :</strong> [Credit photographe ou banque d'images — a completer]</li>
-                <li><strong>Icones :</strong> [Credit si applicable — a completer]</li>
+                <li><strong>Conception et developpement :</strong> {CREDITS.developpement}</li>
+                <li><strong>Design et identite visuelle :</strong> {CREDITS.design}</li>
+                <li><strong>Photographies produits :</strong> {CREDITS.photographies}</li>
+                <li><strong>Icones :</strong> {CREDITS.icones}</li>
             </ul>
 
             <h2>10. Droit applicable</h2>

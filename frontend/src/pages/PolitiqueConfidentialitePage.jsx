@@ -24,6 +24,8 @@ Exemple d'utilisation :
 import { Helmet } from 'react-helmet-async';
 import styles from './LegalPage.module.css';
 
+import { SITE, EDITEUR, HEBERGEUR } from '../config/legalIdentity';
+import LegalPreproductionNotice from '../components/LegalPreproductionNotice';
 const PolitiqueConfidentialitePage = () => (
     <div className={styles.container}>
         <Helmet>
@@ -36,22 +38,23 @@ const PolitiqueConfidentialitePage = () => (
 
         <h1 className={styles.pageTitle}>Politique de confidentialite</h1>
         <p className={styles.lastUpdated}>Derniere mise a jour : 2 septembre 2026</p>
+        <LegalPreproductionNotice />
 
         <div className={styles.content}>
             <h2>1. Responsable du traitement</h2>
             <p>
                 Le responsable du traitement des donnees personnelles collectees sur le site
-                volo-skin.fr est :
+                {' '}{SITE.domaine} est :
             </p>
             <ul>
-                <li><strong>VOLO SAS</strong></li>
-                <li>12 rue de la Paix, 75001 Paris, France</li>
-                <li>Email : <a href="mailto:contact@volo-skin.fr">contact@volo-skin.fr</a></li>
-                <li>SIRET : 123 456 789 00001 (a completer)</li>
+                <li><strong>{EDITEUR.raisonSociale}</strong></li>
+                <li>{EDITEUR.siege}</li>
+                <li>Email : <a href={`mailto:${EDITEUR.email}`}>{EDITEUR.email}</a></li>
+                <li>SIRET : {EDITEUR.siret}</li>
             </ul>
             <p>
                 <strong>Contact delegue a la protection des donnees (DPO) :</strong>{' '}
-                <a href="mailto:dpo@volo-skin.fr">dpo@volo-skin.fr</a>
+                <a href={`mailto:${EDITEUR.emailDpo}`}>{EDITEUR.emailDpo}</a>
             </p>
 
             <h2>2. Donnees collectees</h2>
@@ -134,7 +137,7 @@ const PolitiqueConfidentialitePage = () => (
                     Voir section 5 pour les transferts internationaux.
                 </li>
                 <li>
-                    <strong>Notre hebergeur</strong> ([a completer]) — pour l'hebergement technique
+                    <strong>Notre hebergeur</strong> ({HEBERGEUR.raisonSociale}) — pour l'hebergement technique
                     du site et des donnees.
                 </li>
             </ul>
@@ -177,7 +180,7 @@ const PolitiqueConfidentialitePage = () => (
                 </li>
                 <li>
                     <strong>Donnees de paiement :</strong> conservees par Stripe conformement a
-                    leurs propres obligations legales. VOLO SAS ne conserve que la reference de
+                    leurs propres obligations legales. {EDITEUR.raisonSociale} ne conserve que la reference de
                     la transaction.
                 </li>
                 <li>
@@ -242,7 +245,7 @@ const PolitiqueConfidentialitePage = () => (
 
             <h2>8. Profilage et decisions automatisees</h2>
             <p>
-                VOLO SAS ne realise <strong>aucun profilage</strong> au sens de l'article 22 du
+                {EDITEUR.raisonSociale} ne realise <strong>aucun profilage</strong> au sens de l'article 22 du
                 RGPD. Aucune decision fondee exclusivement sur un traitement automatise
                 produisant des effets juridiques ou affectant de maniere significative
                 l'utilisateur n'est prise.
@@ -298,8 +301,8 @@ const PolitiqueConfidentialitePage = () => (
                 Pour exercer l'un de ces droits, adressez votre demande :
             </p>
             <ul>
-                <li>Par email a <a href="mailto:dpo@volo-skin.fr">dpo@volo-skin.fr</a></li>
-                <li>Par courrier a VOLO SAS — Protection des donnees, 12 rue de la Paix, 75001 Paris</li>
+                <li>Par email a <a href={`mailto:${EDITEUR.emailDpo}`}>{EDITEUR.emailDpo}</a></li>
+                <li>Par courrier a {EDITEUR.raisonSociale} — Protection des donnees, {EDITEUR.siege}</li>
             </ul>
             <p>
                 Votre demande doit indiquer vos nom, prenom, adresse email associee au compte,
@@ -314,7 +317,7 @@ const PolitiqueConfidentialitePage = () => (
 
             <h2>10. Protection des donnees des mineurs</h2>
             <p>
-                Le site volo-skin.fr n'est pas destine aux enfants de moins de 16 ans. Nous ne
+                Le site {SITE.domaine} n'est pas destine aux enfants de moins de 16 ans. Nous ne
                 collectons pas sciemment de donnees personnelles aupres de mineurs de moins de
                 16 ans sans le consentement du titulaire de l'autorite parentale, conformement a
                 l'article 8 du RGPD et a l'article 45 de la loi Informatique et Libertes.
@@ -344,7 +347,7 @@ const PolitiqueConfidentialitePage = () => (
             <h2>12. Violation de donnees</h2>
             <p>
                 En cas de violation de donnees a caractere personnel susceptible d'engendrer un
-                risque pour les droits et libertes des personnes concernees, VOLO SAS notifiera
+                risque pour les droits et libertes des personnes concernees, {EDITEUR.raisonSociale} notifiera
                 la CNIL dans un delai de 72 heures conformement a l'article 33 du RGPD.
             </p>
             <p>
@@ -354,7 +357,7 @@ const PolitiqueConfidentialitePage = () => (
 
             <h2>13. Modifications de la politique</h2>
             <p>
-                VOLO SAS se reserve le droit de modifier la presente politique de
+                {EDITEUR.raisonSociale} se reserve le droit de modifier la presente politique de
                 confidentialite a tout moment. En cas de modification substantielle, les
                 utilisateurs enregistres seront informes par email. La date de derniere mise a
                 jour est indiquee en haut de cette page.
@@ -378,7 +381,7 @@ const PolitiqueConfidentialitePage = () => (
             </ul>
             <p>
                 Nous vous encourageons a nous contacter au prealable a l'adresse{' '}
-                <a href="mailto:dpo@volo-skin.fr">dpo@volo-skin.fr</a> afin de resoudre toute
+                <a href={`mailto:${EDITEUR.emailDpo}`}>{EDITEUR.emailDpo}</a> afin de resoudre toute
                 difficulte de maniere amiable.
             </p>
         </div>

@@ -422,7 +422,7 @@ Plus un lien « Retour au site » vers la SPA.
 | Tests backend | PHPUnit 13 | — | Sécurité, paiement, webhook, contact — chiffres relevés dans [STRATEGIE_TESTS.md](STRATEGIE_TESTS.md) |
 | Tests frontend | Vitest + Testing Library | — | Tests des contextes, validators, pages |
 | Analyse statique | PHPStan level max | — | 0 erreur hors baseline (la baseline gèle l'existant) |
-| Linting front | ESLint 10 | — | **4 erreurs restantes** (`react-hooks/set-state-in-effect`), signalées sans bloquer la CI |
+| Linting front | ESLint 10 | — | **4 erreurs restantes**, sur trois règles (`react-hooks/set-state-in-effect`, `no-empty`, `react-refresh/only-export-components`), signalées sans bloquer la CI |
 | Qualité React | React Doctor 0.9.12 | — | **94/100**, 2 avertissements (relevé local du 14/09/2026). Le workflow GitHub, lui, n'a encore jamais tourné |
 | SEO | react-helmet-async + SitemapController | — | Meta par page + sitemap XML dynamique |
 
@@ -678,7 +678,7 @@ $client->request('POST', '/api/orders', [], [], [
 ### Analyse statique
 
 - **PHPStan** : `level: max` (le plus strict), 0 erreur hors baseline. La baseline gèle les erreurs préexistantes : elle empêche d'en ajouter de nouvelles, elle ne dit pas que le code est propre
-- **ESLint** : 4 erreurs restantes, toutes `react-hooks/set-state-in-effect` (`api/api.js`, `components/NavBar.jsx`, `contexts/ToastContext.jsx`, `pages/ProductDetailPage.jsx`) — une règle de React 19 sur les `setState` synchrones dans un effet. Signalées par la CI sans la faire échouer, le temps d'être traitées
+- **ESLint** : 4 erreurs restantes, sur **trois** règles — cette ligne les disait à tort « toutes `react-hooks/set-state-in-effect` » : `react-hooks/set-state-in-effect` dans `components/NavBar.jsx` et `pages/ProductDetailPage.jsx` (une règle de React 19 sur les `setState` synchrones dans un effet), `no-empty` dans `api/api.js`, et `react-refresh/only-export-components` dans `contexts/ToastContext.jsx`. Signalées par la CI sans la faire échouer, le temps d'être traitées
 - **React Doctor** (0.9.12) : **score 94/100**, 2 avertissements — `npx react-doctor` lancé localement le 14/09/2026, 41 fichiers scannés. Les deux avertissements sont des `no-giant-component` sur `CGVPage.jsx` (404 lignes) et `PolitiqueConfidentialitePage.jsx` (388 lignes). **Non corrigés, délibérément** : ces deux fichiers ne contiennent aucun hook, aucun gestionnaire d'événement, aucune condition — ce sont des fonctions fléchées qui retournent de la prose juridique statique (les 17 articles des CGV). La règle vise les composants difficiles à faire évoluer parce que *complexes* ; ceux-ci sont longs sans être complexes, et les découper en sous-composants déplacerait le texte sans rien simplifier
 - **Réserve sur ce chiffre** : il vient d'une exécution locale, pas de la CI. **Le workflow GitHub n'a encore jamais tourné** — il était placé dans `frontend/.github/workflows/` alors que GitHub ne lit que `<racine>/.github/workflows/`, et ciblait `main` quand le dépôt est sur `master`. Les deux causes sont corrigées depuis le 14/09/2026, mais tant qu'aucun push n'a eu lieu, le score affiché reste un relevé de poste de travail
 
@@ -1007,7 +1007,7 @@ Dependencies:
 - Suites de tests backend (PHPUnit) et frontend (Vitest) couvrant l'authentification, le CSRF, le paiement, le webhook Stripe, le contact, le panier et les validateurs — chiffres dans [STRATEGIE_TESTS.md](STRATEGIE_TESTS.md)
 - PHPStan level max à 0 erreur hors baseline, exécuté à chaque push par la CI
 - UI/UX soignée : toast notifications animées (gradients, SVG, progress bar), `ConfirmDialog` avec backdrop blur et icônes contextuelles, page de confirmation avec animations cascade et check SVG animé, images de problématiques de peau sur la page d'accueil
-- Pages légales conformes au droit français du e-commerce : CGV (17 articles, formulaire de rétractation, règlement cosmétiques CE 1223/2009, médiation, force majeure), mentions légales (LCEN + CGU intégrées), politique de confidentialité (RGPD, transferts internationaux Stripe US, profilage, mineurs, violation de données)
+- Pages légales structurées selon les obligations du e-commerce français : CGV (17 articles, formulaire de rétractation, règlement cosmétiques CE 1223/2009, médiation, force majeure), mentions légales (LCEN + CGU intégrées), politique de confidentialité (RGPD, transferts internationaux Stripe US, profilage, mineurs, violation de données). **En pré-production, l'identité de l'éditeur, de l'hébergeur et du médiateur est fictive** — valeurs impossibles à attribuer (SIRET à zéros, domaine `volo.example`), centralisées dans `frontend/src/config/legalIdentity.js` et signalées par un bandeau sur chaque page. Les vraies informations, et une relecture juridique, restent à apporter avant la mise en ligne
 - Documentation exhaustive et auto-critique
 
 **Défauts corrigés en cours de projet :**

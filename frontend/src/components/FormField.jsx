@@ -10,6 +10,7 @@ Responsabilites :
     - Valider au blur (perte de focus) et au changement apres premier blur.
     - Afficher une bordure rouge + message sous le champ en cas d'erreur.
     - Afficher une bordure verte + coche si le champ est valide apres edition.
+    - Pour type="password" : bouton afficher / masquer la saisie (PasswordInput).
 
 Props :
     - label (string)         : Texte du label.
@@ -37,6 +38,7 @@ Exemple :
 */
 
 import { useState, useCallback } from 'react';
+import PasswordInput from './PasswordInput';
 
 const errorMsgStyle = {
     color: '#d9534f',
@@ -54,6 +56,10 @@ const validIconStyle = {
     fontSize: '1.1em',
     pointerEvents: 'none',
 };
+
+// Pour un mot de passe, la coche est decalee vers la gauche : a 12px du bord,
+// elle se superposerait au bouton afficher / masquer.
+const validIconStylePassword = { ...validIconStyle, right: '44px' };
 
 const FormField = ({
     label,
@@ -105,6 +111,23 @@ const FormField = ({
         ? { borderColor, boxShadow }
         : {};
 
+    const isPassword = type === 'password';
+
+    const inputProps = {
+        id,
+        value,
+        onChange: handleChange,
+        onBlur: handleBlur,
+        placeholder,
+        required,
+        autoComplete,
+        minLength,
+        className,
+        style: inputStyle,
+        'aria-invalid': isInvalid || undefined,
+        'aria-describedby': isInvalid ? `${id}-error` : undefined,
+    };
+
     return (
         <div style={{ marginBottom: '18px', textAlign: 'left' }}>
             {label && (
@@ -121,22 +144,10 @@ const FormField = ({
                 </label>
             )}
             <div style={{ position: 'relative' }}>
-                <input
-                    id={id}
-                    type={type}
-                    value={value}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    placeholder={placeholder}
-                    required={required}
-                    autoComplete={autoComplete}
-                    minLength={minLength}
-                    className={className}
-                    style={inputStyle}
-                    aria-invalid={isInvalid || undefined}
-                    aria-describedby={isInvalid ? `${id}-error` : undefined}
-                />
-                {isValid && <span style={validIconStyle} aria-hidden="true">&#10003;</span>}
+                {isPassword ? <PasswordInput {...inputProps} /> : <input {...inputProps} type={type} />}
+                {isValid && (
+                    <span style={isPassword ? validIconStylePassword : validIconStyle} aria-hidden="true">&#10003;</span>
+                )}
             </div>
             <div id={`${id}-error`} style={errorMsgStyle} role={isInvalid ? 'alert' : undefined}>
                 {isInvalid ? error : ''}

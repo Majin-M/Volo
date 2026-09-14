@@ -25,6 +25,7 @@ namespace App\Controller;
 
 use App\Entity\Product;
 use App\Http\ApiError;
+use App\Http\JsonBody;
 use App\Repository\ProductRepository;
 use App\Security\ProductVoter;
 use App\Service\ProductService;
@@ -118,7 +119,10 @@ class ProductController extends AbstractController
      * @param int $id Identifiant du produit.
      * @return JsonResponse Donnees completes du produit (relations incluses).
      */
-    #[Route('/api/products/{id}', name: 'api_product_show', methods: ['GET'])]
+    // {id} contraint a un entier positif de 18 chiffres au plus : `abc` ou un
+    // nombre depassant PHP_INT_MAX levaient un TypeError sur `int $id` (500).
+    // Ils ne correspondent desormais a aucune route : 404.
+    #[Route('/api/products/{id}', name: 'api_product_show', requirements: ['id' => '[1-9]\d{0,17}'], methods: ['GET'])]
     public function show(int $id, Request $request): JsonResponse
     {
         $productData = $this->productService->getProductById($id);
@@ -148,9 +152,11 @@ class ProductController extends AbstractController
     {
         $this->denyAccessUnlessGranted(ProductVoter::CREATE);
 
-        $data = json_decode($request->getContent(), true);
+        // Objet JSON exige : un scalaire comme `"x"` passait `!$data` puis
+        // faisait planter le service en TypeError (500). Cf. App\Http\JsonBody.
+        $data = JsonBody::decode($request);
 
-        if (!$data) {
+        if ($data === null || $data === []) {
             return ApiError::response('Format JSON invalide.', 400);
         }
 
@@ -180,14 +186,16 @@ class ProductController extends AbstractController
      * @param Request $request Corps JSON avec les champs a mettre a jour.
      * @return JsonResponse    Produit modifie (200) ou erreur (400/404).
      */
-    #[Route('/api/products/{id}', name: 'api_product_update', methods: ['PUT'])]
+    #[Route('/api/products/{id}', name: 'api_product_update', requirements: ['id' => '[1-9]\d{0,17}'], methods: ['PUT'])]
     public function update(int $id, Request $request): JsonResponse
     {
         $this->denyAccessUnlessGranted(ProductVoter::EDIT, $this->findProductOr404($id));
 
-        $data = json_decode($request->getContent(), true);
+        // Objet JSON exige : un scalaire comme `"x"` passait `!$data` puis
+        // faisait planter le service en TypeError (500). Cf. App\Http\JsonBody.
+        $data = JsonBody::decode($request);
 
-        if (!$data) {
+        if ($data === null || $data === []) {
             return ApiError::response('Format JSON invalide.', 400);
         }
 
@@ -211,7 +219,7 @@ class ProductController extends AbstractController
      * @param int $id Identifiant du produit a supprimer.
      * @return JsonResponse Message de confirmation (200).
      */
-    #[Route('/api/products/{id}', name: 'api_product_delete', methods: ['DELETE'])]
+    #[Route('/api/products/{id}', name: 'api_product_delete', requirements: ['id' => '[1-9]\d{0,17}'], methods: ['DELETE'])]
     public function delete(int $id): JsonResponse
     {
         $this->denyAccessUnlessGranted(ProductVoter::DELETE, $this->findProductOr404($id));

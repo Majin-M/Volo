@@ -23,6 +23,7 @@ Exceptions :
 
 namespace App\Service;
 
+use App\Http\JsonBody;
 use App\Entity\Product;
 use App\Repository\BrandRepository;
 use App\Repository\ProductRepository;
@@ -65,9 +66,26 @@ class ProductService
     {
         $offset = ($page - 1) * $limit;
 
-        // Récupération des filtres depuis le tableau
-        $brandId = $filters['brand'] ?? null;
-        $skinConcernSlug = $filters['skin_concern'] ?? null;
+        // Filtres : types verifies. `?brand=abc` ou `?brand[]=1` atteignaient
+        // findFiltered(?int) et levaient un TypeError (500). Un filtre invalide
+        // ne peut correspondre a aucun produit : liste vide, pas d'erreur.
+        $vide = ['data' => [], 'meta' => ['page' => $page, 'limit' => $limit, 'total' => 0]];
+
+        $brandId = null;
+        if (isset($filters['brand']) && $filters['brand'] !== '') {
+            $brandId = JsonBody::int($filters['brand']);
+            if ($brandId === null) {
+                return $vide;
+            }
+        }
+
+        $skinConcernSlug = null;
+        if (isset($filters['skin_concern']) && $filters['skin_concern'] !== '') {
+            $skinConcernSlug = JsonBody::string($filters['skin_concern']);
+            if ($skinConcernSlug === null) {
+                return $vide;
+            }
+        }
         // Conversion string 'true'/'false' vers booléen
         $available = isset($filters['available']) ? filter_var($filters['available'], FILTER_VALIDATE_BOOLEAN) : null;
 
@@ -123,11 +141,19 @@ class ProductService
     /**
      * Cree un nouveau produit.
      *
-     * @param array<string, mixed> $data Donnees du produit (name, price, description, brandId, skinConcernIds, isAvailable)
+     * @param array<mixed> $data Donnees du produit (name, price, description, brandId, skinConcernIds, isAvailable)
      * @return Product
      */
     public function createProduct(array $data): Product
     {
+        // Un produit sans nom, prix ou marque ne peut pas etre enregistre : on le
+        // dit ici en 400 plutot que de laisser MySQL le refuser en 500.
+        foreach (['name', 'price', 'brandId'] as $champ) {
+            if (!array_key_exists($champ, $data)) {
+                throw new \InvalidArgumentException(sprintf('Le champ %s est obligatoire.', $champ));
+            }
+        }
+
         $product = new Product();
         $this->hydrateProduct($product, $data);
 
@@ -140,7 +166,7 @@ class ProductService
     /**
      * Met a jour un produit existant.
      *
-     * @param array<string, mixed> $data
+     * @param array<mixed> $data
      */
     public function updateProduct(int $id, array $data): Product
     {
@@ -174,39 +200,70 @@ class ProductService
     /**
      * Hydrate un produit a partir des donnees fournies.
      *
-     * @param array<string, mixed> $data
+     * @param array<mixed> $data
      */
     private function hydrateProduct(Product $product, array $data): void
     {
-        if (isset($data['name']) && is_string($data['name'])) {
-            $product->setName($data['name']);
+        // Validation stricte des types ET des limites de la base, AVANT toute
+        // ecriture. Audit du 14/09/2026 : un nom numerique n'etait pas applique
+        // (nom NULL -> contrainte NOT NULL), et un nom de 100 000 caracteres, un
+        // prix de 1e308 ou un stock hors limites atteignaient MySQL, qui refusait
+        // l'ecriture. L'API repondait 500 la ou la faute du client meritait 400.
+        if (array_key_exists('name', $data)) {
+            $nom = JsonBody::string($data['name']);
+            if ($nom === null || trim($nom) === '') {
+                throw new \InvalidArgumentException('Le nom doit etre une chaine non vide.');
+            }
+            if (mb_strlen($nom) > 255) {
+                throw new \InvalidArgumentException('Le nom est trop long (255 caracteres maximum).');
+            }
+            $product->setName(trim($nom));
         }
 
-        if (isset($data['description']) && is_string($data['description'])) {
-            $product->setDescription($data['description']);
+        if (array_key_exists('description', $data)) {
+            $description = $data['description'] === null ? null : JsonBody::string($data['description']);
+            if ($data['description'] !== null && $description === null) {
+                throw new \InvalidArgumentException('La description doit etre une chaine de caracteres.');
+            }
+            $product->setDescription($description);
         }
 
-        if (isset($data['price'])) {
-            $product->setPrice((string) (float) $data['price']);
+        if (array_key_exists('price', $data)) {
+            $prix = $data['price'];
+            if (!(is_int($prix) || is_float($prix) || (is_string($prix) && is_numeric($prix)))) {
+                throw new \InvalidArgumentException('Le prix doit etre un nombre.');
+            }
+            $valeur = (float) $prix;
+            // Colonne DECIMAL(10,2) : 99 999 999,99 au plus.
+            if (!is_finite($valeur) || $valeur <= 0 || $valeur > 99999999.99) {
+                throw new \InvalidArgumentException('Le prix doit etre compris entre 0,01 et 99 999 999,99.');
+            }
+            $product->setPrice(number_format($valeur, 2, '.', ''));
         }
 
         if (array_key_exists('isAvailable', $data)) {
-            $product->setIsAvailable((bool) $data['isAvailable']);
+            // Booleen strict : `(bool) "false"` vaut true, ce qui publiait un
+            // produit qu'on voulait masquer.
+            if (!is_bool($data['isAvailable'])) {
+                throw new \InvalidArgumentException('isAvailable doit etre un booleen (true ou false).');
+            }
+            $product->setIsAvailable($data['isAvailable']);
         }
 
         if (array_key_exists('stock', $data)) {
-            $stock = (int) $data['stock'];
-            if ($stock < 0) {
-                throw new \InvalidArgumentException('Le stock ne peut pas etre negatif.');
+            $stock = JsonBody::int($data['stock']);
+            // Colonne INT signee : 2 147 483 647 au plus.
+            if ($stock === null || $stock < 0 || $stock > 2147483647) {
+                throw new \InvalidArgumentException('Le stock doit etre un entier compris entre 0 et 2 147 483 647.');
             }
             $product->setStock($stock);
         }
 
-        if (isset($data['brandId'])) {
-            $brandId = (int) $data['brandId'];
-            $brand = $this->brandRepository->find($brandId);
+        if (array_key_exists('brandId', $data)) {
+            $brandId = JsonBody::int($data['brandId']);
+            $brand = $brandId !== null && $brandId > 0 ? $this->brandRepository->find($brandId) : null;
             if (!$brand) {
-                throw new \InvalidArgumentException('Marque introuvable (id: ' . $brandId . ').');
+                throw new \InvalidArgumentException('Marque introuvable.');
             }
             $product->setBrand($brand);
         }
@@ -215,9 +272,9 @@ class ProductService
             foreach ($product->getSkinConcerns()->toArray() as $sc) {
                 $product->removeSkinConcern($sc);
             }
-            /** @var int|string $scId */
             foreach ($data['skinConcernIds'] as $scId) {
-                $sc = $this->skinConcernRepository->find((int) $scId);
+                $idProblematique = JsonBody::int($scId);
+                $sc = $idProblematique !== null && $idProblematique > 0 ? $this->skinConcernRepository->find($idProblematique) : null;
                 if ($sc) {
                     $product->addSkinConcern($sc);
                 }

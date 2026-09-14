@@ -223,6 +223,8 @@ Dépôt monorepo à la racine (`backend/` + `frontend/`). Le dépôt initial ne 
 >
 > **PHPStan tourne en `level: max`** — le niveau le plus strict. Le `phpstan-baseline.neon` comptait **102 entrées** au 02/09/2026 — chiffre daté, vérifiable par `grep -c 'message:' phpstan-baseline.neon` ; il a été régénéré à cette date après les modifications de `StripePaymentGateway` (cast explicite `(string)` sur `order_id`, type `metadata` corrigé). **0 erreur hors baseline**, revérifié le 13/09/2026.
 >
+> **Mise à jour du 14/09/2026 : la baseline est descendue à 77 entrées.** L'audit a corrigé la validation des entrées de l'API (`App\Http\JsonBody`, types stricts dans `AuthController`, `ProductService`, `OrderService`). Ces corrections ont fait disparaître **25 erreurs de typage que la baseline masquait** — PHPStan les a signalées comme entrées obsolètes. La baseline n'a été régénérée qu'après avoir vérifié qu'il ne restait **aucune** erreur réelle, pour ne pas y enfouir de nouveau défaut. Une baseline qui rétrécit mesure un progrès réel ; une baseline régénérée à l'aveugle ne mesure rien.
+>
 > Deux pièges appris à l'usage : PHPStan a besoin du conteneur `dev` compilé (`cache:warmup` avant, sinon il refuse de démarrer), et de `--memory-limit=1G` (128M ne suffisent pas, il s'arrête en cours d'analyse).
 
 PHPStan reste le meilleur rapport effort/trouvailles du projet. Il est exécuté à chaque push depuis la mise en place de la CI le 14/09/2026 (`.github/workflows/ci.yml`) — un analyseur que personne ne lance ne trouve rien.

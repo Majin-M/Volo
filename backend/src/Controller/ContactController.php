@@ -23,6 +23,7 @@ Securite :
 namespace App\Controller;
 
 use App\Http\ApiError;
+use App\Http\JsonBody;
 use App\Service\ContactService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -57,9 +58,11 @@ class ContactController extends AbstractController
             return ApiError::response('Trop de tentatives. Veuillez reessayer plus tard.', 429);
         }
 
-        $data = json_decode($request->getContent(), true);
+        // Objet JSON exige : un scalaire comme `"x"` passait `!$data` puis
+        // faisait planter le service en TypeError (500). Cf. App\Http\JsonBody.
+        $data = JsonBody::decode($request);
 
-        if (!$data) {
+        if ($data === null || $data === []) {
             return ApiError::response('Format JSON invalide.', 400);
         }
 

@@ -53,7 +53,8 @@ volo/
 │
 ├── backend/
 │   ├── src/
-│   │   ├── Command/             # app:create-admin (seule voie vers ROLE_ADMIN)
+│   │   ├── Command/             # app:create-admin (seule voie vers ROLE_ADMIN),
+│   │   │                        #   app:release-stale-orders (paniers abandonnés)
 │   │   ├── Controller/          # Points d'entrée REST + Admin/ (EasyAdmin)
 │   │   ├── DataFixtures/        # Données de test
 │   │   ├── Entity/              # Entités Doctrine
@@ -61,18 +62,23 @@ volo/
 │   │   ├── Doctrine/Filter/     # SoftDeleteFilter (exclut les enregistrements supprimés)
 │   │   ├── Event/               # VIDE — ⬜ aucun événement métier
 │   │   ├── EventSubscriber/     # Audit, CsrfProtection, Exception,
-│   │   │                        #   SecurityHeaders, StatusTransition
+│   │   │                        #   SecurityHeaders, StatusTransition,
+│   │   │                        #   StockRelease (restitution à l'annulation)
+│   │   ├── Http/                # ApiError (enveloppe d'erreur), JsonBody (types des entrées)
 │   │   ├── Repository/          # Requêtes BDD
-│   │   ├── Security/            # OrderVoter, ProductVoter
+│   │   ├── Security/            # OrderVoter, ProductVoter, ApiEntryPoint (401 dans l'enveloppe)
 │   │   └── Service/             # Logique métier + PaymentGateway/
 │   │
 │   ├── migrations/              # Migrations Doctrine
 │   ├── public/admin-theme/      # Thème VOLO du back-office (CSS + favicon)
 │   ├── tests/                   # suite PHPUnit — chiffres : docs/STRATEGIE_TESTS.md
-│   │   ├── Controller/          # AuthControllerTest, WebhookStripeTest
+│   │   ├── Controller/          # AuthControllerTest, WebhookStripeTest,
+│   │   │                        #   PaginationBoundsTest, ApiInputRobustnessTest
 │   │   ├── Entity/              # OrderPaymentTest
+│   │   ├── EventSubscriber/     # AuditSubscriberTest
 │   │   ├── Security/            # CsrfProtectionTest
-│   │   └── Service/             # ContactNotificationTest
+│   │   └── Service/             # ContactNotificationTest, StockReleaseTest,
+│   │                            #   PaymentSettlementTest
 │   │
 │   ├── compose.yaml             # db + mailer seulement — la pile complète
 │   │                            #   est à la racine du dépôt (cf. §6)
@@ -85,7 +91,9 @@ volo/
 │   │   ├── assets/
 │   │   ├── components/          # NavBar, Footer, ProductCard, PaymentForm,
 │   │   │                        #   PrivateRoute, ConfirmDialog, ErrorBoundary,
-│   │   │                        #   FormField, PasswordStrength, Skeleton
+│   │   │                        #   FormField, PasswordStrength, PasswordInput,
+│   │   │                        #   LegalPreproductionNotice, Skeleton
+│   │   ├── config/              # legalIdentity.js — identité légale, fictive en pré-production
 │   │   ├── contexts/            # AuthContext, CartContext, ToastContext
 │   │   ├── pages/               # Une page par route
 │   │   ├── test/                # Configuration Vitest
@@ -371,4 +379,4 @@ Deux étapes du flux d'origine n'existent toujours pas :
 
 Ce que le schéma d'origine **ne montrait pas** et qui est pourtant l'essentiel : le firewall et le contrôle CSRF, c'est-à-dire les deux étapes qui décident si la requête a le droit d'exister.
 
-Le parcours va désormais jusqu'au bout : une commande payée passe bien à `paid` par le webhook, et le passage est couvert par `WebhookStripeTest` (10 tests, dont l'idempotence du rejeu).
+Le parcours va désormais jusqu'au bout : une commande payée passe bien à `paid` par le webhook, et le passage est couvert par `WebhookStripeTest` — idempotence du rejeu, succès après refus de carte sur le même paiement, et remboursement d'un paiement reçu pour une commande annulée ([STRATEGIE_TESTS.md](STRATEGIE_TESTS.md) porte les chiffres).

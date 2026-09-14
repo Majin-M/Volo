@@ -27,6 +27,22 @@ Design System :
     margin: 0 0 40px 0;
 }
 
+/* Bandeau « informations fictives » (pre-production) */
+.notice {
+    background-color: #FBF4EA;
+    border: 1px solid #E9D7C3;
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin: -20px 0 30px 0;
+    color: #5F4C42;
+    font-size: 0.9em;
+    line-height: 1.6;
+}
+
+.notice strong {
+    font-weight: 600;
+}
+
 .content {
     background-color: #fff;
     border: 1px solid #E9D7C3;

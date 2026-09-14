@@ -6,16 +6,16 @@
 >
 > | Ce qui est mesuré | Valeur relevée | Commande |
 > |---|---|---|
-> | Suite backend | 74 tests, 204 assertions, verts | `php bin/phpunit` |
-> | Suite frontend | 32 tests sur 3 fichiers, verts | `npx vitest run` |
+> | Suite backend | 110 tests, 269 assertions, verts | `php bin/phpunit` |
+> | Suite frontend | 42 tests sur 5 fichiers, verts | `npx vitest run` |
 > | Build frontend | passe | `npm run build` |
 > | PHPStan `level: max` | 0 erreur hors baseline | `vendor/bin/phpstan analyse` |
 > | ESLint | **4 erreurs** — voir réserve ci-dessous | `npx eslint src` |
 > | React Doctor 0.9.12 | **94/100**, 2 avertissements | `npm run doctor` |
 >
-> **Couverture backend, par fichier** : `AuthControllerTest` (inscription, cookies), `CsrfProtectionTest` (double-submit), `OrderPaymentTest` (dérivation du statut, contrat d'API, cascade), `ContactNotificationTest` (persistance + notification email), `WebhookStripeTest` (signature HMAC, idempotence, transitions de statut), `StockReleaseTest` (réservation et restitution du stock, balayage des commandes abandonnées), `AuditSubscriberTest` (traçabilité des modifications), `PaginationBoundsTest` (bornes des paramètres publics), `PaymentSettlementTest` (paiement idempotent, fermeture et remboursement à l'annulation). **Frontend** : `LoginPage.test.jsx`, `CartContext.test.jsx`, `validators.test.js`.
+> **Couverture backend, par fichier** : `AuthControllerTest` (inscription, cookies), `CsrfProtectionTest` (double-submit), `OrderPaymentTest` (dérivation du statut, contrat d'API, cascade), `ContactNotificationTest` (persistance + notification email), `WebhookStripeTest` (signature HMAC, idempotence, transitions de statut), `StockReleaseTest` (réservation et restitution du stock, balayage des commandes abandonnées), `AuditSubscriberTest` (traçabilité des modifications), `PaginationBoundsTest` (bornes des paramètres publics), `PaymentSettlementTest` (paiement idempotent, fermeture et remboursement à l'annulation), `ApiInputRobustnessTest` (entrées malformées : 400 ou 404, jamais 500, avec contrôles positifs). **Frontend** : `LoginPage.test.jsx`, `CartContext.test.jsx`, `validators.test.js`, `PasswordInput.test.jsx` (afficher / masquer le mot de passe, sans soumettre le formulaire), `LegalPages.test.jsx` (identité légale rendue : bandeau de pré-production, aucun marqueur « à compléter », espaces préservés autour des valeurs injectées).
 >
-> **Une réserve à énoncer telle quelle** : ESLint ne sort pas 0 erreur. Les quatre erreurs sont toutes `react-hooks/set-state-in-effect`, dans `api/api.js`, `components/NavBar.jsx`, `contexts/ToastContext.jsx` et `pages/ProductDetailPage.jsx`. Elles sont signalées par la CI sans la faire échouer (§9), le temps qu'elles soient traitées.
+> **Une réserve à énoncer telle quelle** : ESLint ne sort pas 0 erreur. Les quatre erreurs relèvent de **trois règles différentes** — cette réserve affirmait à tort qu'elles étaient « toutes `react-hooks/set-state-in-effect` » (constaté le 14/09/2026 en relançant ESLint) : `react-hooks/set-state-in-effect` dans `components/NavBar.jsx` et `pages/ProductDetailPage.jsx`, `no-empty` (bloc vide) dans `api/api.js`, et `react-refresh/only-export-components` dans `contexts/ToastContext.jsx`. Elles sont signalées par la CI sans la faire échouer (§9), le temps qu'elles soient traitées.
 >
 > Ce document existe pour deux raisons : dire quoi écrire quand on s'y mettra, et **nommer précisément ce qui est aujourd'hui non vérifié** — parce que « ça marche quand je clique » n'est pas une vérification.
 >
@@ -37,7 +37,7 @@ C'est la section la plus importante du document. Chacun de ces mécanismes est *
 |---|---|---|
 | Protection CSRF | Un `POST /api/orders` sans `X-Csrf-Token` → 403 | ✅ **Testé** — `CsrfProtectionTest`, 8 tests |
 | Rate limiting | La 6ᵉ tentative → 429 | ✅ **Vérifié** — constaté à l'usage (voir ci-dessous) |
-| Hachage EasyAdmin | Le mot de passe créé en back-office est bien haché | ⚠️ Toujours jamais vérifié en base |
+| Hachage EasyAdmin | Le mot de passe créé en back-office est bien haché | ✅ **Vérifié en base** le 14/09/2026 — utilisateur créé par le vrai formulaire EasyAdmin : empreinte bcrypt `$2y$13$`, 60 caractères, jamais stockée en clair. Contrôle scripté, **pas encore un test PHPUnit** |
 | Cookie `HttpOnly` | Le JWT est inaccessible au JS | ✅ **Testé** — `testRegister_Success` |
 | Autorisation par ressource | Un client ne lit pas la commande d'un autre | 🟡 **Sans objet aujourd'hui** — voir ci-dessous |
 | Bornes de pagination | `?limit=100000` ramené à 50, `?limit=-5` et `?page=0` ramenés au plancher | ✅ **Testé** — `PaginationBoundsTest`. Le plafond existait ; **le plancher, non** : les valeurs négatives descendaient jusqu'à Doctrine |
@@ -48,7 +48,7 @@ C'est la section la plus importante du document. Chacun de ces mécanismes est *
 
 > C'est la leçon la plus utile de cette révision : **ce document désignait la mauvaise porte.** Pendant qu'il surveillait `GET /api/orders/{id}`, un CRUD Twig anonyme traînait sur `/user` et permettait à quiconque de se créer un compte `ROLE_ADMIN`, mot de passe en clair. Aucun test ne le couvrait, et aucune ligne de ce tableau ne le mentionnait. Un raisonnement sur ce qui est *probablement* cassé ne remplace pas un inventaire de ce qui est *réellement* exposé — `debug:router` confronté à `access_control` l'aurait montré en une minute.
 
-**Cette section reste un plan de travail, mais court** : un seul mécanisme reste non prouvé par un test — le **hachage EasyAdmin** (vérifié une fois à la main après correction, jamais figé). Le rate limiting est constaté à l'usage mais mériterait aussi son test dédié (§5). Toutes les autres lignes sont désormais couvertes.
+**Cette section reste un plan de travail, mais court** : plus aucun mécanisme n'est non vérifié. Le **hachage EasyAdmin** a été contrôlé en base lors de l'audit du 14/09/2026, mais par un script, pas par un test automatisé : il reste à le figer dans la suite. Le rate limiting est constaté à l'usage mais mériterait aussi son test dédié (§5). Toutes les autres lignes sont désormais couvertes.
 
 > **Ce que la ligne « pagination » a appris, et qui vaut d'être gardé.** Elle disait « jamais testé, mais le code existe ». Le code existait effectivement — mais seulement à moitié : il plafonnait `limit` à 50 et ne planchait rien. `?limit=-5` et `?page=0` traversaient donc jusqu'à Doctrine. **« Le code existe » n'est pas « le code est correct »** : c'est précisément ce qu'un test départage, et c'est pour ça qu'une ligne « non testé » ne doit jamais être lue comme rassurante.
 

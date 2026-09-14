@@ -138,9 +138,10 @@ jobs:
         run: npm ci
 
       - name: ESLint
-        # NON BLOQUANT volontairement. Quatre erreurs
-        # `react-hooks/set-state-in-effect` preexistent (api.js, NavBar.jsx,
-        # ToastContext.jsx, ProductDetailPage.jsx). Les rendre bloquantes
+        # NON BLOQUANT volontairement. Quatre erreurs preexistent, sur trois
+        # regles : react-hooks/set-state-in-effect (NavBar.jsx,
+        # ProductDetailPage.jsx), no-empty (api.js) et
+        # react-refresh/only-export-components (ToastContext.jsx). Les rendre bloquantes
         # mettrait la CI au rouge des sa mise en place, et une CI rouge en
         # permanence finit par etre ignoree — ce qui la rend inutile.
         # A basculer en bloquant des que ces quatre erreurs sont traitees :

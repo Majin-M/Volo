@@ -27,6 +27,7 @@ import { Helmet } from 'react-helmet-async';
 import { submitContactMessage } from '../api/contactApi';
 import { validateEmail, isRequired } from '../utils/validators';
 import styles from './ContactPage.module.css';
+import { EDITEUR } from '../config/legalIdentity';
 
 const initialState = {
     firstName: '',
@@ -140,12 +141,12 @@ const ContactPage = () => {
 
                     <div className={styles.infoRow}>
                         <span className={styles.infoIcon}>📍</span>
-                        <span>12 rue de la Paix, 75001 Paris</span>
+                        <span>{EDITEUR.siege}</span>
                     </div>
                     <div className={styles.infoRow}>
                         <span className={styles.infoIcon}>✉️</span>
-                        <a href="mailto:contact@volo-skin.fr" className={styles.infoLink}>
-                            contact@volo-skin.fr
+                        <a href={`mailto:${EDITEUR.email}`} className={styles.infoLink}>
+                            {EDITEUR.email}
                         </a>
                     </div>
                     <div className={styles.infoRow}>

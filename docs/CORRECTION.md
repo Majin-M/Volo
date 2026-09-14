@@ -569,7 +569,7 @@ Quatre documents affirmaient que `8.0` faisait « générer du SQL MySQL 8 ». C
 | Base Docker existante (migration appliquée par l'entrypoint) | ✅ in sync |
 | Base de développement, plateforme `mariadb-10.4.32` | ✅ in sync |
 
-La suite PHPUnit (64 tests) et PHPStan sont restés verts.
+La suite PHPUnit et PHPStan sont restés verts.
 
 > ⚠️ **Incident pendant la vérification, à consigner tel quel.** Pour lire le SQL que la migration produirait sur la base de développement, `doctrine:migrations:migrate --write-sql=<fichier>` a été lancé en croyant que l'option se contentait d'écrire le fichier. **Elle exécute aussi la migration**, sauf combinée à `--dry-run`. La migration a donc été appliquée à la base de développement sans décision préalable. L'effet a été vérifié : une seule instruction (`SET DEFAULT 0`), non destructive, index intact grâce à la condition, version enregistrée cohérente avec le SQL appliqué. C'était la convergence visée — mais l'appliquer devait rester une décision. **Pour prévisualiser sans exécuter : `--dry-run --write-sql`, jamais `--write-sql` seul.**
 
@@ -672,3 +672,65 @@ La suite PHPUnit (64 tests) et PHPStan sont restés verts.
 - **Un premier essai EasyAdmin a rendu 422.** C'était le script de test, pas l'application : les boutons d'enregistrement sont hors de la balise `<form>` (attribut `form="…"`), et le jeton CSRF sans état attend soit le script `csrf-protection` du navigateur, soit un en-tête `Origin`. En imitant un navigateur, l'annulation passe.
 
 **Limite restante** : si Stripe est injoignable au moment où le balayage annule une commande, le paiement n'est pas fermé chez Stripe. La commande est annulée quand même, et un paiement tardif est remboursé par le webhook — mais le client aura été débité puis remboursé.
+
+---
+
+## ✅ Audit complet : 27 erreurs 500 sur entrées malformées, corrigées
+
+> **Audit et corrections du 14/09/2026.**
+
+**Ce qui a été vérifié, et trouvé sain** :
+
+| Contrôle | Résultat |
+|---|---|
+| Suite PHPUnit, PHPStan `level: max` | Verts avant corrections |
+| Dépendances PHP (`composer audit`) | Aucune faille connue |
+| Dépendances JavaScript (`npm audit`, production et développement) | Aucune faille connue |
+| Secrets dans les fichiers versionnés | Aucun ; aucun fichier `.env` réel ni clé `.pem` suivi |
+| Routes réelles confrontées à `access_control` | Les 20 routes couvertes par une règle adaptée, aucun trou |
+| Frontières d'accès en conditions réelles | 401 anonyme, 403 sans jeton CSRF, 403 client sur les routes admin |
+| Hachage des mots de passe créés dans EasyAdmin | ✅ Vérifié en base : bcrypt `$2y$13$`, jamais en clair — seule ligne de sécurité qui n'avait jamais été prouvée |
+
+**Ce qui a été trouvé** — test de robustesse de **478 requêtes malformées** contre la pile Docker : corps vides, JSON invalide, scalaires, tableaux à la place de chaînes, valeurs négatives, démesurées, HTML, Unicode, identifiants absurdes, comptes client **et** administrateur. **27 erreurs 500**, dont la cause exacte a été relevée dans les journaux avant toute correction :
+
+| Cause | Où |
+|---|---|
+| Corps JSON valide mais pas un objet (`"x"`, `123`) : `if (!$data)` le laisse passer, le service attend un tableau → `TypeError` | Commandes, contact, création et modification de produit |
+| Champ reçu en tableau, passé à `trim()` → `TypeError` | Connexion, profil |
+| Identifiant d'URL non numérique ou au-delà de `PHP_INT_MAX` sur un paramètre `int $id` | Affichage, modification, suppression de produit |
+| Filtre `?brand=abc` ou `?brand[]=1` transmis à un paramètre `?int` | Liste des produits |
+| Valeurs refusées par MySQL : nom absent (`NOT NULL`), nom > 255 caractères, prix hors `DECIMAL(10,2)`, stock hors `INT` | Création et modification de produit |
+
+Deux défauts **silencieux** en plus, sans erreur 500 :
+
+- `(int) "12,50"` vaut 12 et `(int) true` vaut 1 : une **commande de 12 unités acceptée** pour une saisie invalide ; `(bool) "false"` vaut `true`.
+- Au-delà de 4096 caractères, le hacheur de Symfony **lève une exception au lieu de hacher** : une inscription avec un mot de passe géant aurait rendu 500.
+
+**Correction** :
+
+- `App\Http\JsonBody` (nouveau) : `decode()` n'accepte qu'un objet JSON, `string()` et `int()` vérifient le type — **un seul endroit** pour ces règles.
+- Contrôleurs de commande, contact, produits et authentification : types vérifiés à l'entrée, 400 sinon ; mot de passe borné à 4096 caractères.
+- `{id}` des routes produits contraint à `[1-9]\d{0,17}` : un identifiant impossible ne correspond à aucune route (404).
+- `ProductService` : chaque champ validé contre les limites de la base ; filtres invalides → liste vide.
+- `OrderService` : quantités et identifiants en entiers stricts.
+
+**Défaut du tunnel de commande, trouvé en lisant le code** : `CheckoutPage` crée la commande puis le paiement. Si la création du paiement échouait, un nouveau clic **créait une seconde commande**, la première gardant son stock réservé. La commande déjà créée est désormais réutilisée (`POST /api/payments` étant idempotent), et le vrai message d'erreur est affiché — « Stock insuffisant pour… » au lieu d'un message générique.
+
+**Vérifié** :
+
+| Vérification | Résultat |
+|---|---|
+| Même test de robustesse, 478 requêtes, sur la pile corrigée | **0 erreur 500** (contre 27), toutes les erreurs dans l'enveloppe standard |
+| `ApiInputRobustnessTest` (nouveau) | Chaque famille de défaut figée, **avec contrôle positif** — sans lui, une API qui répondrait 400 à tout passerait aussi |
+| Suite PHPUnit complète | Verte |
+| PHPStan `level: max` | 0 erreur ; baseline **102 → 77** — les corrections ont éliminé 25 erreurs que la baseline masquait |
+| Vitest, build, ESLint | Verts ; aucune erreur ESLint nouvelle |
+| Base Docker | Restaurée depuis la sauvegarde prise avant l'audit ; comptes de test supprimés ; stocks et volumes identiques à l'état initial ; schéma synchronisé |
+
+**Pièges d'outillage rencontrés, à connaître pour refaire l'audit** : un caractère Unicode de contrôle dans une commande shell l'a fait refuser, puis mal analyser — le test doit vivre dans un fichier ; les routes produits d'écriture répondent 403 à un client **avant** toute validation, il faut les attaquer avec un compte administrateur pour exercer leur code ; un formulaire EasyAdmin soumis sans reproduire le double envoi CSRF du navigateur rend 422, ce qui ne prouve rien sur l'application.
+
+**Limites restantes, assumées** :
+
+- Un pays d'adresse non textuel est remplacé par « France » plutôt que refusé.
+- Recharger la page de commande crée encore une nouvelle commande ; seule la nouvelle tentative **sur la même page** réutilise la précédente. Les commandes abandonnées ne sont libérées que par `app:release-stale-orders`, **qui n'est planifiée nulle part** tant que la mise en ligne n'est pas faite.
+- Pas de verrou sur le stock ; 4 erreurs ESLint préexistantes ; le contrôle du hachage EasyAdmin est un script, pas encore un test automatisé.

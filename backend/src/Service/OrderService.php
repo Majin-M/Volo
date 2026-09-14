@@ -25,6 +25,7 @@ namespace App\Service;
 use App\Entity\Order;
 use App\Entity\OrderItem;
 use App\Entity\Product;
+use App\Http\JsonBody;
 use App\Repository\ProductRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -94,8 +95,11 @@ class OrderService
                 if (!is_array($itemData)) {
                     throw new \InvalidArgumentException('Format d\'item invalide.');
                 }
-                $productId = isset($itemData['productId']) ? (int) $itemData['productId'] : 0;
-                $quantity = isset($itemData['quantity']) ? (int) $itemData['quantity'] : 0;
+                // Entiers STRICTS : `(int)` convertissait silencieusement "12,50" en 12
+                // et `true` en 1 — une commande de 12 unites acceptee pour une saisie
+                // invalide. Seuls un entier JSON ou une chaine de chiffres passent.
+                $productId = JsonBody::int($itemData['productId'] ?? null) ?? 0;
+                $quantity = JsonBody::int($itemData['quantity'] ?? null) ?? 0;
 
                 if ($productId <= 0) {
                     throw new \InvalidArgumentException('Identifiant produit invalide.');

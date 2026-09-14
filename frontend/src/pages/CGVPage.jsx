@@ -22,6 +22,8 @@ Exemple d'utilisation :
 import { Helmet } from 'react-helmet-async';
 import styles from './LegalPage.module.css';
 
+import { SITE, EDITEUR, MEDIATEUR } from '../config/legalIdentity';
+import LegalPreproductionNotice from '../components/LegalPreproductionNotice';
 const CGVPage = () => (
     <div className={styles.container}>
         <Helmet>
@@ -34,20 +36,20 @@ const CGVPage = () => (
 
         <h1 className={styles.pageTitle}>Conditions generales de vente</h1>
         <p className={styles.lastUpdated}>Derniere mise a jour : 2 septembre 2026</p>
+        <LegalPreproductionNotice />
 
         <div className={styles.content}>
             <h2>1. Objet et champ d'application</h2>
             <p>
                 Les presentes Conditions Generales de Vente (CGV) regissent l'ensemble des
-                ventes de produits cosmetiques effectuees sur le site volo-skin.fr, edite par
-                VOLO SAS, au capital de 10 000 euros, immatriculee au RCS de Paris sous le
-                numero 123 456 789 (a completer), dont le siege social est situe au 12 rue de
-                la Paix, 75001 Paris, France.
+                ventes de produits cosmetiques effectuees sur le site {SITE.domaine}, edite par
+                {' '}{EDITEUR.raisonSociale}, au capital de {EDITEUR.capital}, immatriculee au RCS de {EDITEUR.villeRcs} sous le
+                numero {EDITEUR.numeroRcs}, dont le siege social est situe au {EDITEUR.siege}.
             </p>
             <p>
                 Toute commande passee sur le site implique l'acceptation pleine et entiere des
                 presentes CGV. Le client reconnait en avoir pris connaissance avant la validation
-                de sa commande. VOLO SAS se reserve le droit de modifier les presentes CGV a tout
+                de sa commande. {EDITEUR.raisonSociale} se reserve le droit de modifier les presentes CGV a tout
                 moment ; les conditions applicables sont celles en vigueur a la date de la
                 commande.
             </p>
@@ -75,7 +77,7 @@ const CGVPage = () => (
                 produit, seule la description fait foi.
             </p>
             <p>
-                VOLO SAS se reserve le droit de modifier l'assortiment de produits a tout
+                {EDITEUR.raisonSociale} se reserve le droit de modifier l'assortiment de produits a tout
                 moment. En cas d'indisponibilite d'un produit apres passation de la commande,
                 le client sera informe dans les meilleurs delais et pourra choisir entre un
                 produit de substitution de qualite et prix equivalents ou le remboursement
@@ -89,12 +91,12 @@ const CGVPage = () => (
                 de la commande.
             </p>
             <p>
-                VOLO SAS se reserve le droit de modifier ses prix a tout moment. Les produits
+                {EDITEUR.raisonSociale} se reserve le droit de modifier ses prix a tout moment. Les produits
                 seront factures au tarif en vigueur lors de la validation de la commande par le
                 client.
             </p>
             <p>
-                En cas d'erreur manifeste de prix (prix derisoire, prix aberrant), VOLO SAS se
+                En cas d'erreur manifeste de prix (prix derisoire, prix aberrant), {EDITEUR.raisonSociale} se
                 reserve le droit d'annuler la commande, meme apres confirmation, et d'en
                 informer le client.
             </p>
@@ -121,7 +123,7 @@ const CGVPage = () => (
                 l'exigibilite des sommes dues.
             </p>
             <p>
-                VOLO SAS se reserve le droit de refuser toute commande pour un motif legitime,
+                {EDITEUR.raisonSociale} se reserve le droit de refuser toute commande pour un motif legitime,
                 notamment en cas de commande anormale, de mauvaise foi du client ou de litige
                 existant.
             </p>
@@ -139,7 +141,7 @@ const CGVPage = () => (
             <p>
                 Les donnees de paiement sont traitees directement par Stripe, certifie PCI DSS
                 niveau 1 (plus haut niveau de certification de securite des paiements). Les
-                numeros de carte bancaire ne transitent jamais par les serveurs de VOLO SAS et
+                numeros de carte bancaire ne transitent jamais par les serveurs de {EDITEUR.raisonSociale} et
                 ne sont jamais stockes par nos soins.
             </p>
             <p>
@@ -171,7 +173,7 @@ const CGVPage = () => (
             </p>
             <p>
                 Les delais de livraison sont communiques a titre indicatif lors de la validation
-                de la commande. VOLO SAS s'engage a livrer dans un delai maximum de 30 jours a
+                de la commande. {EDITEUR.raisonSociale} s'engage a livrer dans un delai maximum de 30 jours a
                 compter de la validation du paiement, conformement a l'article L216-1 du Code
                 de la consommation.
             </p>
@@ -185,7 +187,7 @@ const CGVPage = () => (
             <p>
                 Le client est tenu de verifier l'etat de l'emballage et des produits a la
                 reception. En cas de dommage constate, le client doit emettre des reserves
-                aupres du transporteur et en informer VOLO SAS dans un delai de 3 jours
+                aupres du transporteur et en informer {EDITEUR.raisonSociale} dans un delai de 3 jours
                 ouvrables suivant la livraison.
             </p>
 
@@ -203,8 +205,8 @@ const CGVPage = () => (
                 moyen d'une declaration denouee de toute ambiguite, par exemple en utilisant le
                 formulaire de retractation figurant en annexe des presentes CGV, en l'adressant
                 par email a{' '}
-                <a href="mailto:contact@volo-skin.fr">contact@volo-skin.fr</a> ou par courrier
-                a VOLO SAS, 12 rue de la Paix, 75001 Paris, avant l'expiration du delai de 14
+                <a href={`mailto:${EDITEUR.email}`}>{EDITEUR.email}</a> ou par courrier
+                a {EDITEUR.raisonSociale}, {EDITEUR.siege}, avant l'expiration du delai de 14
                 jours.
             </p>
 
@@ -248,8 +250,8 @@ const CGVPage = () => (
             </p>
             <div style={{ fontStyle: 'italic', background: '#FAF5EF', padding: '16px', borderRadius: '6px', border: '1px solid #E9D7C3' }}>
                 <p style={{ margin: '0 0 8px 0' }}>
-                    A l'attention de VOLO SAS, 12 rue de la Paix, 75001 Paris —{' '}
-                    <a href="mailto:contact@volo-skin.fr">contact@volo-skin.fr</a>
+                    A l'attention de {EDITEUR.raisonSociale}, {EDITEUR.siege} —{' '}
+                    <a href={`mailto:${EDITEUR.email}`}>{EDITEUR.email}</a>
                 </p>
                 <p style={{ margin: '0 0 8px 0' }}>
                     Je vous notifie par la presente ma retractation du contrat portant sur la vente
@@ -287,9 +289,9 @@ const CGVPage = () => (
                 </li>
             </ul>
             <p>
-                Pour faire valoir ses garanties, le client doit informer VOLO SAS du defaut de
+                Pour faire valoir ses garanties, le client doit informer {EDITEUR.raisonSociale} du defaut de
                 conformite ou du vice cache par email a{' '}
-                <a href="mailto:contact@volo-skin.fr">contact@volo-skin.fr</a>.
+                <a href={`mailto:${EDITEUR.email}`}>{EDITEUR.email}</a>.
             </p>
 
             <h2>10. Responsabilite</h2>
@@ -300,13 +302,13 @@ const CGVPage = () => (
                 chaque fiche produit et sur l'emballage.
             </p>
             <p>
-                VOLO SAS ne saurait etre tenue responsable en cas de mauvaise utilisation du
+                {EDITEUR.raisonSociale} ne saurait etre tenue responsable en cas de mauvaise utilisation du
                 produit, de non-respect des precautions d'emploi, ou de reaction allergique
                 individuelle. Il est recommande au client d'effectuer un test cutane avant la
                 premiere utilisation de tout nouveau produit cosmetique.
             </p>
             <p>
-                La responsabilite de VOLO SAS ne saurait etre engagee pour l'ensemble des
+                La responsabilite de {EDITEUR.raisonSociale} ne saurait etre engagee pour l'ensemble des
                 inconvenients ou dommages inherents a l'utilisation du reseau Internet,
                 notamment une rupture de service, une intrusion exterieure ou la presence de
                 virus informatiques.
@@ -314,7 +316,7 @@ const CGVPage = () => (
 
             <h2>11. Force majeure</h2>
             <p>
-                VOLO SAS ne pourra etre tenue responsable de l'inexecution totale ou partielle
+                {EDITEUR.raisonSociale} ne pourra etre tenue responsable de l'inexecution totale ou partielle
                 de ses obligations au titre du contrat si cette inexecution est imputable au
                 client, au fait imprevisible et insurmontable d'un tiers au contrat, ou a un
                 cas de force majeure tel que defini par l'article 1218 du Code civil,
@@ -336,12 +338,12 @@ const CGVPage = () => (
                 Pour toute question, information ou reclamation, le service client est joignable :
             </p>
             <ul>
-                <li>Par email : <a href="mailto:contact@volo-skin.fr">contact@volo-skin.fr</a></li>
-                <li>Par courrier : VOLO SAS, 12 rue de la Paix, 75001 Paris, France</li>
+                <li>Par email : <a href={`mailto:${EDITEUR.email}`}>{EDITEUR.email}</a></li>
+                <li>Par courrier : {EDITEUR.raisonSociale}, {EDITEUR.siege}</li>
                 <li>Via le formulaire de contact du site</li>
             </ul>
             <p>
-                VOLO SAS s'engage a traiter toute reclamation dans un delai de 30 jours
+                {EDITEUR.raisonSociale} s'engage a traiter toute reclamation dans un delai de 30 jours
                 ouvrables a compter de sa reception.
             </p>
 
@@ -355,9 +357,9 @@ const CGVPage = () => (
                 Le mediateur competent est :
             </p>
             <ul>
-                <li><strong>Nom :</strong> [Nom du mediateur de la consommation — a completer]</li>
-                <li><strong>Adresse :</strong> [Adresse du mediateur — a completer]</li>
-                <li><strong>Site :</strong> [URL du mediateur — a completer]</li>
+                <li><strong>Nom :</strong> {MEDIATEUR.nom}</li>
+                <li><strong>Adresse :</strong> {MEDIATEUR.adresse}</li>
+                <li><strong>Site :</strong> <a href={MEDIATEUR.siteWeb} target="_blank" rel="noopener noreferrer">{MEDIATEUR.siteWeb}</a></li>
             </ul>
             <p>
                 Le client peut egalement deposer sa reclamation sur la plateforme europeenne de
@@ -369,10 +371,10 @@ const CGVPage = () => (
 
             <h2>15. Propriete intellectuelle</h2>
             <p>
-                L'ensemble des elements du site volo-skin.fr (textes, images, logos, marques,
+                L'ensemble des elements du site {SITE.domaine} (textes, images, logos, marques,
                 graphismes, logiciels, base de donnees) est protege par le droit de la propriete
                 intellectuelle. Toute reproduction, representation ou diffusion, totale ou
-                partielle, sans autorisation ecrite prealable de VOLO SAS, est interdite et
+                partielle, sans autorisation ecrite prealable de {EDITEUR.raisonSociale}, est interdite et
                 constitue une contrefacon sanctionnee par les articles L335-2 et suivants du
                 Code de la propriete intellectuelle.
             </p>

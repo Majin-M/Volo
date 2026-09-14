@@ -47,6 +47,7 @@ Configuration requise :
 namespace App\Controller;
 
 use App\Http\ApiError;
+use App\Http\JsonBody;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\PasswordValidator;
@@ -144,16 +145,25 @@ class AuthController extends AbstractController
             return ApiError::response('Trop de tentatives. Veuillez réessayer plus tard.', 429);
         }
 
-        $data = json_decode($request->getContent(), true);
+        // Chaque champ doit etre une CHAINE : un tableau atteignait trim() et
+        // levait un TypeError, donc un 500 (audit du 14/09/2026, cf. JsonBody).
+        $data = JsonBody::decode($request) ?? [];
+        $email = JsonBody::string($data['email'] ?? null);
+        $password = JsonBody::string($data['password'] ?? null);
 
-        if (empty($data['email']) || empty($data['password'])) {
+        if ($email === null || trim($email) === '' || $password === null || $password === '') {
             return ApiError::response('Email et mot de passe requis.', 400);
         }
 
-        $email = trim($data['email']);
-        $password = $data['password'];
-        $firstName = strip_tags(trim($data['firstName'] ?? ''));
-        $lastName = strip_tags(trim($data['lastName'] ?? ''));
+        // Au-dela de 4096 caracteres, le hacheur de Symfony leve une exception
+        // au lieu de hacher : sans cette borne, un mot de passe geant rendait 500.
+        if (mb_strlen($password) > 4096) {
+            return ApiError::response('Le mot de passe est trop long.', 400);
+        }
+
+        $email = trim($email);
+        $firstName = strip_tags(trim(JsonBody::string($data['firstName'] ?? null) ?? ''));
+        $lastName = strip_tags(trim(JsonBody::string($data['lastName'] ?? null) ?? ''));
 
         if (mb_strlen($firstName) > 255) {
             return ApiError::response('Le prenom est trop long (max 255 caracteres).', 400);
@@ -221,9 +231,10 @@ class AuthController extends AbstractController
             return ApiError::response('Trop de tentatives. Veuillez réessayer dans quelques minutes.', 429);
         }
 
-        $data = json_decode($request->getContent(), true);
-        $email = trim($data['email'] ?? $data['username'] ?? '');
-        $password = $data['password'] ?? null;
+        // Chaines seulement : un tableau atteignait trim() -> TypeError (500).
+        $data = JsonBody::decode($request) ?? [];
+        $email = trim(JsonBody::string($data['email'] ?? null) ?? JsonBody::string($data['username'] ?? null) ?? '');
+        $password = JsonBody::string($data['password'] ?? null);
 
         if (!$email || !$password) {
             return ApiError::response('Email et mot de passe requis.', 400);
@@ -346,15 +357,23 @@ class AuthController extends AbstractController
             return ApiError::response('Trop de tentatives. Veuillez reessayer plus tard.', 429);
         }
 
-        $data = json_decode($request->getContent(), true);
+        $data = JsonBody::decode($request);
 
-        if (!$data) {
+        if ($data === null || $data === []) {
             return ApiError::response('Format JSON invalide.', 400);
+        }
+
+        // Tous les champs modifiables sont des chaines. Un tableau atteignait
+        // trim() et levait un TypeError (500) : on le refuse d'emblee en 400.
+        foreach (['firstName', 'lastName', 'currentPassword', 'newPassword'] as $champ) {
+            if (isset($data[$champ]) && JsonBody::string($data[$champ]) === null) {
+                return ApiError::response(sprintf('Le champ %s doit etre une chaine de caracteres.', $champ), 400);
+            }
         }
 
         // Mise a jour du prenom
         if (isset($data['firstName'])) {
-            $firstName = strip_tags(trim($data['firstName']));
+            $firstName = strip_tags(trim(JsonBody::string($data['firstName']) ?? ''));
             if ($firstName === '') {
                 return ApiError::response('Le prénom ne peut pas être vide.', 400);
             }
@@ -366,7 +385,7 @@ class AuthController extends AbstractController
 
         // Mise a jour du nom
         if (isset($data['lastName'])) {
-            $lastName = strip_tags(trim($data['lastName']));
+            $lastName = strip_tags(trim(JsonBody::string($data['lastName']) ?? ''));
             if ($lastName === '') {
                 return ApiError::response('Le nom ne peut pas être vide.', 400);
             }
@@ -378,20 +397,28 @@ class AuthController extends AbstractController
 
         // Changement de mot de passe (necessite le mot de passe actuel)
         if (isset($data['newPassword'])) {
-            if (empty($data['currentPassword'])) {
+            $nouveau = JsonBody::string($data['newPassword']) ?? '';
+            $actuel = JsonBody::string($data['currentPassword'] ?? null) ?? '';
+
+            if ($actuel === '') {
                 return ApiError::response('Le mot de passe actuel est requis pour en définir un nouveau.', 400);
             }
 
-            if (!$this->passwordHasher->isPasswordValid($user, $data['currentPassword'])) {
+            if (!$this->passwordHasher->isPasswordValid($user, $actuel)) {
                 return ApiError::response('Mot de passe actuel incorrect.', 400);
             }
 
-            $passwordErrors = $this->passwordValidator->validate($data['newPassword']);
+            // Au-dela de 4096 caracteres, le hacheur leve une exception (500).
+            if (mb_strlen($nouveau) > 4096) {
+                return ApiError::response('Le mot de passe est trop long.', 400);
+            }
+
+            $passwordErrors = $this->passwordValidator->validate($nouveau);
             if (!empty($passwordErrors)) {
                 return ApiError::response(implode(' ', $passwordErrors), 400);
             }
 
-            $user->setPassword($this->passwordHasher->hashPassword($user, $data['newPassword']));
+            $user->setPassword($this->passwordHasher->hashPassword($user, $nouveau));
         }
 
         $this->entityManager->flush();

@@ -31,6 +31,7 @@ import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../contexts/AuthContext';
 import styles from './AccountPage.module.css';
 
+import PasswordInput from '../components/PasswordInput';
 const initialState = {
     isEditing: false,
     firstName: '',
@@ -238,9 +239,8 @@ const AccountPage = () => {
                                         <label className={styles.formLabel} htmlFor="edit-currentPassword">
                                             Mot de passe actuel
                                         </label>
-                                        <input
+                                        <PasswordInput
                                             id="edit-currentPassword"
-                                            type="password"
                                             className={styles.formInput}
                                             value={state.currentPassword}
                                             onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'currentPassword', value: e.target.value })}
@@ -251,9 +251,8 @@ const AccountPage = () => {
                                         <label className={styles.formLabel} htmlFor="edit-newPassword">
                                             Nouveau mot de passe
                                         </label>
-                                        <input
+                                        <PasswordInput
                                             id="edit-newPassword"
-                                            type="password"
                                             className={styles.formInput}
                                             value={state.newPassword}
                                             onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'newPassword', value: e.target.value })}
@@ -264,9 +263,8 @@ const AccountPage = () => {
                                         <label className={styles.formLabel} htmlFor="edit-confirmPassword">
                                             Confirmer le mot de passe
                                         </label>
-                                        <input
+                                        <PasswordInput
                                             id="edit-confirmPassword"
-                                            type="password"
                                             className={styles.formInput}
                                             value={state.confirmPassword}
                                             onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'confirmPassword', value: e.target.value })}

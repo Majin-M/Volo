@@ -78,34 +78,44 @@ const CheckoutPage = () => {
                 quantity: item.quantity
             }));
 
-            // --- ETAPE 1 : Creer la commande ---
-            const orderResponse = await apiCall('/orders', {
-                method: 'POST',
-                body: JSON.stringify({
-                    items: itemsPayload,
-                    shippingAddress: shippingAddress
-                })
-            });
+            // --- ETAPE 1 : Creer la commande, UNE SEULE FOIS ---
+            // Si l'etape 2 echouait (reseau, prestataire), le bouton se
+            // reactivait et un nouveau clic creait une SECONDE commande : la
+            // premiere restait en attente, son stock reserve pour rien. La
+            // commande deja creee est donc reutilisee ; POST /api/payments est
+            // idempotent et renverra le meme paiement s'il existe deja.
+            if (!orderIdRef.current) {
+                const orderResponse = await apiCall('/orders', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        items: itemsPayload,
+                        shippingAddress: shippingAddress
+                    })
+                });
 
-            const newOrderId = orderResponse.data.id;
-            const orderReference = orderResponse.data.reference;
+                const newOrderId = orderResponse.data.id;
+                const orderReference = orderResponse.data.reference;
 
-            if (!newOrderId) {
-                throw new Error("Impossible de recuperer l'identifiant de la commande.");
+                if (!newOrderId) {
+                    throw new Error("Impossible de recuperer l'identifiant de la commande.");
+                }
+
+                orderIdRef.current = { id: newOrderId, reference: orderReference };
             }
-
-            orderIdRef.current = { id: newOrderId, reference: orderReference };
 
             // --- ETAPE 2 : Initialiser le paiement avec l'orderId ---
             const paymentResponse = await apiCall('/payments', {
                 method: 'POST',
-                body: JSON.stringify({ orderId: newOrderId }),
+                body: JSON.stringify({ orderId: orderIdRef.current.id }),
             });
 
             setClientSecret(paymentResponse.data.clientSecret);
 
-        } catch {
-            setError("Erreur lors de l'initialisation du paiement.");
+        } catch (err) {
+            // Le message du serveur est affiche quand il existe : « Stock
+            // insuffisant pour ... » dit au client quoi faire, le message
+            // generique ne lui disait rien.
+            setError(err?.message || "Erreur lors de l'initialisation du paiement.");
         } finally {
             setLoading(false);
         }
