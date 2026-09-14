@@ -732,5 +732,38 @@ Deux défauts **silencieux** en plus, sans erreur 500 :
 **Limites restantes, assumées** :
 
 - Un pays d'adresse non textuel est remplacé par « France » plutôt que refusé.
-- Recharger la page de commande crée encore une nouvelle commande ; seule la nouvelle tentative **sur la même page** réutilise la précédente. Les commandes abandonnées ne sont libérées que par `app:release-stale-orders`, **qui n'est planifiée nulle part** tant que la mise en ligne n'est pas faite.
+- ~~Recharger la page de commande crée encore une nouvelle commande~~ et ~~`app:release-stale-orders` n'est planifiée nulle part~~ : **corrigés**, voir la section suivante.
 - Pas de verrou sur le stock ; 4 erreurs ESLint préexistantes ; le contrôle du hachage EasyAdmin est un script, pas encore un test automatisé.
+
+## ✅ Commandes dupliquées au rechargement, paniers abandonnés jamais libérés
+
+> **Correction du 14/09/2026.**
+
+**Constat** : chaque `POST /api/orders` créait une commande et **réservait son stock**. Recharger la page de paiement, cliquer deux fois ou ouvrir deux onglets produisait donc plusieurs commandes `pending` pour un même panier, chacune immobilisant ses unités. La commande censée les libérer, `app:release-stale-orders`, existait et fonctionnait — mais **rien ne la lançait** : ni cron, ni service Docker. En production, un produit aurait pu s'afficher en rupture sans avoir été vendu.
+
+**Correction** :
+
+- `OrderService::createOrder` cherche d'abord une commande `pending` du **même client**, créée depuis moins de **30 minutes**, avec **exactement** les mêmes produits et quantités (agrégées par produit : deux lignes « 1 + 1 » valent une ligne « 2 »). Si elle existe, elle est renvoyée avec l'adresse mise à jour, **sans toucher au stock**. Sinon, création normale.
+- La fenêtre de 30 minutes est **plus courte** que le délai d'annulation (60 minutes) : on ne renvoie jamais une commande sur le point d'être annulée par le balayage.
+- Nouveau service Docker `scheduler` : même image que le backend, il lance `app:release-stale-orders --minutes=60` toutes les 15 minutes (`SWEEP_INTERVAL_SECONDS`), journalise chaque passage et ne s'arrête pas si un passage échoue.
+- `app:release-stale-orders` ferme désormais aussi le paiement en attente chez Stripe avant d'annuler (`PaymentCancellationService`) : sans cela, un client revenant payer une commande balayée aurait été débité pour une commande annulée — cas que le webhook rembourse, mais qu'il vaut mieux ne pas provoquer.
+
+**Ce qui n'est volontairement pas réutilisé** : une commande payée, une commande d'un autre client, une commande plus ancienne que 30 minutes, un panier différent. Un visiteur non connecté ne peut pas commander (`POST /api/orders` exige l'authentification), la question ne se pose donc pas pour lui.
+
+**Vérifié** :
+
+| Vérification | Résultat |
+|---|---|
+| `OrderReuseTest` (nouveau, 7 tests) | Même panier → même commande, stock réservé une fois ; adresse mise à jour ; quantités agrégées ; panier différent, commande trop ancienne, commande payée, commande d'un autre client → nouvelle commande |
+| Sur la pile Docker, par l'API | Commande #24 (stock 63 → 61) ; renvoi identique → **même** #24, rue mise à jour, stock toujours 61 ; quantité différente → nouvelle #25 |
+| Balayage **dans le conteneur `scheduler`** | Commande en attente vieillie de 70 minutes → `cancelled`, stock 61 → 63 |
+| Conteneur `scheduler` en fonctionnement | Passages journalisés toutes les 15 minutes (`docker compose logs scheduler`) |
+| Suite PHPUnit | **117 tests, 280 assertions**, verte |
+| PHPStan `level: max` | 0 erreur ; baseline 77 → 76 |
+| Base Docker | Restaurée depuis la sauvegarde prise avant les essais ; aucun compte de test restant |
+
+**Limites** :
+
+- Deux requêtes **strictement simultanées** peuvent encore créer deux commandes : la recherche et la création ne sont pas verrouillées. Le rechargement et le double clic, eux, arrivent l'un après l'autre et sont couverts.
+- Le service `scheduler` est une boucle `sleep`, pas un ordonnanceur : un passage manqué pendant un redémarrage est simplement rattrapé au suivant, ce qui suffit pour un balayage idempotent.
+- La **sauvegarde** de la base, elle, reste à planifier sur l'hôte (cron lançant `scripts/backup-db.sh`).

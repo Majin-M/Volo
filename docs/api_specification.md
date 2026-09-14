@@ -539,6 +539,8 @@ Création d'une commande depuis le panier.
 
 **Règles** (toute violation → `400`) : `items` est une liste non vide ; `productId` et `quantity` sont des entiers stricts, la quantité entre 1 et 1 000 ; le produit doit exister, être disponible et avoir assez de stock. `street`, `city` et `postalCode` sont obligatoires ; `country` vaut `France` s'il est absent — ou s'il n'est pas une chaîne, ce qui est un laxisme connu. Le total est **recalculé côté serveur** : un prix envoyé par le client est ignoré.
 
+> **Commande identique réutilisée (14/09/2026).** Si le client a déjà, depuis moins de **30 minutes**, une commande `pending` contenant exactement les mêmes produits et quantités (agrégées par produit), la route **renvoie cette commande**, adresse mise à jour, au lieu d'en créer une seconde — et le stock n'est **pas** réservé une seconde fois. Recharger la page, cliquer deux fois ou ouvrir deux onglets ne duplique donc plus la commande. Le code reste `201`. La fenêtre de 30 minutes est volontairement plus courte que le délai d'annulation automatique (60 minutes), pour ne jamais renvoyer une commande sur le point d'être annulée.
+
 **Réponse 201** (forme réelle, relevée le 14/09/2026) :
 ```json
 {

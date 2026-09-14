@@ -36,7 +36,11 @@ Exemple d'utilisation :
     php bin/console app:release-stale-orders --dry-run
     php bin/console app:release-stale-orders --minutes=30
 
-Cron conseille (toutes les 15 minutes) :
+Planification :
+    Dans la pile Docker, le service `scheduler` (docker-compose.yml) la lance
+    toutes les 15 minutes. Avant ce service, elle n'etait planifiee NULLE
+    PART : les paniers abandonnes immobilisaient leur stock indefiniment.
+    Hors Docker (XAMPP), la lancer a la main, ou via cron :
     *\/15 * * * * php /chemin/bin/console app:release-stale-orders
 ===============================================================================
 */

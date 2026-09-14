@@ -25,37 +25,60 @@ namespace App\Service;
 use App\Entity\Order;
 use App\Entity\OrderItem;
 use App\Entity\Product;
+use App\Entity\User;
+use App\Enum\OrderStatus;
 use App\Http\JsonBody;
+use App\Repository\OrderRepository;
 use App\Repository\ProductRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 class OrderService
 {
+    /**
+     * Fenetre pendant laquelle une commande en attente identique est
+     * reutilisee plutot que dupliquee.
+     *
+     * Elle doit rester PLUS COURTE que le delai du balayage des paniers
+     * abandonnes (app:release-stale-orders, 60 minutes) : sinon on renverrait
+     * au client une commande sur le point d'etre annulee sous ses yeux.
+     */
+    private const FENETRE_REUTILISATION_MINUTES = 30;
+
     private EntityManagerInterface $entityManager;
     private ProductRepository $productRepository;
+    private OrderRepository $orderRepository;
 
     public function __construct(
         EntityManagerInterface $entityManager,
-        ProductRepository $productRepository
+        ProductRepository $productRepository,
+        OrderRepository $orderRepository,
     ) {
         $this->entityManager = $entityManager;
         $this->productRepository = $productRepository;
+        $this->orderRepository = $orderRepository;
     }
 
     /**
-     * Crée une commande et ses items.
+     * Crée une commande et ses items — ou renvoie la commande en attente identique.
      *
-     * @param array $orderData Données JSON reçues (items, shippingAddress)
+     * Recharger la page de commande, cliquer deux fois ou ouvrir deux onglets
+     * creait auparavant une nouvelle commande a chaque fois, chacune reservant
+     * du stock jusqu'au balayage. Si le client a deja, depuis moins de
+     * FENETRE_REUTILISATION_MINUTES, une commande en attente contenant
+     * exactement les memes produits et quantites, elle est renvoyee (adresse
+     * mise a jour) et le stock n'est PAS reserve une seconde fois.
+     *
+     * D'ou l'ordre des etapes : valider le format, chercher la commande
+     * identique, et seulement ensuite verifier et reserver le stock — sinon
+     * une commande deja reservee paraitrait manquer de stock pour elle-meme.
+     *
+     * @param array<mixed> $orderData Données JSON reçues (items, shippingAddress)
      * @param object $user L'utilisateur connecté (User)
-     * @return Order L'entité Order créée
-     * @throws \InvalidArgumentException Si un produit n'existe pas
+     * @return Order La commande créée, ou la commande en attente identique
+     * @throws \InvalidArgumentException Si les données sont invalides ou le stock insuffisant
      */
     public function createOrder(array $orderData, object $user): Order
     {
-        $order = new Order();
-        $order->setUser($user);
-        $order->setStatus(\App\Enum\OrderStatus::PENDING);
-
         // 1. Traitement de l'adresse de livraison
         //
         // L'adresse est OBLIGATOIRE : les colonnes street/city/postalCode de
@@ -82,6 +105,53 @@ class OrderService
             throw new \InvalidArgumentException('Un champ de l\'adresse depasse la longueur maximale autorisee.');
         }
 
+        // 2. Lignes demandees : format valide AVANT tout acces au stock.
+        if (!isset($orderData['items']) || !is_array($orderData['items']) || $orderData['items'] === []) {
+            throw new \InvalidArgumentException("La liste des items est manquante ou invalide.");
+        }
+
+        /** @var list<array{0: int, 1: int}> $lignes */
+        $lignes = [];
+        foreach ($orderData['items'] as $itemData) {
+            if (!is_array($itemData)) {
+                throw new \InvalidArgumentException('Format d\'item invalide.');
+            }
+            // Entiers STRICTS : `(int)` convertissait silencieusement "12,50" en 12
+            // et `true` en 1 — une commande de 12 unites acceptee pour une saisie
+            // invalide. Seuls un entier JSON ou une chaine de chiffres passent.
+            $productId = JsonBody::int($itemData['productId'] ?? null) ?? 0;
+            $quantity = JsonBody::int($itemData['quantity'] ?? null) ?? 0;
+
+            if ($productId <= 0) {
+                throw new \InvalidArgumentException('Identifiant produit invalide.');
+            }
+            if ($quantity <= 0 || $quantity > 1000) {
+                throw new \InvalidArgumentException('La quantite doit etre comprise entre 1 et 1000.');
+            }
+
+            $lignes[] = [$productId, $quantity];
+        }
+
+        // 3. Commande en attente identique : on la renvoie, sans reserver le
+        // stock une seconde fois. Seule l'adresse, peut-etre corrigee par le
+        // client entre-temps, est mise a jour.
+        if ($user instanceof User) {
+            $existante = $this->trouverCommandeIdentique($user, $lignes);
+            if ($existante !== null) {
+                $existante->setStreet($street);
+                $existante->setCity($city);
+                $existante->setPostalCode($postalCode);
+                $existante->setCountry($country);
+                $this->entityManager->flush();
+
+                return $existante;
+            }
+        }
+
+        // 4. Nouvelle commande : disponibilite, stock, reservation.
+        $order = new Order();
+        $order->setUser($user);
+        $order->setStatus(OrderStatus::PENDING);
         $order->setStreet($street);
         $order->setCity($city);
         $order->setPostalCode($postalCode);
@@ -89,78 +159,105 @@ class OrderService
 
         $totalAmount = 0;
 
-        // 2. Traitement des items (produits)
-        if (isset($orderData['items']) && is_array($orderData['items'])) {
-            foreach ($orderData['items'] as $itemData) {
-                if (!is_array($itemData)) {
-                    throw new \InvalidArgumentException('Format d\'item invalide.');
-                }
-                // Entiers STRICTS : `(int)` convertissait silencieusement "12,50" en 12
-                // et `true` en 1 — une commande de 12 unites acceptee pour une saisie
-                // invalide. Seuls un entier JSON ou une chaine de chiffres passent.
-                $productId = JsonBody::int($itemData['productId'] ?? null) ?? 0;
-                $quantity = JsonBody::int($itemData['quantity'] ?? null) ?? 0;
+        foreach ($lignes as [$productId, $quantity]) {
+            $product = $this->productRepository->find($productId);
 
-                if ($productId <= 0) {
-                    throw new \InvalidArgumentException('Identifiant produit invalide.');
-                }
-                if ($quantity <= 0 || $quantity > 1000) {
-                    throw new \InvalidArgumentException('La quantite doit etre comprise entre 1 et 1000.');
-                }
-
-                // Vérifier si le produit existe
-                $product = $this->productRepository->find($productId);
-
-                if (!$product) {
-                    throw new \InvalidArgumentException("Le produit avec l'ID $productId n'existe pas.");
-                }
-
-                if (!$product->isAvailable()) {
-                    throw new \InvalidArgumentException("Le produit {$product->getName()} n'est pas disponible.");
-                }
-
-                if ($product->getStock() < $quantity) {
-                    throw new \InvalidArgumentException(sprintf(
-                        'Stock insuffisant pour "%s" : %d demande(s), %d disponible(s).',
-                        $product->getName(),
-                        $quantity,
-                        $product->getStock(),
-                    ));
-                }
-
-                $product->decrementStock($quantity);
-
-                // Calcul du prix de la ligne
-                $unitPrice = (float) $product->getPrice();
-                $lineTotal = $unitPrice * $quantity;
-                $totalAmount += $lineTotal;
-
-                // Création de l'OrderItem
-                $orderItem = new OrderItem();
-                $orderItem->setOrderEntity($order);
-                $orderItem->setProduct($product);
-                $orderItem->setQuantity($quantity);
-                $orderItem->setUnitPrice(number_format($unitPrice, 2, '.', ''));
-                $orderItem->setProductName($product->getName());
-
-                $order->addItem($orderItem);
+            if (!$product) {
+                throw new \InvalidArgumentException("Le produit avec l'ID $productId n'existe pas.");
             }
-        } else {
-            throw new \InvalidArgumentException("La liste des items est manquante ou invalide.");
+
+            if (!$product->isAvailable()) {
+                throw new \InvalidArgumentException("Le produit {$product->getName()} n'est pas disponible.");
+            }
+
+            if ($product->getStock() < $quantity) {
+                throw new \InvalidArgumentException(sprintf(
+                    'Stock insuffisant pour "%s" : %d demande(s), %d disponible(s).',
+                    $product->getName(),
+                    $quantity,
+                    $product->getStock(),
+                ));
+            }
+
+            $product->decrementStock($quantity);
+
+            // Calcul du prix de la ligne
+            $unitPrice = (float) $product->getPrice();
+            $totalAmount += $unitPrice * $quantity;
+
+            // Création de l'OrderItem
+            $orderItem = new OrderItem();
+            $orderItem->setOrderEntity($order);
+            $orderItem->setProduct($product);
+            $orderItem->setQuantity($quantity);
+            $orderItem->setUnitPrice(number_format($unitPrice, 2, '.', ''));
+            $orderItem->setProductName($product->getName());
+
+            $order->addItem($orderItem);
         }
 
-        // 3. Définir le total de la commande
+        // 5. Définir le total de la commande
         if ($totalAmount == 0) {
             throw new \InvalidArgumentException("Le montant total de la commande ne peut pas être de zéro.");
         }
-        
+
         $order->setTotal(number_format($totalAmount, 2, '.', ''));
 
-        // 4. Persistance
+        // 6. Persistance
         $this->entityManager->persist($order);
         $this->entityManager->flush();
 
         return $order;
+    }
+
+    /**
+     * Commande en attente recente du client, contenant exactement les memes
+     * produits et quantites que la demande.
+     *
+     * La comparaison porte sur les quantites AGREGEES par produit : deux lignes
+     * « produit 1 x1 » valent une ligne « produit 1 x2 ».
+     *
+     * @param list<array{0: int, 1: int}> $lignes Couples [identifiant produit, quantite]
+     */
+    private function trouverCommandeIdentique(User $user, array $lignes): ?Order
+    {
+        $demande = self::quantitesParProduit($lignes);
+        // Heure calculee cote PHP, comme createdAt : comparer a NOW() de MySQL
+        // introduirait le decalage de fuseau deja rencontre (PHP en UTC).
+        $depuis = new \DateTimeImmutable(sprintf('-%d minutes', self::FENETRE_REUTILISATION_MINUTES));
+
+        foreach ($this->orderRepository->findRecentPendingForUser($user, $depuis) as $candidate) {
+            $existant = [];
+            foreach ($candidate->getItems() as $item) {
+                $pid = $item->getProduct()?->getId();
+                $qty = $item->getQuantity();
+                if ($pid === null || $qty === null) {
+                    continue 2;
+                }
+                $existant[] = [$pid, $qty];
+            }
+
+            if (self::quantitesParProduit($existant) === $demande) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<array{0: int, 1: int}> $lignes
+     * @return array<int, int> Quantite totale par identifiant produit, triee par identifiant
+     */
+    private static function quantitesParProduit(array $lignes): array
+    {
+        $parProduit = [];
+        foreach ($lignes as [$productId, $quantity]) {
+            $parProduit[$productId] = ($parProduit[$productId] ?? 0) + $quantity;
+        }
+        ksort($parProduit);
+
+        return $parProduit;
     }
 
     /**

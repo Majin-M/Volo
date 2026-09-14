@@ -84,6 +84,32 @@ class OrderRepository extends ServiceEntityRepository
     }
 
     /**
+     * Commandes en attente d'un utilisateur, creees depuis une date donnee.
+     *
+     * Sert a reutiliser une commande identique au lieu d'en creer une seconde :
+     * rechargement de la page de commande, double clic, deux onglets ouverts.
+     * Chaque doublon reservait du stock pour rien jusqu'au balayage.
+     *
+     * @return Order[] Les plus recentes d'abord.
+     */
+    public function findRecentPendingForUser(User $user, \DateTimeInterface $depuis): array
+    {
+        /** @var Order[] $commandes */
+        $commandes = $this->createQueryBuilder('o')
+            ->where('o.user = :user')
+            ->andWhere('o.status = :statut')
+            ->andWhere('o.createdAt >= :depuis')
+            ->setParameter('user', $user)
+            ->setParameter('statut', OrderStatus::PENDING)
+            ->setParameter('depuis', $depuis)
+            ->orderBy('o.createdAt', 'DESC')
+            ->getQuery()
+            ->getResult();
+
+        return $commandes;
+    }
+
+    /**
      * Compte le nombre total de commandes d'un utilisateur (pour la pagination).
      */
     public function countByUser(User $user): int

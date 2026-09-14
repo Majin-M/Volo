@@ -1,33 +1,13 @@
-# =============================================================================
-# Docker Compose — VOLO (monorepo Symfony + React) — BASE DE PRODUCTION
-# =============================================================================
-# Ce fichier decrit ce qui tourne sur un serveur, et RIEN d'autre.
-# Le developpement ajoute ses outils via docker-compose.override.yml, que
-# Compose charge automatiquement a cote de celui-ci.
+# Docker Compose — VOLO, pile de production.
+# Les outils de développement (Mailpit) sont dans docker-compose.override.yml.
+# Variables : .env à la racine, modèle .env.example. Mise en route : README.md.
 #
-#   En local   : docker compose up -d --build
-#                (charge docker-compose.yml + docker-compose.override.yml)
-#   En serveur : docker compose -f docker-compose.yml up -d --build
-#                (ou COMPOSE_FILE=docker-compose.yml dans le .env du serveur)
-#
-# Configuration : le fichier .env A LA RACINE (modele : .env.example).
-#
-# Les secrets sont OBLIGATOIRES — syntaxe ${VAR:?message}. Une variable
-# absente ou vide fait echouer `docker compose` avant tout demarrage.
-# Auparavant, ${VAR:-defaut} laissait la pile demarrer avec des valeurs
-# publiees dans ce depot (APP_SECRET=change-me-in-production, passphrase JWT
-# connue) : une configuration oubliee passait inapercue. Limite a connaitre :
-# ${VAR:?} detecte une valeur MANQUANTE, pas une valeur restee a son exemple.
-#
-# Architecture :
-#   nginx (port 80)  ->  frontend (SPA React, port interne 80)
-#                    ->  backend  (PHP-FPM, port interne 9000)
-#                    ->  db       (MySQL 8.0, port interne 3306, non publie)
-# =============================================================================
+#   nginx (80) -> frontend (SPA React) | backend (PHP-FPM 9000) -> db (MySQL 8.0)
+#   scheduler  -> tâches planifiées
 
 services:
 
-  # --- Reverse proxy : point d'entree unique ---
+  # Reverse proxy : point d'entrée unique.
   nginx:
     image: nginx:alpine
     container_name: volo-nginx
@@ -38,14 +18,13 @@ services:
       - backend_public:/app/public:ro
     depends_on:
       backend:
-        # service_healthy et non service_started : Nginx demarrait avant que
-        # PHP-FPM ecoute, et les premieres requetes rendaient un 502.
+        # Attend que PHP-FPM écoute, pour éviter des 502 au démarrage.
         condition: service_healthy
       frontend:
         condition: service_started
     restart: unless-stopped
 
-  # --- Backend Symfony (PHP-FPM) ---
+  # Backend Symfony (PHP-FPM).
   backend:
     build:
       context: ./backend
@@ -53,28 +32,17 @@ services:
     container_name: volo-backend
     volumes:
       - backend_public:/app/public
-      # Les cles JWT survivent aux reconstructions d'image. Sans ce volume,
-      # chaque `docker compose build` en generait de nouvelles et invalidait
-      # tous les jetons en circulation : tous les clients deconnectes a
-      # chaque deploiement.
+      # Clés JWT conservées entre deux builds : les sessions restent valides.
       - jwt_keys:/app/config/jwt
-    environment:
+    # Ancre YAML réutilisée par `scheduler`.
+    environment: &backend-environment
       APP_ENV: prod
+      # ${VAR:?} : Compose refuse de démarrer si la variable est absente.
       APP_SECRET: ${APP_SECRET:?APP_SECRET manquant dans .env - generer avec openssl rand -hex 16}
-      # URL publique, utilisee pour les liens generes hors requete HTTP
-      # (emails, sitemap). En production : https://votre-domaine.
+      # URL publique, pour les liens générés hors requête (emails, sitemap).
       DEFAULT_URI: ${DEFAULT_URI:?DEFAULT_URI manquant dans .env}
-      # Construite depuis les memes variables que le service `db` : un seul
-      # endroit pour les identifiants, plus aucun mot de passe dans ce depot.
-      #
-      # serverVersion=8.0.0 et NON 8.0 : DBAL juge "8.0" INFERIEUR a "8.0.0"
-      # et selectionnait alors MySQLPlatform, la plateforme generique, au lieu
-      # de MySQL80Platform. 8.0.0 plutot que 8.0.46 : l'image mysql:8.0 fait
-      # evoluer le correctif, et ce plancher suffit.
+      # 8.0.0 et non 8.0 : Doctrine sélectionnerait sinon une plateforme MySQL générique.
       DATABASE_URL: mysql://${MYSQL_USER:?MYSQL_USER manquant dans .env}:${MYSQL_PASSWORD:?MYSQL_PASSWORD manquant dans .env}@db:3306/${MYSQL_DATABASE:?MYSQL_DATABASE manquant dans .env}?serverVersion=8.0.0&charset=utf8mb4
-      # Plus de valeur par defaut pointant vers Mailpit : en production,
-      # Mailpit n'existe pas, et un DSN vers `mailer` aurait fait disparaitre
-      # tous les emails sans erreur visible.
       MAILER_DSN: ${MAILER_DSN:?MAILER_DSN manquant dans .env}
       MESSENGER_TRANSPORT_DSN: doctrine://default?auto_setup=0
       ADMIN_EMAIL: ${ADMIN_EMAIL:?ADMIN_EMAIL manquant dans .env}
@@ -87,14 +55,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    # Le conteneur n'est « sain » qu'une fois php-fpm en ecoute, donc APRES
-    # que l'entrypoint a joue les migrations. C'est ce qui permet a Nginx
-    # d'attendre une application reellement prete plutot qu'un conteneur
-    # simplement demarre.
-    #
-    # Le test passe par PHP et non par `nc` : busybox ne garantit pas
-    # l'option -z, et un healthcheck qui echoue pour une raison etrangere au
-    # service est pire qu'une absence de healthcheck.
+    # Sain une fois php-fpm en écoute, donc après les migrations de l'entrypoint.
+    # Test en PHP : l'option -z de `nc` n'est pas garantie sous busybox.
     healthcheck:
       test: ["CMD", "php", "-r", "exit(@fsockopen('127.0.0.1', 9000) ? 0 : 1);"]
       interval: 10s
@@ -103,39 +65,51 @@ services:
       start_period: 60s
     restart: unless-stopped
 
-  # --- Frontend React (Vite build + Nginx) ---
+  # Tâches planifiées : annule les commandes impayées depuis plus de 60 minutes,
+  # ferme leur paiement Stripe et restitue leur stock.
+  # Une boucle suffit ici, sans ajouter Symfony Scheduler ni worker Messenger.
+  scheduler:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: volo-scheduler
+    environment: *backend-environment
+    # Entrypoint du backend court-circuité : migrations et clés JWT y sont déjà faites.
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        while true; do
+        echo "[scheduler] $$(date -u +%Y-%m-%dT%H:%M:%SZ) balayage des commandes abandonnees";
+        php bin/console app:release-stale-orders --minutes=60 --no-interaction || echo "[scheduler] ECHEC du balayage (code $$?)";
+        sleep ${SWEEP_INTERVAL_SECONDS:-900};
+        done
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Frontend React : build Vite servi par Nginx.
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # Consommee par `vite build` dans le Dockerfile. Doit etre la cle
-        # PUBLIQUE Stripe (pk_...) : elle finit dans le bundle, donc visible
-        # par le navigateur. Ne jamais y mettre la cle secrete.
-        # Obligatoire : Vite la fige AU BUILD, une valeur vide produisait un
-        # paiement mort en production sans aucune erreur au deploiement.
+        # Clé PUBLIQUE uniquement (pk_...) : Vite l'intègre au bundle au build.
         VITE_STRIPE_PUBLIC_KEY: ${STRIPE_PUBLIC_KEY:?STRIPE_PUBLIC_KEY manquant dans .env}
     container_name: volo-frontend
     restart: unless-stopped
 
-  # --- Base de donnees ---
+  # Base de données.
   db:
     image: mysql:8.0
     container_name: volo-db
     environment:
+      # Appliqués à la première initialisation du volume db_data uniquement.
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD manquant dans .env}
       MYSQL_DATABASE: ${MYSQL_DATABASE:?MYSQL_DATABASE manquant dans .env}
       MYSQL_USER: ${MYSQL_USER:?MYSQL_USER manquant dans .env}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD manquant dans .env}
-    # PIEGE : l'image mysql n'applique MYSQL_USER / MYSQL_PASSWORD /
-    # MYSQL_ROOT_PASSWORD qu'a la PREMIERE initialisation du volume db_data.
-    # Les modifier ensuite dans .env ne change PAS les comptes existants : le
-    # backend echoue alors a se connecter. Changer un mot de passe apres coup
-    # se fait dans MySQL (ALTER USER), pas dans ce fichier.
-    #
-    # AUCUN port publie sur l'hote, deliberement : `"3306:3306"` ouvrait la
-    # base de production sur Internet. Le backend l'atteint par le reseau
-    # interne de Compose. Pour l'inspecter : `docker compose exec db mysql -u root -p`.
+    # Aucun port publié : la base n'est joignable que par le réseau interne.
     volumes:
       - db_data:/var/lib/mysql
     healthcheck:

@@ -6,14 +6,14 @@
 >
 > | Ce qui est mesuré | Valeur relevée | Commande |
 > |---|---|---|
-> | Suite backend | 110 tests, 269 assertions, verts | `php bin/phpunit` |
+> | Suite backend | 117 tests, 280 assertions, verts | `php bin/phpunit` |
 > | Suite frontend | 42 tests sur 5 fichiers, verts | `npx vitest run` |
 > | Build frontend | passe | `npm run build` |
 > | PHPStan `level: max` | 0 erreur hors baseline | `vendor/bin/phpstan analyse` |
 > | ESLint | **4 erreurs** — voir réserve ci-dessous | `npx eslint src` |
 > | React Doctor 0.9.12 | **94/100**, 2 avertissements | `npm run doctor` |
 >
-> **Couverture backend, par fichier** : `AuthControllerTest` (inscription, cookies), `CsrfProtectionTest` (double-submit), `OrderPaymentTest` (dérivation du statut, contrat d'API, cascade), `ContactNotificationTest` (persistance + notification email), `WebhookStripeTest` (signature HMAC, idempotence, transitions de statut), `StockReleaseTest` (réservation et restitution du stock, balayage des commandes abandonnées), `AuditSubscriberTest` (traçabilité des modifications), `PaginationBoundsTest` (bornes des paramètres publics), `PaymentSettlementTest` (paiement idempotent, fermeture et remboursement à l'annulation), `ApiInputRobustnessTest` (entrées malformées : 400 ou 404, jamais 500, avec contrôles positifs). **Frontend** : `LoginPage.test.jsx`, `CartContext.test.jsx`, `validators.test.js`, `PasswordInput.test.jsx` (afficher / masquer le mot de passe, sans soumettre le formulaire), `LegalPages.test.jsx` (identité légale rendue : bandeau de pré-production, aucun marqueur « à compléter », espaces préservés autour des valeurs injectées).
+> **Couverture backend, par fichier** : `AuthControllerTest` (inscription, cookies), `CsrfProtectionTest` (double-submit), `OrderPaymentTest` (dérivation du statut, contrat d'API, cascade), `ContactNotificationTest` (persistance + notification email), `WebhookStripeTest` (signature HMAC, idempotence, transitions de statut), `StockReleaseTest` (réservation et restitution du stock, balayage des commandes abandonnées), `AuditSubscriberTest` (traçabilité des modifications), `PaginationBoundsTest` (bornes des paramètres publics), `PaymentSettlementTest` (paiement idempotent, fermeture et remboursement à l'annulation), `ApiInputRobustnessTest` (entrées malformées : 400 ou 404, jamais 500, avec contrôles positifs), `OrderReuseTest` (commande en attente identique réutilisée, stock réservé une seule fois). **Frontend** : `LoginPage.test.jsx`, `CartContext.test.jsx`, `validators.test.js`, `PasswordInput.test.jsx` (afficher / masquer le mot de passe, sans soumettre le formulaire), `LegalPages.test.jsx` (identité légale rendue : bandeau de pré-production, aucun marqueur « à compléter », espaces préservés autour des valeurs injectées).
 >
 > **Une réserve à énoncer telle quelle** : ESLint ne sort pas 0 erreur. Les quatre erreurs relèvent de **trois règles différentes** — cette réserve affirmait à tort qu'elles étaient « toutes `react-hooks/set-state-in-effect` » (constaté le 14/09/2026 en relançant ESLint) : `react-hooks/set-state-in-effect` dans `components/NavBar.jsx` et `pages/ProductDetailPage.jsx`, `no-empty` (bloc vide) dans `api/api.js`, et `react-refresh/only-export-components` dans `contexts/ToastContext.jsx`. Elles sont signalées par la CI sans la faire échouer (§9), le temps qu'elles soient traitées.
 >

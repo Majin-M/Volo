@@ -15,12 +15,8 @@ RETENTION_DAYS=30
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BACKUP_FILE="${BACKUP_DIR}/volo_${TIMESTAMP}.sql.gz"
 
-# L'archive est ecrite sous un nom temporaire, puis renommee SEULEMENT si
-# mysqldump a reussi. Auparavant, un echec (mot de passe errone, base
-# arretee) laissait une archive tronquee sous un nom valide : elle passait
-# pour une sauvegarde, et la purge a 30 jours finissait par supprimer les
-# vraies. Le motif `volo_*.sql.gz` de la purge ne correspond pas au fichier
-# temporaire, qui n'est donc jamais compte comme sauvegarde.
+# Nom temporaire, renommé seulement si la sauvegarde est valide : une archive
+# tronquée ne passe jamais pour une sauvegarde ni n'est comptée par la purge.
 TMP_FILE="${BACKUP_FILE}.partial"
 trap 'rm -f "$TMP_FILE"' EXIT
 
@@ -32,14 +28,8 @@ if [ "${1:-}" = "--local" ]; then
     "$MYSQLDUMP" -u root "${DB_NAME:-volo}" | gzip > "$TMP_FILE"
 else
     # --- Trouver le conteneur de base DE CE DEPOT ------------------------------
-    # L'ancienne version cherchait un conteneur par son NOM (volo-db, puis
-    # volo-mysql). Or ces noms sont globaux a la machine Docker : un autre
-    # projet peut tres bien avoir son propre `volo-mysql` — c'etait le cas sur
-    # le poste de developpement. Si volo-db etait arrete, le script aurait
-    # sauvegarde la base d'un AUTRE projet, sans aucun avertissement.
-    #
-    # `docker compose ps` ne voit que les conteneurs du projet decrit par le
-    # fichier donne : on ne peut plus se tromper de base.
+    # Recherche par projet Compose et non par nom de conteneur, global à la
+    # machine : impossible de sauvegarder la base d'un autre projet.
     if [ -z "${DB_CONTAINER:-}" ]; then
         # Pile complete (docker-compose.yml racine), service `db`.
         DB_CONTAINER=$(docker compose -f "${ROOT_DIR}/docker-compose.yml" ps -q db 2>/dev/null || true)
@@ -56,10 +46,8 @@ else
     fi
 
     # --- Identifiants : ceux du conteneur lui-meme ------------------------------
-    # Plus aucun mot de passe dans ce script. On lit les variables avec
-    # lesquelles le conteneur MySQL a ete initialise, donc toujours les bonnes.
-    # MYSQL_PWD plutot que -p : un mot de passe passe en argument est visible
-    # de tout utilisateur de la machine dans la liste des processus.
+    # Lus dans le conteneur MySQL : aucun mot de passe dans ce script.
+    # MYSQL_PWD plutôt que -p : un argument est visible dans la liste des processus.
     docker exec "$DB_CONTAINER" sh -c '
         user="${MYSQL_USER:-root}"
         if [ "$user" = "root" ]; then pass="${MYSQL_ROOT_PASSWORD:-}"; else pass="${MYSQL_PASSWORD:-}"; fi

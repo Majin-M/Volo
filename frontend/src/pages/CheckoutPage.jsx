@@ -84,6 +84,9 @@ const CheckoutPage = () => {
             // premiere restait en attente, son stock reserve pour rien. La
             // commande deja creee est donc reutilisee ; POST /api/payments est
             // idempotent et renverra le meme paiement s'il existe deja.
+            // Apres un RECHARGEMENT de page, cette reference est perdue : c'est
+            // alors le serveur qui renvoie la commande en attente identique
+            // (OrderService::createOrder), sans reserver le stock une 2e fois.
             if (!orderIdRef.current) {
                 const orderResponse = await apiCall('/orders', {
                     method: 'POST',

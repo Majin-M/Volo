@@ -999,7 +999,7 @@ Dependencies:
 - Sécurité multicouche : JWT HttpOnly, CSRF double-submit, rate limiting, headers de sécurité (CSP, HSTS, Permissions-Policy), hachage bcrypt, Voters
 - Back-office EasyAdmin fonctionnel (produits, marques, problématiques, commandes, paiements, utilisateurs)
 - Webhook Stripe avec vérification HMAC, idempotence et métadonnées UUID
-- Gestion de stock : réservation à la commande, restitution automatique à l'annulation quelle qu'en soit l'origine (`StockReleaseSubscriber`) et balayage des paniers abandonnés (`app:release-stale-orders`). **Sans verrou** : la survente concurrente reste possible, limite assumée et documentée
+- Gestion de stock : réservation à la commande, restitution automatique à l'annulation quelle qu'en soit l'origine (`StockReleaseSubscriber`) et balayage des paniers abandonnés (`app:release-stale-orders`, lancé toutes les 15 minutes par le service Docker `scheduler`) ; une commande en attente identique est réutilisée au lieu d'être dupliquée (rechargement, double clic). **Sans verrou** : la survente concurrente reste possible, limite assumée et documentée
 - Transitions de statut contraintes par le composant Workflow Symfony + `StatusTransitionSubscriber`
 - Audit trail automatique (`AuditSubscriber`) traçant les changements de statut et les modifications sensibles
 - Soft Delete sur `Order` et `Payment` via `SoftDeleteFilter` Doctrine

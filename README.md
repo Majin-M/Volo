@@ -167,9 +167,12 @@ docker compose up -d --build
 
 Au démarrage, le conteneur `backend` **attend la base, génère les clés JWT et joue les migrations tout seul** : rien à lancer à la main. Suivre sa progression avec `docker compose logs -f backend` (lignes préfixées `[volo]`).
 
+Le conteneur `scheduler` lance ensuite **toutes les 15 minutes** l'annulation des commandes impayées depuis plus de 60 minutes (`app:release-stale-orders` : paiement fermé chez Stripe, stock restitué). Suivre ses passages avec `docker compose logs -f scheduler` ; régler l'intervalle avec `SWEEP_INTERVAL_SECONDS` dans le `.env` racine (défaut : 900).
+
 - Application : http://localhost (proxy Nginx)
 - Interface Mailpit (emails capturés) : http://localhost:8025
 - Base de données : **non exposée sur l'hôte**, volontairement. Pour l'inspecter : `docker compose exec db mysql -u root -p`
+- Identifiants MySQL : ils ne sont appliqués qu'à la **première** création du volume `db_data`. Modifier ensuite `MYSQL_PASSWORD` dans `.env` ne change pas le compte existant et le backend ne se connecte plus : changer le mot de passe dans MySQL (`ALTER USER`), puis dans `.env`.
 
 Créer un compte administrateur pour accéder à `/admin` :
 ```bash

@@ -409,12 +409,6 @@ parameters:
 			path: src/Service/ContactService.php
 
 		-
-			message: '#^Method App\\Service\\OrderService\:\:createOrder\(\) has parameter \$orderData with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Service/OrderService.php
-
-		-
 			message: '#^Parameter \#1 \$productName of method App\\Entity\\OrderItem\:\:setProductName\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 1

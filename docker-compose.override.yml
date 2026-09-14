@@ -1,30 +1,14 @@
-# =============================================================================
-# Surcharge de DEVELOPPEMENT — chargee automatiquement par `docker compose`
-# =============================================================================
-# Compose fusionne ce fichier avec docker-compose.yml des qu'il est present
-# dans le repertoire. Il ajoute les outils du poste de developpement, qui ne
-# doivent jamais tourner sur un serveur.
-#
-# SUR UN SERVEUR, ce fichier doit etre IGNORE :
-#   docker compose -f docker-compose.yml up -d
-# ou, pour ne pas avoir a y penser : COMPOSE_FILE=docker-compose.yml dans le
-# .env du serveur. Sinon Mailpit demarrerait en production.
-# =============================================================================
+# Surcharge de développement, fusionnée automatiquement avec docker-compose.yml.
+# Ne doit pas être chargée sur un serveur (voir README.md).
 
 services:
 
-  # --- Mailer : capture tous les emails, n'en envoie aucun ---
-  # Pour l'utiliser, .env doit contenir MAILER_DSN=smtp://mailer:1025
+  # Mailpit : capture les emails sans les envoyer (MAILER_DSN=smtp://mailer:1025).
   mailer:
     image: axllent/mailpit
-    # Pas de `container_name` : `volo-mailer` entrait en collision avec le
-    # conteneur du meme nom de backend/compose.yaml et d'autres projets, et
-    # bloquait le demarrage de toute la pile. Le backend le joint par son nom
-    # reseau `mailer` ; Compose nomme le conteneur lui-meme.
+    # Pas de container_name : évite une collision avec d'autres projets.
     ports:
-      # Liees a 127.0.0.1 : l'interface Mailpit n'a pas d'authentification,
-      # et elle affiche le contenu de tous les emails captures. Inutile de
-      # l'ouvrir aux autres machines du reseau.
+      # Liés à 127.0.0.1 : l'interface n'a pas d'authentification.
       - "127.0.0.1:1025:1025"
       - "127.0.0.1:8025:8025"
     environment:
