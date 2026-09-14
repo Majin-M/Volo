@@ -1,2 +1,10 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Les scripts shell DOIVENT rester en LF.
+#
+# `* text=auto` les restituerait en CRLF sur un poste Windows. Copies tels
+# quels dans une image Alpine, ils echouent avec un message trompeur :
+# "docker-entrypoint.sh: no such file or directory" — alors que le fichier
+# est bien la. C'est le \r de la ligne shebang que le noyau ne trouve pas.
+*.sh text eol=lf
