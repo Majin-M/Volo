@@ -197,6 +197,31 @@ class Product
         return $this;
     }
 
+    /**
+     * Restitue des unites au stock.
+     *
+     * Contrepartie de decrementStock() : le stock etant retire des la
+     * CREATION de la commande (statut pending), il doit revenir des que
+     * cette commande ne se concretisera pas — paiement echoue, annulation,
+     * ou panier abandonne. Sans cela chaque commande non payee retire des
+     * unites vendables definitivement.
+     *
+     * Volontairement sans plafond : le stock d'origine n'est pas connu ici,
+     * et refuser une restitution laisserait le compteur durablement faux.
+     */
+    public function incrementStock(int $quantity): self
+    {
+        if ($quantity < 0) {
+            throw new \LogicException(sprintf(
+                'Restitution de stock negative pour "%s" : %d.',
+                $this->name,
+                $quantity,
+            ));
+        }
+        $this->stock += $quantity;
+        return $this;
+    }
+
     public function getBrand(): ?Brand
     {
         return $this->brand;

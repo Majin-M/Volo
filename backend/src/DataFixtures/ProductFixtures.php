@@ -28,6 +28,7 @@ class ProductFixtures extends Fixture implements DependentFixtureInterface
         $p1->setBrand($brandLrp);
         $p1->addSkinConcern($concernAcne);
         $manager->persist($p1);
+        $this->addReference('product-effaclar', $p1);
 
         // Produit 2
         $p2 = new Product();
@@ -38,6 +39,7 @@ class ProductFixtures extends Fixture implements DependentFixtureInterface
         $p2->setBrand($brandCerave);
         $p2->addSkinConcern($concernDry);
         $manager->persist($p2);
+        $this->addReference('product-cleanser', $p2);
 
         // Produit 3
         $p3 = new Product();
@@ -48,6 +50,7 @@ class ProductFixtures extends Fixture implements DependentFixtureInterface
         $p3->setBrand($brandLrp);
         $p3->addSkinConcern($concernDry);
         $manager->persist($p3);
+        $this->addReference('product-lipikar', $p3);
 
         $manager->flush();
     }

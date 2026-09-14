@@ -289,6 +289,17 @@ MESSAGE_CONTACT (#id, firstName, email, subject, message, isProcessed,
 | **Beige** | `#E9D7C3` | Fonds secondaires, cartes, sections |
 | **Vert sage** | `#9CB997` | Accents, boutons CTA, badges disponibilité |
 
+### Typographie
+
+| Rôle | Police | Usage |
+|---|---|---|
+| **Titres** | Outfit (500/600/700) | Titres de page et de section, logo, boutons |
+| **Texte courant** | Lato (400/700) | Paragraphes, libellés, formulaires |
+
+**Pourquoi Outfit** : la version précédente utilisait Playfair Display, un serif à très fort contraste au dessin calligraphié. Élégant, mais trop marqué pour un site de soin où la lisibilité prime — et daté dans un registre plutôt « mode ». Outfit est une sans-serif géométrique aux formes rondes : aucun empattement, aucun contraste, des lettres larges et ouvertes. Le registre reste doux sans être ornemental.
+
+**Un point technique à connaître** : le back-office **héberge Outfit localement** (`public/admin-theme/fonts/`, police variable, 32 Ko + 15 Ko) au lieu de la charger depuis Google Fonts. La Content-Security-Policy du site (`default-src 'self'`) bloque les ressources distantes : une police Google n'y serait jamais chargée, **et l'échec est silencieux**. C'était déjà le cas de Playfair Display, déclarée dans le thème admin mais jamais rendue — le back-office affichait Georgia sans que rien ne le signale. La SPA, elle, n'est pas soumise à cette CSP et charge Outfit depuis Google Fonts.
+
 ### Approche visuelle
 
 - Palette chaleureuse et naturelle, évoquant le soin et la douceur
@@ -667,7 +678,8 @@ $client->request('POST', '/api/orders', [], [], [
 ### Analyse statique
 
 - **PHPStan** : `level: max` (le plus strict), 0 erreur (avec baseline de 102 entrées)
-- **ESLint** : 1 erreur restante — `react-hooks/set-state-in-effect` dans `NavBar.jsx`, sur l'effet qui referme le menu au changement de route
+- **ESLint** : 4 erreurs restantes, toutes `react-hooks/set-state-in-effect` (`api/api.js`, `components/NavBar.jsx`, `contexts/ToastContext.jsx`, `pages/ProductDetailPage.jsx`) — une règle de React 19 sur les `setState` synchrones dans un effet
+- **Tests frontend** : 32 tests sur 3 fichiers (Vitest), verts
 - **React Doctor** : score **100/100** (0 issue). Analyse statique frontend : bugs, sécurité, performance, accessibilité. CI GitHub Actions sur les PRs
 
 ---
@@ -1006,7 +1018,7 @@ Dependencies:
 - CRUD `/user` anonyme exposant les rôles → supprimé + filet de sécurité
 - Formulaire de contact bloqué en 403 pour les visiteurs → exemption CSRF
 - Références `CMD-{id}` dans le front → remplacées par la `reference` UUID de la commande
-- SGBD dev/prod désynchronisés (MariaDB 10.4 / MySQL 8) → unifié sur MySQL 8.0
+- SGBD dev/prod désynchronisés (MariaDB 10.4 / MySQL 8) → fichiers Compose alignés sur `mysql:8.0`, mais **l'écart subsiste en développement** (voir axes d'amélioration)
 - Métadonnées Stripe sans référence de commande → `order_id` (cast string) + `reference` UUID
 
 ### Axes d'amélioration
@@ -1027,6 +1039,6 @@ Dependencies:
 | ~~**Permissions-Policy**~~ | ✅ **Implémenté** — Header `Permissions-Policy: camera=(), microphone=(), geolocation=()` ajouté dans `SecurityHeadersSubscriber` |
 | ~~**Sauvegardes automatisées**~~ | ✅ **Implémenté** — Script `scripts/backup-db.sh` : `mysqldump` compressé (gzip), rétention 30 jours avec purge automatique, mode Docker (`volo-db`) ou local XAMPP (`--local`). Prêt pour cron (`0 3 * * *`). Axe restant : monitoring et alerting conteneurs |
 | ~~**Composant PrivateRoute**~~ | ✅ **Implémenté** — `PrivateRoute.jsx` wraps les routes protégées (`/commande`, `/confirmation`, `/mes-commandes`, `/mon-compte`) dans `App.jsx`. Utilise `useAuth()` : redirige vers `/connexion` si non authentifié, affiche un loader pendant la restauration de session. Suppression du guard ad hoc dans `AccountPage` |
-| ~~**Unifier le SGBD**~~ | ✅ **Corrigé** — `DATABASE_URL` dans `.env` cible désormais MySQL 8.0 explicitement (`?serverVersion=8.0&charset=utf8mb4`). Les deux `compose.yaml` (racine et backend) utilisent `mysql:8.0`. Doctrine génère les migrations pour MySQL 8 partout, éliminant les incompatibilités MariaDB (ex : `RENAME INDEX`) |
+| **Unifier le SGBD** | 🟠 **Partiel.** Les deux `compose.yaml` utilisent `mysql:8.0`, mais le développement tourne toujours sur le MariaDB 10.4.32 de XAMPP — `SELECT VERSION()` fait foi. `DATABASE_URL` déclare `serverVersion=8.0` : Doctrine génère donc du SQL MySQL 8 contre MariaDB, ce qui rend la panne `RENAME INDEX` plus probable, pas moins. À trancher : développer sur le conteneur, ou déclarer `serverVersion=mariadb-10.4.32` en `.env.local` |
 | ~~**React Doctor 100/100**~~ | ✅ **Corrigé** — 6 issues identifiées et résolues : `ConfirmDialog` migré vers `<dialog>` natif (accessibilité + suppression de la gestion manuelle d'Escape/focus), `ToastContext` stabilisé avec `useMemo` (évite les re-renders inutiles des consommateurs), `AccountPage` refactoré avec `useReducer` (9 `useState` liés consolidés), `HomePage` clés stables sans index de tableau, `ProductDetailPage` pattern `AbortController` + `.then()` au lieu de `async/await` dans `useEffect` |
 | **Backlog v2** | Programme de fidélité, diagnostic peau (questionnaire → routine personnalisée), blog skincare, avis produits, wishlist, application mobile (React Native sur la même API), multi-langue |

@@ -169,7 +169,7 @@ const ProductDetailPage = () => {
                         <div className={styles.tags}>
                             {product.skinConcerns.map((concern) => (
                                 <span key={concern.id} className={styles.tag}>
-                                    #{concern.slug}
+                                    {concern.name}
                                 </span>
                             ))}
                         </div>

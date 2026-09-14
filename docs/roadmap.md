@@ -12,7 +12,7 @@
 > | 1.2 | Nginx reverse proxy | ⬜ Jamais exécuté — le proxy Vite tient ce rôle en dev |
 > | 2.5 | Voters (`ProductVoter`, `OrderVoter`) | ✅ `src/Security/ProductVoter.php` + `OrderVoter.php` |
 > | 2.6 | API REST produits | ✅ `GET` + `POST` + `PUT` + `DELETE` (Voters) |
-> | 2.9 | API REST routines | ⬜ Aucun `RoutineController` |
+> | 2.9 | API REST routines | ✅ `RoutineController` (`GET /api/routines`, filtres `level` et `skin_concern`), CRUD EasyAdmin et fixtures — 14/09/2026 |
 > | 2.11 | API REST compte utilisateur | ✅ `GET /api/auth/me` + `PATCH /api/auth/me` (rate limited) |
 > | 2.15 | Tests unitaires et fonctionnels | 🟠 36 tests / 108 assertions (`AuthController`, `Order`↔`Payment`, CSRF, contact, webhook Stripe), verts — **pas zéro** |
 > | 3.13 | `OrderConfirmationPage` | ✅ Page de confirmation fonctionnelle (`OrderConfirmationPage.jsx`) |
@@ -28,7 +28,7 @@
 > - ~~Lire les messages de contact~~ — ✅ **résolu le 17/07/2026** par la notification email (`ContactService`), et non par un écran d'administration. RG12 / `processed_by_user_id` abandonnés en conséquence ([MODELE_DONNEES.md](MODELE_DONNEES.md) §6.5). L'*envoi* était cassé aussi (403 pour tout visiteur anonyme) — corrigé et testé.
 > - **Mettre en place un worker Messenger** — `SendEmailMessage` a dû être retiré du routage `async` : aucun worker n'existe, donc un email en file n'en serait jamais sorti. Les emails partent en synchrone en attendant. **Prérequis de 4.2** ([TECHNOLOGIES.md](TECHNOLOGIES.md) §2). 🟠
 > - **`openapi.yaml`** — le seul mécanisme qui empêcherait `api_specification.md` de dériver à nouveau ([CONTRAT_API.md](CONTRAT_API.md) §8). 🟠
-> - ~~**Unifier le SGBD**~~ — ✅ **Résolu le 01/09/2026**. `DATABASE_URL` cible MySQL 8.0 partout, les deux `compose.yaml` utilisent `mysql:8.0` ([TECHNOLOGIES.md](TECHNOLOGIES.md) §2).
+> - **Unifier le SGBD** — 🟠 **Partiel.** Les deux `compose.yaml` utilisent `mysql:8.0`, mais le dev tourne toujours sur MariaDB 10.4.32 (XAMPP), vérifié le 14/09/2026. `serverVersion=8.0` dans `DATABASE_URL` ne change pas le serveur, il ment à Doctrine ([TECHNOLOGIES.md](TECHNOLOGIES.md) §2).
 > - **Trancher les trois chemins d'images** — `/images/products`, `/media/products`, `/media/brands` coexistent ([TECHNOLOGIES.md](TECHNOLOGIES.md) §2). 🟡
 >
 > **Tâches complétées le 01-02/09/2026** :

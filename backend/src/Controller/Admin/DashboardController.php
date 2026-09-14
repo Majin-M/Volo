@@ -87,6 +87,7 @@ class DashboardController extends AbstractDashboardController
         yield MenuItem::linkTo(ProductCrudController::class, 'Produits', 'fa fa-tags');
         yield MenuItem::linkTo(BrandCrudController::class, 'Marques', 'fa fa-building');
         yield MenuItem::linkTo(SkinConcernCrudController::class, 'Problématiques', 'fa fa-stethoscope');
+        yield MenuItem::linkTo(RoutineCrudController::class, 'Routines', 'fa fa-list-ol');
 
         yield MenuItem::section('Ventes');
         yield MenuItem::linkTo(OrderCrudController::class, 'Commandes', 'fa fa-shopping-cart');

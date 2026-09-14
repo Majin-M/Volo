@@ -9,7 +9,7 @@ Feuille de style : CartPage
 }
 
 .pageTitle {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Outfit', sans-serif;
     color: #5F4C42;
     font-size: 2.2em;
     margin-bottom: 40px;
@@ -149,7 +149,7 @@ Feuille de style : CartPage
 }
 
 .summaryTitle {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Outfit', sans-serif;
     color: #5F4C42;
     font-size: 1.3em;
     margin: 0 0 20px 0;
@@ -226,7 +226,7 @@ Feuille de style : CartPage
 }
 
 .emptyTitle {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Outfit', sans-serif;
     color: #5F4C42;
     margin-bottom: 10px;
 }

@@ -39,7 +39,7 @@ L'ironie mérite d'être notée, parce qu'elle est instructive : cette migration
 - L'index `UNIQUE` est renommé lui aussi : le `CHANGE` conserve l'index mais pas son nom, qui reste haché sur l'ancienne colonne — et `doctrine:schema:validate` reste rouge tant qu'il diffère de ce qu'attend Doctrine.
 - `down()` est strictement symétrique (vérifié : aller-retour complet, état d'origine restauré à l'identique).
 
-**Piège de moteur, découvert à l'exécution** : `RENAME INDEX` (première tentative) n'existe qu'à partir de MariaDB 10.5.2 et XAMPP livre **10.4** — erreur de syntaxe 1064. Remplacé par `DROP INDEX` + `CREATE UNIQUE INDEX`, portable MySQL comme MariaDB. C'est cet incident qui a mis au jour la désynchronisation des moteurs, **résolue depuis le 01/09/2026** : le projet est unifié sur MySQL 8.0 (cf. `docs/TECHNOLOGIES.md` §2).
+**Piège de moteur, découvert à l'exécution** : `RENAME INDEX` (première tentative) n'existe qu'à partir de MariaDB 10.5.2 et XAMPP livre **10.4** — erreur de syntaxe 1064. Remplacé par `DROP INDEX` + `CREATE UNIQUE INDEX`, portable MySQL comme MariaDB. C'est cet incident qui a mis au jour la désynchronisation des moteurs. Elle a été annoncée résolue le 01/09/2026, mais la vérification du 14/09/2026 montre que **seuls les fichiers Compose ont été alignés** : la base de développement répond toujours `10.4.32-MariaDB` (cf. `docs/TECHNOLOGIES.md` §2).
 
 **Résultat après réparation**, sur `volo_test` recréée de zéro :
 
@@ -288,6 +288,129 @@ Trois défauts d'affichage cumulés sur `/admin` :
 Un thème aux couleurs VOLO a été ajouté (`public/admin-theme/volo-admin.css`), chargé via `configureAssets()`. Il surcharge 167 variables CSS d'EasyAdmin sans un seul `!important` : le bundle déclare tout son style dans `@layer ea`, et une feuille non-layered l'emporte sur une couche quelle que soit sa spécificité. Aucune police distante n'est chargée, la CSP l'interdirait.
 
 Le menu du dashboard pointait par ailleurs vers une route `app_home` **inexistante** : le rendu du menu aurait levé une `RouteNotFoundException` dès l'ouverture du back-office. Remplacé par une URL directe.
+
+---
+
+## ✅ Journal d'audit : aucune modification n'était tracée
+
+> **Corrigé le 14/09/2026.** Découvert en vérifiant la traçabilité de l'annulation des 19 commandes.
+
+**Constat** : `audit_log` contenait **18 traces `create` et 0 trace `update`** — depuis le début du projet. Le journal ne consignait que des créations. Or c'est l'inverse qui justifie son existence : la documentation annonce qu'il trace « les changements de statut (Order, Payment) et les modifications sensibles (User.password, User.roles) ».
+
+**Cause** — un piège Doctrine, et deux moitiés cassées de façons opposées :
+
+- `preUpdate()` appelait `persist()` sur l'`AuditLog`. À ce stade, Doctrine a **déjà calculé ses changesets** : l'entité est persistée mais jamais insérée. Aucune erreur, aucun avertissement — la trace disparaissait en silence.
+- `postPersist()` appelait `flush()` **à l'intérieur du flush en cours**. Les créations passaient, mais par un flush imbriqué pendant le commit, sans garde contre la réentrance.
+
+**Correction** — deux mécanismes, parce que créations et modifications se heurtent à des contraintes opposées :
+
+| | Événement | Pourquoi |
+|---|---|---|
+| Modifications | `onFlush` | Seul moment où l'on peut encore greffer des entités sur le flush en cours. Impose d'appeler soi-même `computeChangeSet()`, sans quoi l'ajout est ignoré lui aussi. |
+| Créations | `postPersist` → `postFlush` | L'identifiant d'une entité neuve n'existe qu'après son INSERT, donc après `onFlush`. On les met en file, puis on les écrit **hors** du flush d'origine. |
+
+La réentrance est bloquée en vidant la file **avant** le flush de `postFlush` : le second passage trouve une file vide et s'arrête.
+
+**Vérifié** :
+
+```
+Order  28  status    pending → cancelled                     (commande CLI, sans auteur)
+User   13  password  [hashed] → [hashed]  qa-audit@volo.test (via l'API, auteur attribué)
+```
+
+Le hachage du mot de passe est bien masqué, et l'auteur correctement attribué quand le contexte de sécurité existe. Les créations continuent de fonctionner. Données de test supprimées après vérification.
+
+---
+
+## ✅ Stock jamais restitué — fuite permanente sur panier abandonné
+
+> **Corrigé le 14/09/2026.** Défaut le plus coûteux relevé par l'audit de robustesse.
+
+**Constat** : le stock est décrémenté à la **création** de la commande, donc au statut `pending`, avant tout paiement — c'est une réservation. Or rien ne la levait jamais. `decrementStock()` était appelé à un seul endroit et aucune méthode inverse n'existait. Ni l'échec de paiement, ni l'annulation, ni l'abandon du panier ne rendaient les unités.
+
+**Démontré, pas supposé** : une commande jamais payée fait passer le stock de 49 à 46. Et la base de développement contenait déjà **19 commandes `pending` immobilisant 22 unités**, la plus ancienne datant de juin.
+
+En production, chaque panier abandonné aurait retiré des unités vendables **définitivement**. Un produit finit par afficher « rupture de stock » alors qu'il est en rayon.
+
+**Ce qui a été ajouté** :
+
+- `Product::incrementStock()` — contrepartie de `decrementStock()`. Volontairement sans plafond : le stock d'origine n'est pas connu, et refuser une restitution laisserait le compteur durablement faux.
+- `OrderService::releaseStock(Order)` — restitue les unités d'une commande. **Ne flushe pas** : l'appelant maîtrise sa transaction, ce qui permet de traiter plusieurs commandes en un seul flush. Ignore sans échouer une ligne dont le produit a été supprimé depuis.
+- Branchement sur `payment_intent.payment_failed` dans `WebhookController`.
+- `app:release-stale-orders` — commande planifiable qui annule les commandes impayées au-delà d'un délai et restitue leur stock. Options `--minutes` (défaut 60) et `--dry-run`.
+
+**Comment l'idempotence est garantie** — c'est le point délicat, car Stripe rejoue ses webhooks. `releaseStock()` ne se protège pas lui-même ; ce sont les appelants qui s'appuient sur la **machine à états**. La garde `can($payment, 'fail')` ne laisse passer la transition qu'une seule fois : un rejeu du même événement n'atteint jamais la restitution. Même principe dans la commande, via `can($order, 'cancel_pending')`. Sans cette barrière, chaque nouvelle tentative gonflerait le stock.
+
+**Vérifié de bout en bout** : commande de 4 unités → stock 49 → 45 ; exécution de la commande → commande `cancelled`, stock revenu à **49** ; relance immédiate → « rien à faire », stock inchangé. La base a été restaurée à son état initial après le test.
+
+> **Reste à faire** : l'annulation depuis EasyAdmin ne restitue pas encore le stock. Un administrateur qui bascule une commande en `cancelled` ne déclenche aucune restitution, car EasyAdmin écrit le statut directement sans passer par `$workflow->apply()`. Le brancher proprement suppose un écouteur Doctrine `onFlush`/`postFlush` — délicat à poser à côté du `flush()` imbriqué déjà présent dans `AuditSubscriber`, et donc traité séparément.
+
+---
+
+## ✅ Typographie et étiquettes de problématiques
+
+> **Fait le 14/09/2026.**
+
+**Typographie** — Playfair Display, serif à très fort contraste au dessin calligraphié, remplacée par **Outfit**, sans-serif géométrique. 29 déclarations dans 13 fichiers CSS, plus trois styles inline dans `ConfirmDialog.jsx`, `ErrorBoundary.jsx` et `Footer.jsx` qu'un remplacement CSS seul aurait manqués.
+
+Le back-office **héberge Outfit localement** (`public/admin-theme/fonts/`, police variable, 32 Ko + 15 Ko) plutôt que de la charger depuis Google Fonts. Raison : la CSP (`default-src 'self'`) bloque les ressources distantes, et l'échec est silencieux. C'était déjà le cas de Playfair Display, déclarée dans le thème mais jamais rendue — le back-office affichait Georgia sans que rien ne le signale. Détail complet dans [PRESENTATION.md](PRESENTATION.md) §7.
+
+**Étiquettes de problématiques** — les cartes produit et la fiche produit affichaient `#{concern.slug}`, soit l'identifiant d'URL préfixé d'un croisillon : `#acnee`. Elles affichent désormais `concern.name`, le libellé prévu pour l'affichage (« Acnée »), dans une pastille contourée plutôt qu'un aplat — l'aplat reste réservé aux éléments cliquables, pour ne pas concurrencer le bouton d'ajout au panier.
+
+> **Donnée à corriger côté métier** : la problématique est enregistrée sous le nom « acnée », avec un *e* de trop. L'affichage du slug masquait la faute ; elle est maintenant visible sur chaque carte. Corrigeable en back-office (Catalogue › Problématiques) — **sans toucher au slug** `acnee`, qui sert d'identifiant public dans les URL de filtrage (RG9).
+
+---
+
+## ✅ Clé Stripe absente du build frontend en production
+
+> **Corrigé le 14/09/2026.**
+
+**Symptôme potentiel** : en production Docker, `loadStripe()` aurait reçu `undefined` et le paiement aurait été inutilisable. Jamais constaté, faute de déploiement — le défaut dormait dans la configuration.
+
+**Cause** : `frontend/src/App.jsx` lit `import.meta.env.VITE_STRIPE_PUBLIC_KEY`, mais le service `frontend` de `docker-compose.yml` n'avait ni `args:` ni `environment:`. La clé n'existait que dans un `.env.local` non versionné, présent uniquement sur le poste de développement.
+
+**Correction** : `ARG VITE_STRIPE_PUBLIC_KEY` dans `frontend/Dockerfile`, alimenté par `docker-compose.yml` depuis `STRIPE_PUBLIC_KEY` (déjà présent dans `.env.example`).
+
+**Le piège à retenir** : Vite fige les variables `VITE_*` **au moment du build**, pas au démarrage du conteneur. Les passer en `environment:` — le réflexe naturel — n'aurait rien changé. Vérifié empiriquement : build avec une clé témoin, puis recherche de cette clé dans `dist/assets/index-*.js`.
+
+**Rappel de sécurité** : seule la clé **publique** (`pk_...`) peut transiter ici. Elle finit dans le bundle, donc visible par tout visiteur. La clé secrète reste côté backend.
+
+---
+
+## ✅ Commande sans adresse : 500 au lieu de 400
+
+> **Corrigé le 14/09/2026.**
+
+**Constat** : dans `OrderService::createOrder()`, toute la validation d'adresse était enfermée dans un `if (isset($orderData['shippingAddress']))`. Une requête omettant ce champ traversait la validation sans rien déclencher, puis échouait au `flush` sur la contrainte `NOT NULL` de `shop_order.street`. Le client recevait une **erreur 500** là où son erreur méritait un **400**.
+
+Vérifié avant correction : aucune commande fantôme n'était créée — la transaction Doctrine étant atomique, le rollback était propre. Le défaut portait sur la classe d'erreur retournée, pas sur l'intégrité des données.
+
+**Correction** : l'adresse est désormais exigée explicitement, au bon niveau. `throw new \InvalidArgumentException('L'adresse de livraison est requise.')`, que `OrderController` traduit en 400.
+
+**Principe** : une erreur du client ne doit jamais produire une erreur serveur. Un 500 dit « le serveur est cassé » ; ici c'est la requête qui l'était.
+
+---
+
+## ✅ Domaine Routine branché
+
+> **Fait le 14/09/2026.**
+
+**Constat** : `Routine`, `RoutineLevel`, `RoutineRepository` et les tables `routine` / `routine_product` existaient depuis le premier commit, mais **rien ne les atteignait** : pas de contrôleur, pas d'entrée en back-office, pas de fixture. La table contenait 0 ligne, et aucun chemin ne permettait d'en créer une. Seule entité du modèle sans entrée ni sortie.
+
+Deux éléments donnaient pourtant l'illusion du contraire : la page d'accueil affiche six routines **codées en dur** dans `HomePage.jsx`, et `security.yaml` déclarait `^/api/routines` en `PUBLIC_ACCESS` — une règle protégeant une route absente.
+
+**Pourquoi c'était arrivé** : la roadmap créait toutes les entités d'un bloc en priorité 🔴 (tâches 2.1/2.2), mais découpait l'exposition en tâches distinctes de priorité 🟡 — 2.9 « API REST routines » et 3.8 « Page routines ». Les fonctionnalités critiques ont été menées au bout, celle-ci s'est arrêtée après la persistance.
+
+**Ce qui a été ajouté** :
+
+- `RoutineController` — `GET /api/routines`, public, avec les filtres `level` et `skin_concern`. Un niveau inconnu renvoie un 400 qui énumère les valeurs acceptées, plutôt qu'une liste vide qu'on lirait comme « aucune routine ».
+- `RoutineCrudController` + entrée « Routines » au menu Catalogue, avec `by_reference => false` sur la relation ManyToMany — sans quoi EasyAdmin ne persiste pas les changements de collection.
+- `RoutineFixtures` — trois routines, une par niveau, rattachées à de vrais produits. `ProductFixtures` expose désormais des références réutilisables.
+- Groupes `routine:read` sur l'entité. Le contrôleur sérialise avec `['routine:read', 'product:read']` : sans le second, les produits imbriqués sortiraient vides.
+
+**Le point de modèle à retenir** : une routine n'est pas liée à une problématique de peau. Elle l'est **indirectement, par ses produits** — c'est ce que faisait déjà `findByFilters()`, qui joint `routine → produits → problématiques`. Ce repository était complet depuis l'origine ; il ne lui manquait qu'un appelant.
+
+**Reste ouvert** : `HomePage.jsx` affiche toujours ses routines en dur. Les brancher sur l'API dégraderait visiblement la page tant que la base ne contient que deux produits — décision à prendre séparément.
 
 ---
 

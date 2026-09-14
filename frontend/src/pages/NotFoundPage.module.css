@@ -20,7 +20,7 @@ Feuille de style : NotFoundPage (404)
 }
 
 .code {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Outfit', sans-serif;
     font-size: 5em;
     color: #5F4C42;
     margin: 0;
@@ -29,7 +29,7 @@ Feuille de style : NotFoundPage (404)
 }
 
 .title {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Outfit', sans-serif;
     font-size: 1.6em;
     color: #5F4C42;
     margin: 10px 0 15px 0;

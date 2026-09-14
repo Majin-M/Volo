@@ -2,7 +2,9 @@
 
 > **État au 13/09/2026** : PHPUnit 13, **36 tests, 108 assertions**, verts. Répartis sur cinq fichiers : `AuthControllerTest` (inscription, cookies — 3 tests), `CsrfProtectionTest` (double-submit — 8), `OrderPaymentTest` (dérivation du statut, contrat d'API, cascade — 9), `ContactNotificationTest` (persistance + notification email — 6), `WebhookStripeTest` (signature HMAC, idempotence, transitions de statut — 10). **Tests front présents** : Vitest + Testing Library, 3 fichiers (`LoginPage.test.jsx`, `CartContext.test.jsx`, `validators.test.js`). PHPStan `level: max` à 0 erreur (baseline de 102 entrées). React Doctor **100/100** (0 issue — bugs, performance, accessibilité).
 >
-> **Deux réserves à énoncer telles quelles** : ESLint ne sort pas 0 erreur — il en signale une, `react-hooks/set-state-in-effect` dans `frontend/src/components/NavBar.jsx` (l'effet qui referme le menu au changement de route). Et aucune CI n'exécute ces outils : le seul workflow du dépôt, `frontend/.github/workflows/react-doctor.yml`, est placé hors de `<racine>/.github/workflows/` et n'est donc jamais déclenché par GitHub.
+> **Tests front** : `npx vitest run` → **32 tests sur 3 fichiers**, verts. `npm run build` passe (80 modules).
+>
+> **Deux réserves à énoncer telles quelles** : ESLint ne sort pas 0 erreur — `npx eslint src` en signale **4**, toutes `react-hooks/set-state-in-effect`, dans `api/api.js`, `components/NavBar.jsx`, `contexts/ToastContext.jsx` et `pages/ProductDetailPage.jsx`. Et aucune CI n'exécute ces outils : le seul workflow du dépôt, `frontend/.github/workflows/react-doctor.yml`, est placé hors de `<racine>/.github/workflows/` et n'est donc jamais déclenché par GitHub.
 >
 > Ce document existe pour deux raisons : dire quoi écrire quand on s'y mettra, et **nommer précisément ce qui est aujourd'hui non vérifié** — parce que « ça marche quand je clique » n'est pas une vérification.
 >

@@ -42,7 +42,7 @@ const linkStyle = {
 
 const headingStyle = {
     color: '#fff',
-    fontFamily: 'Playfair Display, serif',
+    fontFamily: 'Outfit, sans-serif',
     marginBottom: '15px',
     fontSize: '1.2em',
 };

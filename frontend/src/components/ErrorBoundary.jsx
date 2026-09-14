@@ -55,7 +55,7 @@ class ErrorBoundary extends Component {
                     textAlign: 'center',
                 }}>
                     <h1 style={{
-                        fontFamily: "'Playfair Display', serif",
+                        fontFamily: "'Outfit', sans-serif",
                         color: '#5F4C42',
                         fontSize: '1.8em',
                         marginBottom: '16px',

@@ -60,7 +60,7 @@ const ProductCard = ({ product, onAddToCart }) => {
                             key={concern.id}
                             className={styles.tag}
                         >
-                            #{concern.slug}
+                            {concern.name}
                         </span>
                     ))}
                 </div>

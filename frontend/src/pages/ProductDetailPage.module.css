@@ -73,14 +73,14 @@ Feuille de style : ProductDetailPage
 }
 
 .name {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Outfit', sans-serif;
     color: #5F4C42;
     font-size: 2em;
     margin: 0 0 12px 0;
 }
 
 .price {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Outfit', sans-serif;
     color: #5F4C42;
     font-size: 1.6em;
     margin: 0 0 18px 0;
@@ -93,12 +93,19 @@ Feuille de style : ProductDetailPage
     margin-bottom: 20px;
 }
 
+/* Meme traitement que sur ProductCard : pastille contouree, libelle lisible
+   (concern.name) plutot que le slug prefixe d'un #. */
 .tag {
-    font-size: 0.8em;
-    background: #E9D7C3;
-    padding: 4px 12px;
-    border-radius: 12px;
-    color: #5F4C42;
+    font-size: 0.78em;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: capitalize;
+    background: transparent;
+    border: 1px solid #DCC4A8;
+    padding: 5px 14px;
+    border-radius: 999px;
+    color: #7A6558;
+    white-space: nowrap;
 }
 
 .description {
@@ -185,7 +192,7 @@ Feuille de style : ProductDetailPage
 }
 
 .sectionTitle {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Outfit', sans-serif;
     color: #5F4C42;
     font-size: 1.4em;
     margin: 0 0 20px 0;
@@ -232,7 +239,7 @@ Feuille de style : ProductDetailPage
 
 .notFound h2 {
     color: #5F4C42;
-    font-family: 'Playfair Display', serif;
+    font-family: 'Outfit', sans-serif;
 }
 
 .backLink {

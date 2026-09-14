@@ -22,14 +22,14 @@
 | `POST` · `PUT` · `DELETE /api/brands` | ⬜ |
 | `GET /api/products/{id}` détaillé, `GET /api/brands/{id}/products` | ⬜ |
 | `GET /api/skin-concerns/{slug}/products` | ⬜ |
-| `GET /api/routines` | ⬜ roadmap 2.9 — aucun `RoutineController` |
+| `GET /api/routines` | ✅ Implémenté le 14/09/2026 (`RoutineController`), filtrable par `level` et `skin_concern` |
 | `GET /api/orders/{id}` · `PATCH /api/orders/{id}` | ⬜ |
 | `GET /api/auth/me` · `PATCH /api/auth/me` | ✅ — profil + mise à jour (rate limited) |
 | **Tout le §11 Administration** (`/api/admin/*`) | ⬜ — **aucune** de ces routes n'existe |
 
 Deux pièges que cette liste rend visibles :
 
-- **`security.yaml` protège des routes inexistantes** (`^/api/routines`, `POST /api/products`). Une règle d'`access_control` sur une route absente ne protège rien — elle fait croire que la route existe.
+- **`security.yaml` protégeait des routes inexistantes.** Les deux cas cités — `^/api/routines` et `POST /api/products` — sont désormais implémentés, la règle correspond donc à quelque chose. Le principe reste à retenir : une règle d'`access_control` sur une route absente ne protège rien, elle fait seulement croire que la route existe.
 - **Le back-office n'est pas une API.** Produits, marques et commandes se gèrent aujourd'hui par EasyAdmin (Twig, `/admin/*`), pas par `/api/admin/*`. Le §11 n'a jamais été construit parce qu'EasyAdmin l'a rendu inutile.
 
 ## Table des matières
@@ -427,11 +427,11 @@ Produits recommandés pour une problématique.
 
 ---
 
-## 6. Routines — ⬜ SECTION ENTIÈREMENT NON IMPLÉMENTÉE
+## 6. Routines — ✅ IMPLÉMENTÉ
 
-> Renvoie **404** : il n'existe aucun `RoutineController` (roadmap 2.9 ⬜ 🟡). L'entité `Routine` et la table `routine_product` existent en base, mais rien ne les expose. `security.yaml` déclare une règle `PUBLIC_ACCESS` pour `^/api/routines` — une règle sur une route absente.
+> **Implémenté le 14/09/2026.** L'entité, son enum, son repository et sa table existaient depuis l'origine, mais rien ne les exposait ni ne les remplissait : la table était vide et le domaine inatteignable. Trois pièces manquaient et ont été ajoutées — `RoutineController` (cette section), `RoutineCrudController` (gestion en back-office) et `RoutineFixtures` (jeu de données).
 >
-> L'exemple ci-dessous montre par ailleurs une clé `skinConcern` sur une routine : **cette relation n'existe pas** au modèle. `Routine` est liée aux produits (N-N), pas aux problématiques ([MODELE_DONNEES.md](MODELE_DONNEES.md) §3).
+> **Attention au modèle** : une routine n'est **pas** liée directement à une problématique de peau. Le lien passe par ses produits — `RoutineRepository::findByFilters()` joint `routine → produits → problématiques`. Filtrer sur `?skin_concern=acne` retourne donc les routines contenant au moins un produit qui cible l'acné. Une clé `skinConcern` directement sur une routine n'existe pas au modèle ([MODELE_DONNEES.md](MODELE_DONNEES.md) §3).
 
 ### GET /api/routines
 

@@ -50,7 +50,7 @@ Responsabilités :
 .sectionTitle {
     text-align: center;
     color: #5F4C42;
-    font-family: 'Playfair Display', serif;
+    font-family: 'Outfit', sans-serif;
     font-size: 2em;
     margin-bottom: 30px;
     margin-top: 20px;
@@ -137,6 +137,6 @@ Responsabilités :
     color: #5F4C42;
     margin: 0 0 20px 0;
     padding-bottom: 20px;
-    font-family: 'Playfair Display', serif;
+    font-family: 'Outfit', sans-serif;
     border-bottom: 1px solid #E9D7C3;
 }

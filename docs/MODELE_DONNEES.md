@@ -219,7 +219,7 @@ COMMANDE (#id, reference, status, total, street, city, postalCode, country, note
           user_id→UTILISATEUR)
 
 LIGNE_COMMANDE (#id, quantity, unitPrice, productName,
-                order_id→COMMANDE, product_id→PRODUIT)
+                order_entity_id→COMMANDE, product_id→PRODUIT)
 
 PAIEMENT (#id, status, method, clientSecret, stripePaymentIntentId UNIQUE,
           amount, deletedAt, createdAt, updatedAt,
@@ -380,6 +380,8 @@ RG12 et le MCD prévoient la relation `TRAITE`. L'entité Doctrine ne l'a jamais
 Vérifié de deux façons : par la migration, qui affiche à l'exécution le nom réellement trouvé (`Colonnes détectées : payment_status / payment_method`), et par `SHOW CREATE TABLE`. Le doute était donc infondé — mais il ne pouvait pas être levé sans regarder.
 
 > **Le vrai enseignement est ailleurs.** Ce défaut concernait des colonnes dont le nom était *dérivé automatiquement*, et le nommage automatique était correct. Pendant ce temps, une colonne dérivée de la même façon — `payment.order_entity_id`, tirée de la propriété `$orderEntity` — a été **supposée** s'appeler `order_id` par la migration censée corriger tout ça. C'est elle qui a cassé.
+>
+> **Et la leçon a dû être réapprise le 14/09/2026** : le MLD ci-dessus annonçait `LIGNE_COMMANDE (… order_id→COMMANDE …)`. La vraie colonne est `order_entity_id`, pour exactement la même raison — la propriété s'appelle `$orderEntity`. Vérifié via `information_schema.KEY_COLUMN_USAGE`, qui donne l'état réel : `order_item.order_entity_id` et `payment.order_id`. Les deux tables pointent la même entité avec deux noms différents ; seule la base permet de le savoir.
 >
 > La leçon n'est pas « vérifier la stratégie de nommage ». C'est : **une colonne dont le nom est dérivé par l'ORM ne doit jamais être écrite en dur sans avoir été lue.**
 

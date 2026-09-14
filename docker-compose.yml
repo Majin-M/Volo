@@ -63,6 +63,11 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # Consommee par `vite build` dans le Dockerfile. Doit etre la cle
+        # PUBLIQUE Stripe (pk_...) : elle finit dans le bundle, donc visible
+        # par le navigateur. Ne jamais y mettre la cle secrete.
+        VITE_STRIPE_PUBLIC_KEY: ${STRIPE_PUBLIC_KEY}
     container_name: volo-frontend
     restart: unless-stopped
 

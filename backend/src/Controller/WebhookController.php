@@ -40,6 +40,7 @@ namespace App\Controller;
 use App\Http\ApiError;
 use App\Repository\PaymentRepository;
 use App\Service\OrderConfirmationService;
+use App\Service\OrderService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Stripe\Exception\SignatureVerificationException;
@@ -58,6 +59,7 @@ class WebhookController extends AbstractController
         private EntityManagerInterface $entityManager,
         private LoggerInterface $logger,
         private OrderConfirmationService $orderConfirmationService,
+        private OrderService $orderService,
         #[Autowire(env: 'STRIPE_WEBHOOK_SECRET')] private string $webhookSecret,
         #[Autowire(service: 'state_machine.order')] private WorkflowInterface $orderStateMachine,
         #[Autowire(service: 'state_machine.payment')] private WorkflowInterface $paymentStateMachine,
@@ -172,11 +174,22 @@ class WebhookController extends AbstractController
 
         $this->paymentStateMachine->apply($payment, 'fail');
 
+        // Le paiement ayant echoue, la reservation de stock faite a la
+        // creation de la commande n'a plus lieu d'etre : on restitue.
+        //
+        // C'est la garde `can(..., 'fail')` ci-dessus qui rend l'operation
+        // idempotente : un rejeu Stripe du meme evenement n'arrive jamais
+        // ici, le paiement etant deja dans l'etat 'failed'. Sans cette
+        // barriere, chaque nouvelle tentative gonflerait le stock.
+        $order = $payment->getOrderEntity();
+        $restituees = $order !== null ? $this->orderService->releaseStock($order) : 0;
+
         $this->entityManager->flush();
 
         $this->logger->info('Webhook Stripe : paiement echoue.', [
             'intent_id' => $intentId,
             'payment_id' => $payment->getId(),
+            'stock_restitue' => $restituees,
         ]);
 
         return new JsonResponse(['message' => 'Echec enregistre.'], 200);

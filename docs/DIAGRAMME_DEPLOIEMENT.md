@@ -5,7 +5,7 @@ Schématise l'infrastructure décrite en prose dans [architecture.md](architectu
 > **Révisé le 13/09/2026.** L'écart entre conception et réalité, longtemps béant, s'est en grande partie refermé :
 >
 > - **La pile Docker complète existe** : `docker-compose.yml` à la racine déclare les 5 services (`nginx`, `backend`, `frontend`, `db`, `mailer`), avec `backend/Dockerfile`, `frontend/Dockerfile` et `docker/nginx/default.conf`. `backend/compose.yaml` subsiste à côté, réduit à `db` + `mailer`, pour développer le back sur XAMPP sans monter toute la pile.
-> - **Le SGBD est unifié sur MySQL 8.0** depuis le 01/09/2026 (`serverVersion=8.0` dans `DATABASE_URL`, `mysql:8.0` dans les deux fichiers Compose). L'ancien écart MariaDB 10.4 / MySQL 8 — qui avait fait échouer une migration sur `RENAME INDEX`, absent de MariaDB avant 10.5.2 — n'existe plus.
+> - **Le SGBD n'est unifié que côté Compose.** Les deux fichiers épinglent `mysql:8.0`, mais le développement tourne toujours sur le MariaDB de XAMPP : `SELECT VERSION()` répond `10.4.32-MariaDB` (vérifié le 14/09/2026). `DATABASE_URL` déclare pourtant `serverVersion=8.0`, ce qui fait générer à Doctrine du SQL MySQL 8 contre MariaDB — c'est ce qui avait fait échouer une migration sur `RENAME INDEX`, absent de MariaDB avant 10.5.2. **L'écart dev/prod subsiste.**
 > - **Les sauvegardes existent** : `scripts/backup-db.sh` (mysqldump compressé, rétention 30 jours, mode Docker ou XAMPP).
 >
 > **Ce qui reste vrai** : aucun déploiement n'a eu lieu sur un serveur réel. La configuration Nginx est écrite et cohérente, mais elle n'a tourné qu'en local. Il n'existe ni environnement de staging, ni secrets de production, ni activation du cron de sauvegarde.

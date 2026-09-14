@@ -35,6 +35,7 @@ use App\Repository\RoutineRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity(repositoryClass: RoutineRepository::class)]
 #[ORM\Table(name: 'routine')]
@@ -44,18 +45,25 @@ class Routine
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
+    #[Groups('routine:read')]
     private ?int $id = null;
 
     #[ORM\Column(type: 'string', length: 255)]
+    #[Groups('routine:read')]
     private ?string $name = null;
 
     #[ORM\Column(type: 'string', length: 255, enumType: RoutineLevel::class)]
+    #[Groups('routine:read')]
     private RoutineLevel $level;
 
     #[ORM\Column(type: 'text', nullable: true)]
+    #[Groups('routine:read')]
     private ?string $description = null;
 
+    // Les produits portent le groupe 'product:read' : c'est lui qui decide de
+    // ce qui est expose pour chaque produit imbrique dans une routine.
     #[ORM\ManyToMany(targetEntity: Product::class)]
+    #[Groups('routine:read')]
     private Collection $products;
 
     #[ORM\Column(type: 'datetime')]

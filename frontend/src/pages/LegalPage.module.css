@@ -5,7 +5,7 @@ Design System :
     - Mise en page texte longue, lisible, centree.
     - Utilisee par MentionsLegalesPage, PolitiqueConfidentialitePage, CGVPage.
     - Palette et typographie coherentes avec le reste du site
-      (brun cacao, ivoire, beige / Playfair Display + Lato).
+      (brun cacao, ivoire, beige / Outfit + Lato).
 ===============================================================================*/
 
 .container {
@@ -15,7 +15,7 @@ Design System :
 }
 
 .pageTitle {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Outfit', sans-serif;
     color: #5F4C42;
     font-size: 2.2em;
     margin: 0 0 10px 0;
@@ -38,7 +38,7 @@ Design System :
 }
 
 .content h2 {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Outfit', sans-serif;
     color: #5F4C42;
     font-size: 1.3em;
     margin: 35px 0 12px 0;

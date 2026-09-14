@@ -39,7 +39,7 @@ Structure :
 }
 
 .heroTitle {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Outfit', sans-serif;
     font-size: 4em;
     margin: 0 0 15px 0;
     letter-spacing: 4px;
@@ -76,7 +76,7 @@ Structure :
 .sectionTitle {
     text-align: center;
     color: #5F4C42;
-    font-family: 'Playfair Display', serif;
+    font-family: 'Outfit', sans-serif;
     font-size: 2.2em;
     margin: 0 0 10px 0;
     padding: 0 20px;
@@ -208,7 +208,7 @@ Structure :
 }
 
 .routineName {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Outfit', sans-serif;
     color: #5F4C42;
     margin: 0 0 12px 0;
     font-size: 1.3em;
@@ -254,7 +254,7 @@ Structure :
 }
 
 .tipTitle {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Outfit', sans-serif;
     color: #5F4C42;
     margin: 0 0 10px 0;
     font-size: 1.1em;

@@ -160,7 +160,7 @@ const ConfirmDialog = ({
                     <h2
                         id="confirm-dialog-title"
                         style={{
-                            fontFamily: "'Playfair Display', serif",
+                            fontFamily: "'Outfit', sans-serif",
                             fontSize: '1.35em',
                             color: '#5F4C42',
                             margin: '0 0 8px',

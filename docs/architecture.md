@@ -26,13 +26,17 @@ VOLO est une application e-commerce skincare construite sur une architecture **d
 |---|---|---|
 | **API REST** | Symfony 7, contrôleurs écrits à la main | Exposition des données et logique métier |
 | **Front-end SPA** | React 19 + Vite | Interface utilisateur |
-| **Base de données** | MySQL 8.0 | Persistance des données |
+| **Base de données** | MariaDB 10.4 en dev (XAMPP), MySQL 8.0 en cible Docker | Persistance des données |
 | **Auth** | JWT (LexikJWTBundle), en cookie `HttpOnly` | Authentification stateless |
 | **Infra** | XAMPP (Apache) + proxy Vite en dev ; Nginx + Docker en cible | Développement local et production |
 
 > **❌ API Platform n'est pas utilisé.** Il ne figure pas dans `composer.json`. Chaque endpoint est un contrôleur Symfony écrit à la main qui construit sa réponse avec `JsonResponse`. Toute affirmation contraire — y compris [CONTRAT_API.md](CONTRAT_API.md) §8, qui suggère de générer le contrat depuis les attributs d'entités — repose sur une brique absente.
 >
-> **Le SGBD est unifié sur MySQL 8.0 depuis le 01/09/2026.** `DATABASE_URL` cible explicitement `serverVersion=8.0`, et les deux fichiers Compose épinglent `mysql:8.0`. Auparavant XAMPP livrait MariaDB 10.4 en dev face à MySQL 8 en conteneur : ce n'était pas théorique, `RENAME INDEX` existe en MySQL 5.7+ mais seulement à partir de MariaDB 10.5.2 — une migration l'a appris en échouant.
+> ⚠️ **Le SGBD n'est PAS unifié, contrairement à ce que TECHNOLOGIES.md §2 a longtemps affirmé.** Vérifié le 14/09/2026 en interrogeant le serveur : `SELECT VERSION()` répond **`10.4.32-MariaDB`**. Le développement se fait donc toujours sur le MariaDB de XAMPP, tandis que les deux fichiers Compose épinglent `mysql:8.0`.
+>
+> Pire, `DATABASE_URL` déclare `?serverVersion=8.0`. Ce paramètre ne change pas le serveur : il indique à Doctrine quelle plateforme SQL cibler. On lui fait donc générer du SQL MySQL 8 **contre un serveur MariaDB 10.4**, ce qui rend la panne plus probable, pas moins : `RENAME INDEX` existe depuis MySQL 5.7 mais seulement depuis MariaDB 10.5.2 — une migration l'a déjà appris en échouant en erreur 1064.
+>
+> Ce qui a réellement été fait le 01/09/2026, c'est l'alignement des **fichiers Compose** entre eux. L'écart dev/prod, lui, subsiste. Deux issues honnêtes : faire tourner le dev sur le conteneur `mysql:8.0` plutôt que sur XAMPP, ou déclarer la vraie plateforme en dev via un `.env.local` (`serverVersion=mariadb-10.4.32`). Tant que ni l'une ni l'autre n'est faite, **c'est un écart à énoncer en soutenance, pas à masquer**.
 
 Principe fondamental : **le front-end ne contient aucune logique métier.** Toute règle métier (prix, stock, validation de commande) appartient aux Services Symfony.
 
@@ -197,7 +201,8 @@ components/                      pages/
 └── Skeleton.jsx                 ├── RegisterPage.jsx
                                  ├── ContactPage.jsx
 utils/                           ├── MentionsLegalesPage.jsx
-└── validators.js                ├── CGVPage.jsx
+└── validators.js                ├── PolitiqueConfidentialitePage.jsx
+                                 ├── CGVPage.jsx
                                  └── NotFoundPage.jsx
 ```
 
@@ -293,12 +298,16 @@ Le nommage des colonnes est bien en `snake_case` (`image_url`, `postal_code`, `c
 
 Deux fichiers Compose coexistent, avec des rôles distincts :
 
-| Fichier | Contenu | Usage |
-|---|---|---|
-| `docker-compose.yml` (racine) | 5 services : `nginx`, `backend`, `frontend`, `db`, `mailer` | Pile complète, cible de production |
-| `backend/compose.yaml` | `db` + `mailer` seulement | Dépendances d'appoint quand on développe le back sur XAMPP |
+| Fichier | Services | Conteneurs | Usage |
+|---|---|---|---|
+| `docker-compose.yml` (racine) | `nginx`, `backend`, `frontend`, `db`, `mailer` | `volo-nginx`, `volo-backend`, `volo-frontend`, `volo-db`, `volo-mailer` | Pile complète, cible de production |
+| `backend/compose.yaml` | `volo-db`, `mailer` | `volo-mysql`, `volo-mailer` | Dépendances d'appoint quand on développe le back sur XAMPP |
 
-> ⚠️ **Les noms de services ne sont pas préfixés `volo-`** — c'est le `container_name` qui l'est. [convention_de_nommage.md](convention_de_nommage.md) §7 et [roadmap.md](roadmap.md) 1.1 annoncent `volo-api`, `volo-react`, `volo-nginx` : ces noms n'existent nulle part. Conséquence concrète : `scripts/backup-db.sh` cible `volo-db`, alors que `backend/compose.yaml` nomme son conteneur `volo-mysql` — la sauvegarde ne fonctionne que sur la pile racine.
+> ⚠️ **Les deux fichiers ne nomment pas leurs services de la même façon** : à la racine les services sont génériques (`db`) et seuls les `container_name` portent le préfixe ; dans `backend/compose.yaml` le service lui-même s'appelle `volo-db`, mais son conteneur `volo-mysql`. Il n'existe en revanche ni service ni conteneur nommé `volo-api` ou `volo-react`, contrairement à ce qu'annoncent [convention_de_nommage.md](convention_de_nommage.md) §7 et [roadmap.md](roadmap.md) 1.1.
+>
+> **`VITE_STRIPE_PUBLIC_KEY` arrive par un build arg** — corrigé le 14/09/2026. `frontend/Dockerfile` déclare `ARG VITE_STRIPE_PUBLIC_KEY`, et `docker-compose.yml` le lui passe depuis `STRIPE_PUBLIC_KEY`.
+>
+> Le piège vaut d'être retenu : Vite fige les variables `VITE_*` **au moment du build**, pas au démarrage du conteneur. Les passer en `environment:` n'aurait donc eu aucun effet — le bundle aurait reçu `undefined` et `loadStripe()` aurait échoué en silence, tuant le paiement en production.
 
 En développement, le rôle de Nginx est tenu par le **proxy Vite**, en quelques lignes de `vite.config.js`. Ce n'est pas un pis-aller : c'est ce qui fait tenir les cookies `HttpOnly`, en ramenant React et l'API à une **origine unique**. Le détail est dans [DIAGRAMME_DEPLOIEMENT.md](DIAGRAMME_DEPLOIEMENT.md) §1.
 

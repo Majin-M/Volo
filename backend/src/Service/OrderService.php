@@ -56,26 +56,35 @@ class OrderService
         $order->setStatus(\App\Enum\OrderStatus::PENDING);
 
         // 1. Traitement de l'adresse de livraison
-        if (isset($orderData['shippingAddress']) && is_array($orderData['shippingAddress'])) {
-            /** @var array<string, mixed> $addr */
-            $addr = $orderData['shippingAddress'];
-            $street = strip_tags(trim(is_string($addr['street'] ?? null) ? $addr['street'] : ''));
-            $city = strip_tags(trim(is_string($addr['city'] ?? null) ? $addr['city'] : ''));
-            $postalCode = strip_tags(trim(is_string($addr['postalCode'] ?? null) ? $addr['postalCode'] : ''));
-            $country = strip_tags(trim(is_string($addr['country'] ?? null) ? $addr['country'] : 'France'));
-
-            if ($street === '' || $city === '' || $postalCode === '') {
-                throw new \InvalidArgumentException('L\'adresse de livraison est incomplete (rue, ville et code postal requis).');
-            }
-            if (mb_strlen($street) > 255 || mb_strlen($city) > 100 || mb_strlen($postalCode) > 20 || mb_strlen($country) > 100) {
-                throw new \InvalidArgumentException('Un champ de l\'adresse depasse la longueur maximale autorisee.');
-            }
-
-            $order->setStreet($street);
-            $order->setCity($city);
-            $order->setPostalCode($postalCode);
-            $order->setCountry($country);
+        //
+        // L'adresse est OBLIGATOIRE : les colonnes street/city/postalCode de
+        // shop_order sont NOT NULL. Quand ce bloc etait conditionne par un
+        // `if (isset(...))`, une requete sans 'shippingAddress' traversait la
+        // validation sans rien declencher, puis echouait au flush sur la
+        // contrainte SQL : le client recevait un 500 la ou son erreur meritait
+        // un 400. On refuse donc explicitement, au bon niveau.
+        if (!isset($orderData['shippingAddress']) || !is_array($orderData['shippingAddress'])) {
+            throw new \InvalidArgumentException('L\'adresse de livraison est requise.');
         }
+
+        /** @var array<string, mixed> $addr */
+        $addr = $orderData['shippingAddress'];
+        $street = strip_tags(trim(is_string($addr['street'] ?? null) ? $addr['street'] : ''));
+        $city = strip_tags(trim(is_string($addr['city'] ?? null) ? $addr['city'] : ''));
+        $postalCode = strip_tags(trim(is_string($addr['postalCode'] ?? null) ? $addr['postalCode'] : ''));
+        $country = strip_tags(trim(is_string($addr['country'] ?? null) ? $addr['country'] : 'France'));
+
+        if ($street === '' || $city === '' || $postalCode === '') {
+            throw new \InvalidArgumentException('L\'adresse de livraison est incomplete (rue, ville et code postal requis).');
+        }
+        if (mb_strlen($street) > 255 || mb_strlen($city) > 100 || mb_strlen($postalCode) > 20 || mb_strlen($country) > 100) {
+            throw new \InvalidArgumentException('Un champ de l\'adresse depasse la longueur maximale autorisee.');
+        }
+
+        $order->setStreet($street);
+        $order->setCity($city);
+        $order->setPostalCode($postalCode);
+        $order->setCountry($country);
 
         $totalAmount = 0;
 
@@ -148,5 +157,44 @@ class OrderService
         $this->entityManager->flush();
 
         return $order;
+    }
+
+    /**
+     * Restitue au stock les unites retenues par une commande.
+     *
+     * Le stock est retire des la creation de la commande (statut pending),
+     * avant tout paiement : c'est une reservation. Cette methode en est la
+     * contrepartie, a appeler des que la reservation tombe — paiement
+     * echoue, annulation, ou commande abandonnee.
+     *
+     * NE FLUSHE PAS : l'appelant maitrise sa transaction, et c'est ce qui
+     * permet de restituer plusieurs commandes en un seul flush.
+     *
+     * L'IDEMPOTENCE EST A LA CHARGE DE L'APPELANT. Rien ici n'empeche une
+     * double restitution ; les appelants s'appuient sur la machine a etats,
+     * dont la garde ne laisse passer une transition qu'une seule fois.
+     *
+     * @return int Nombre d'unites effectivement restituees.
+     */
+    public function releaseStock(Order $order): int
+    {
+        $restituees = 0;
+
+        foreach ($order->getItems() as $item) {
+            $product = $item->getProduct();
+            $quantity = $item->getQuantity();
+
+            // Un produit supprime depuis la commande n'a plus de stock a
+            // recevoir : la ligne garde son snapshot (nom, prix), pas la
+            // relation. On ignore sans echouer, le reste doit passer.
+            if ($product === null || $quantity === null || $quantity <= 0) {
+                continue;
+            }
+
+            $product->incrementStock($quantity);
+            $restituees += $quantity;
+        }
+
+        return $restituees;
     }
 }

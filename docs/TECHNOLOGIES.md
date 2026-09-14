@@ -75,7 +75,13 @@ Traduit les objets PHP en SQL. Le vrai bénéfice n'est pas le confort : **Doctr
 
 ### MySQL 8 — ✅ unifié
 
-> ✅ **Résolu le 01/09/2026.** `DATABASE_URL` dans `.env` cible désormais MySQL 8.0 explicitement (`?serverVersion=8.0&charset=utf8mb4`). Les deux `compose.yaml` (racine et backend) utilisent `mysql:8.0`. Doctrine génère les migrations pour MySQL 8 partout, éliminant les incompatibilités MariaDB (ex : `RENAME INDEX`).
+> ⚠️ **Partiellement résolu seulement — cette entrée annonçait à tort une résolution complète.** Vérification du 14/09/2026 : `SELECT VERSION()` sur la base de développement répond **`10.4.32-MariaDB`**.
+>
+> Ce qui a été fait le 01/09/2026 : les deux fichiers Compose épinglent `mysql:8.0`, et `DATABASE_URL` déclare `?serverVersion=8.0`. Ce qui n'a **pas** été fait : changer le serveur de développement, toujours celui de XAMPP.
+>
+> `serverVersion` n'est pas un sélecteur de moteur, c'est une indication de plateforme donnée à Doctrine. Le déclarer à `8.0` devant un MariaDB 10.4 fait générer du SQL MySQL 8 contre un serveur qui ne le comprend pas toujours — la panne `RENAME INDEX` (erreur 1064) devient plus probable, pas moins. `doctrine:schema:validate` signale d'ailleurs une base désynchronisée, cohérent avec cet écart.
+>
+> **Deux issues honnêtes** : développer sur le conteneur `mysql:8.0` plutôt que sur XAMPP, ou déclarer la vraie plateforme en dev via un `.env.local` (`serverVersion=mariadb-10.4.32`). En attendant, l'écart dev/prod doit être énoncé, pas masqué.
 >
 > **Historique** : trois moteurs coexistaient (MariaDB 10.4 sous XAMPP, MySQL 8.0 dans Compose, MySQL 8 en cible prod). Constaté en corrigeant une migration : `RENAME INDEX` existe depuis MySQL 5.7 mais seulement depuis MariaDB 10.5.2 — sur 10.4 il échouait en erreur de syntaxe 1064.
 
