@@ -59,7 +59,7 @@ Titre et description par page. Google exécute le JavaScript : c'est suffisant p
 
 ## 2. Le back-end
 
-### PHP 8.2 + Symfony 7
+### PHP 8.4 + Symfony 7
 
 **Pourquoi Symfony et pas Express/NestJS** : le projet a besoin d'un back-office. Symfony en fournit un (EasyAdmin) en quelques classes ; l'écrire à la main en Node aurait représenté plusieurs semaines. Le composant Security, les Voters, le rate limiter et la validation sont fournis, testés, et maintenus.
 
@@ -77,9 +77,14 @@ Traduit les objets PHP en SQL. Le vrai bénéfice n'est pas le confort : **Doctr
 
 > ⚠️ **Partiellement résolu seulement — cette entrée annonçait à tort une résolution complète.** Vérification du 14/09/2026 : `SELECT VERSION()` sur la base de développement répond **`10.4.32-MariaDB`**.
 >
-> Ce qui a été fait le 01/09/2026 : les deux fichiers Compose épinglent `mysql:8.0`, et `DATABASE_URL` déclare `?serverVersion=8.0`. Ce qui n'a **pas** été fait : changer le serveur de développement, toujours celui de XAMPP.
+> Ce qui a été fait le 01/09/2026 : les deux fichiers Compose épinglent `mysql:8.0`, et `DATABASE_URL` déclarait `?serverVersion=8.0` — valeur corrigée en `8.0.0` le 14/09/2026 (voir ci-dessous). Ce qui n'a **pas** été fait : changer le serveur de développement, toujours celui de XAMPP.
 >
-> `serverVersion` n'est pas un sélecteur de moteur, c'est une indication de plateforme donnée à Doctrine. Le déclarer à `8.0` devant un MariaDB 10.4 fait générer du SQL MySQL 8 contre un serveur qui ne le comprend pas toujours — la panne `RENAME INDEX` (erreur 1064) devient plus probable, pas moins. `doctrine:schema:validate` signale d'ailleurs une base désynchronisée, cohérent avec cet écart.
+> `serverVersion` n'est pas un sélecteur de moteur, c'est une indication de plateforme donnée à Doctrine. **Et `8.0` ne désigne même pas MySQL 8** : DBAL compare `version_compare($version, '8.0.0', '>=')`, et `"8.0"` est jugé *inférieur* à `"8.0.0"`. Vérifié le 14/09/2026 dans l'image Docker : `serverVersion=8.0` sélectionne `MySQLPlatform`, la plateforme générique, et seul `8.0.0` sélectionne `MySQL80Platform`. Cette documentation affirmait que `8.0` faisait « générer du SQL MySQL 8 » : c'était faux. Corrigé en `8.0.0` dans `docker-compose.yml` et `backend/.env.example`.
+>
+> **Ce que `doctrine:schema:validate` signalait, et ce qu'on lui attribuait à tort.** Sa désynchronisation était mise sur le compte de l'écart MariaDB/MySQL. Mesuré le 14/09/2026, elle mêlait deux choses distinctes :
+>
+> - **Du bruit de plateforme.** Interrogée comme un MySQL, la base MariaDB faisait apparaître six écarts fantômes (défauts `NULL`, `roles JSON`). Déclarée sous sa vraie plateforme, `mariadb-10.4.32`, ils disparaissent tous.
+> - **Une vraie dérive**, confirmée **sur un MySQL 8 vierge** où MariaDB n'intervient pas : les migrations ne produisaient pas le schéma du mapping. L'index unique de `shop_order.reference` était créé sous un mauvais nom, et `product.stock` portait un `DEFAULT 0` absent du mapping. Corrigé par `Version20260914120000` et l'alignement du mapping. Les trois bases — MySQL 8 vierge, Docker, développement — sont désormais synchronisées.
 >
 > **Deux issues honnêtes** : développer sur le conteneur `mysql:8.0` plutôt que sur XAMPP, ou déclarer la vraie plateforme en dev via un `.env.local` (`serverVersion=mariadb-10.4.32`). En attendant, l'écart dev/prod doit être énoncé, pas masqué.
 >

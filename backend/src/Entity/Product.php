@@ -73,7 +73,12 @@ class Product
     #[Groups('product:read')]
     private bool $isAvailable = true;
 
-    #[ORM\Column(type: 'integer')]
+    // `options: ['default' => 0]` aligne le mapping sur la base. La migration
+    // Version20260901120000 cree la colonne avec DEFAULT 0, mais le mapping ne
+    // le declarait pas : `doctrine:schema:validate` signalait une base
+    // desynchronisee, et `schema:update` aurait SUPPRIME ce defaut. C'est la
+    // base qui a raison : une insertion hors ORM obtient 0 au lieu d'echouer.
+    #[ORM\Column(type: 'integer', options: ['default' => 0])]
     #[Groups('product:read')]
     private int $stock = 0;
 

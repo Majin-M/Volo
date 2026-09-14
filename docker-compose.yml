@@ -27,7 +27,9 @@ services:
       - backend_public:/app/public:ro
     depends_on:
       backend:
-        condition: service_started
+        # service_healthy et non service_started : Nginx demarrait avant que
+        # PHP-FPM ecoute, et les premieres requetes rendaient un 502.
+        condition: service_healthy
       frontend:
         condition: service_started
     restart: unless-stopped
@@ -40,10 +42,23 @@ services:
     container_name: volo-backend
     volumes:
       - backend_public:/app/public
+      # Les cles JWT survivent aux reconstructions d'image. Sans ce volume,
+      # chaque `docker compose build` en generait de nouvelles et invalidait
+      # tous les jetons en circulation : tous les clients deconnectes a
+      # chaque deploiement.
+      - jwt_keys:/app/config/jwt
     environment:
       APP_ENV: prod
       APP_SECRET: ${APP_SECRET:-change-me-in-production}
-      DATABASE_URL: mysql://volo_user:volo_password@db:3306/volo?serverVersion=8.0&charset=utf8mb4
+      # serverVersion=8.0.0 et NON 8.0 — la difference n'est pas cosmetique.
+      # DBAL compare `version_compare($version, '8.0.0', '>=')` : "8.0" est
+      # juge INFERIEUR a "8.0.0". Doctrine sautait alors MySQL80Platform et
+      # retombait sur MySQLPlatform, la plateforme generique : la pile
+      # generait du SQL qui ne ciblait pas son propre serveur (8.0.46), avec
+      # l'avertissement "Support for MySQL < 8 is deprecated" a chaque requete.
+      # 8.0.0 plutot que 8.0.46 : l'image mysql:8.0 fait evoluer le correctif,
+      # et ce plancher suffit a selectionner la bonne plateforme.
+      DATABASE_URL: mysql://volo_user:volo_password@db:3306/volo?serverVersion=8.0.0&charset=utf8mb4
       MAILER_DSN: smtp://mailer:1025
       MESSENGER_TRANSPORT_DSN: doctrine://default?auto_setup=0
       ADMIN_EMAIL: ${ADMIN_EMAIL:-contact@volo.fr}
@@ -56,6 +71,20 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # Le conteneur n'est « sain » qu'une fois php-fpm en ecoute, donc APRES
+    # que l'entrypoint a joue les migrations. C'est ce qui permet a Nginx
+    # d'attendre une application reellement prete plutot qu'un conteneur
+    # simplement demarre.
+    #
+    # Le test passe par PHP et non par `nc` : busybox ne garantit pas
+    # l'option -z, et un healthcheck qui echoue pour une raison etrangere au
+    # service est pire qu'une absence de healthcheck.
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(@fsockopen('127.0.0.1', 9000) ? 0 : 1);"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
     restart: unless-stopped
 
   # --- Frontend React (Vite build + Nginx) ---
@@ -80,8 +109,15 @@ services:
       MYSQL_DATABASE: volo
       MYSQL_USER: volo_user
       MYSQL_PASSWORD: volo_password
-    ports:
-      - "3306:3306"
+    # AUCUN port publie sur l'hote, deliberement.
+    #
+    # `"3306:3306"` ouvrait MySQL sur toutes les interfaces de la machine :
+    # sur un serveur, la base de production joignable depuis Internet. Le
+    # backend n'en a pas besoin — il atteint `db` par le reseau interne de
+    # Compose. Le symptome qui l'a revele en local est anodin (conflit avec le
+    # MySQL de XAMPP) ; la cause, elle, ne l'etait pas.
+    #
+    # Pour inspecter la base : `docker compose exec db mysql -u root -p`.
     volumes:
       - db_data:/var/lib/mysql
     healthcheck:
@@ -94,7 +130,16 @@ services:
   # --- Mailer (dev/staging : capture tous les emails) ---
   mailer:
     image: axllent/mailpit
-    container_name: volo-mailer
+    # Pas de `container_name` ici, a la difference des autres services.
+    #
+    # `volo-mailer` est un nom global a la machine Docker : il entrait en
+    # collision avec le conteneur du meme nom de `backend/compose.yaml`, et
+    # avec celui de tout autre projet l'ayant reutilise — `docker compose up`
+    # refusait alors de demarrer la pile entiere. Rien ne reference ce nom :
+    # le backend joint le service par son nom reseau `mailer`. Compose le
+    # nomme donc lui-meme (`volo-mailer-1`), sans risque de conflit.
+    #
+    # `volo-db` garde en revanche son nom fixe : scripts/backup-db.sh le cible.
     ports:
       - "1025:1025"
       - "8025:8025"
@@ -106,3 +151,4 @@ services:
 volumes:
   db_data:
   backend_public:
+  jwt_keys:

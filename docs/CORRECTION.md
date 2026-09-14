@@ -488,3 +488,89 @@ La troisième était la plus visible : tout appel sans session la déclenche, et
 **Ce qui a rendu le changement sûr** : `apiCall()` côté React lisait déjà les deux formes (chaîne ou objet imbriqué), et aucun composant ne court-circuite ce wrapper ni ne lit `error` directement — vérifié avant de toucher au backend. Le contrat est désormais épinglé par deux tests existants (`AuthControllerTest`, `CsrfProtectionTest`) qui lisent `error.message` sur des chemins de retour direct.
 
 **Non modifiés, volontairement** : les tableaux de contexte passés au logger dans `WebhookController` et le paramètre `error` du template Twig de connexion admin, qui portent la même clé sans être des réponses d'API.
+
+---
+
+## ✅ Pile Docker : démarrée pour la première fois
+
+> **Corrigé et vérifié le 14/09/2026.**
+
+**Constat** : `docker-compose.yml` décrivait une application complète en cinq services. **Elle n'avait jamais démarré, et ne le pouvait pas.** Les six défauts ci-dessous se sont révélés un par un, chacun masquant le suivant. Aucun n'avait été vu, faute d'avoir lancé la pile une seule fois.
+
+| # | Défaut | Symptôme |
+|---|---|---|
+| 1 | Image en `php:8.2-fpm-alpine`, alors que `doctrine/doctrine-bundle` et `doctrine-migrations-bundle` exigent `^8.4` | `composer install --no-dev` échoue : l'image ne se construit pas |
+| 2 | `APP_ENV` absent au build : le `APP_ENV: prod` de Compose n'existe qu'à l'exécution | `cache:clear` part en `dev`, charge `DebugBundle` non installé, et échoue |
+| 3 | `.dockerignore` excluait `.env.local` mais ni `.env` ni `.env.dev` | Les secrets du poste sont scellés dans l'image, `.env.dev` compris, celui où une clé Stripe avait déjà fuité |
+| 4 | Aucune migration jouée au démarrage | Base vide, sans schéma : aucune requête ne peut aboutir |
+| 5 | Clés JWT générées dans un `RUN` avec `${JWT_PASSPHRASE:-…}`, sans `ARG` déclaré | La passphrase est toujours vide au build : le repli public est scellé dans la clé, et définir une vraie passphrase casse la signature |
+| 6 | `db` publié sur le port `3306` de l'hôte | Base de production joignable depuis Internet. En local, le conflit avec un autre MySQL bloquait le démarrage |
+
+S'y ajoutait un `container_name: volo-mailer` en collision avec un conteneur du même nom : `docker compose up` refusait de démarrer la pile entière.
+
+**Correction** :
+
+- `Dockerfile` : PHP 8.4, `ENV APP_ENV=prod APP_DEBUG=0`, `.env` reconstitué depuis `.env.example`, et plus aucune génération de clés au build.
+- `.dockerignore` : `.env`, `.env.dev`, `.env.test` et `.env.prod` exclus.
+- `backend/docker-entrypoint.sh` (nouveau) : il attend que Doctrine se connecte réellement, génère les clés JWT si elles sont absentes, joue les migrations avec `--allow-no-migration`, réchauffe le cache, puis `exec php-fpm`.
+- `docker-compose.yml` : volume `jwt_keys`, healthcheck backend, Nginx en `service_healthy`, port 3306 retiré, `container_name` du mailer retiré.
+- `.gitattributes` : `*.sh text eol=lf`. En CRLF, un script échoue dans Alpine avec un « no such file or directory » trompeur.
+
+**Vérifié sur la pile en marche** :
+
+| Vérification | Résultat |
+|---|---|
+| Cinq services | Sains |
+| Migrations sur MySQL 8 vierge | 11 migrations appliquées. Première exécution complète hors MariaDB |
+| `/`, `/soins/42`, bundle JS et CSS | 200 |
+| `/api/products`, `/api/brands`, `/sitemap.xml` | 200 |
+| `/admin` → `/admin/login` | 302 puis 200, formulaire avec jeton CSRF |
+| Inscription puis `GET /api/auth/me` sur `localhost` | 201 puis 200 |
+| Image | Tourne en `prod`, `debug=false`. Ne contient ni `.env.dev` ni clé scellée |
+| Recréation du conteneur | Empreinte de la clé privée identique. La session ouverte avant répond toujours 200. Clés conservées, aucune migration en attente, démarrage sans erreur |
+
+**Ce que la vérification a corrigé dans la documentation** : le bloquant HTTPS était présenté comme « garanti ». Il est réel, mais **invisible sur `localhost`**, traité comme origine de confiance : la même inscription, appelée sous le nom `volo.test`, rend `401` sur `/api/auth/me` (détail dans [DIAGRAMME_DEPLOIEMENT.md](DIAGRAMME_DEPLOIEMENT.md) §2).
+
+**Non résolu, volontairement hors de cette étape** : TLS, remplacement de Mailpit par un vrai SMTP, identifiants de base encore en dur, valeurs par défaut qui masquent les oublis. La pile démarre en local ; elle n'est **pas** prête pour un serveur.
+
+---
+
+## ✅ Schéma : trois bases qui ne correspondaient pas au mapping
+
+> **Corrigé et vérifié le 14/09/2026.** Découvert en validant la pile Docker.
+
+**Constat 1 — `serverVersion=8.0` ne désignait pas MySQL 8.** Doctrine affichait « Support for MySQL < 8 is deprecated » sur un serveur MySQL **8.0.46**. La cause : DBAL teste `version_compare($version, '8.0.0', '>=')`, et `"8.0"` est jugé inférieur à `"8.0.0"`. Prouvé dans l'image :
+
+| `serverVersion` | Plateforme sélectionnée |
+|---|---|
+| `8.0` | `MySQLPlatform` (générique) |
+| `8.0.0` | `MySQL80Platform` |
+
+Quatre documents affirmaient que `8.0` faisait « générer du SQL MySQL 8 ». C'était faux.
+
+**Constat 2 — les migrations ne produisaient pas le schéma du mapping.** Sur une base MySQL 8 **vierge**, construite uniquement par les migrations, `doctrine:schema:validate` échouait. Ce n'était donc pas un effet de MariaDB :
+
+- `Version20260901130000` créait l'index unique de `shop_order.reference` sous le nom `UNIQ_338B4B18AEA34913` au lieu de `UNIQ_323FC9CAAEA34913`. Hypothèse d'un renommage de table envisagée puis **écartée** : la table s'appelle `shop_order` depuis sa création ;
+- `product.stock` était créé avec `DEFAULT 0`, absent du mapping.
+
+**Constat 3 — la base de développement ne correspondait pas non plus à ses propres migrations.** Elle avait l'index sous le **bon** nom et `stock` **sans** défaut. Sa désynchronisation apparente, sept instructions, était à six septièmes du bruit : déclarée sous sa vraie plateforme (`mariadb-10.4.32`), elle tombait à une seule. La cause de cette dérive n'a pas pu être établie : l'historique git a été réinitialisé, et les deux migrations y entrent deux jours après leur exécution.
+
+**Correction** :
+
+- `serverVersion=8.0.0` dans `docker-compose.yml` et `backend/.env.example` ;
+- `Product::$stock` : `options: ['default' => 0]`, pour aligner le mapping sur la migration ;
+- `Version20260914120000` : `ALTER … SET DEFAULT 0`, puis `DROP INDEX` + `CREATE UNIQUE INDEX` **uniquement si le mauvais nom existe**. Pas de `RENAME INDEX`, qui échoue sous MariaDB 10.4 ; pas de `DROP` inconditionnel, qui échouerait sur la base de dev. `down()` est déclaré irréversible.
+
+**Vérifié** :
+
+| Base | `schema:validate` |
+|---|---|
+| MySQL 8 vierge (12 migrations, comme la CI) | ✅ in sync — index créé sous le bon nom |
+| Base Docker existante (migration appliquée par l'entrypoint) | ✅ in sync |
+| Base de développement, plateforme `mariadb-10.4.32` | ✅ in sync |
+
+La suite PHPUnit (64 tests) et PHPStan sont restés verts.
+
+> ⚠️ **Incident pendant la vérification, à consigner tel quel.** Pour lire le SQL que la migration produirait sur la base de développement, `doctrine:migrations:migrate --write-sql=<fichier>` a été lancé en croyant que l'option se contentait d'écrire le fichier. **Elle exécute aussi la migration**, sauf combinée à `--dry-run`. La migration a donc été appliquée à la base de développement sans décision préalable. L'effet a été vérifié : une seule instruction (`SET DEFAULT 0`), non destructive, index intact grâce à la condition, version enregistrée cohérente avec le SQL appliqué. C'était la convergence visée — mais l'appliquer devait rester une décision. **Pour prévisualiser sans exécuter : `--dry-run --write-sql`, jamais `--write-sql` seul.**
+
+**Reste à faire en développement** : déclarer `serverVersion=mariadb-10.4.32` dans `backend/.env.local`, pour que Doctrine cesse d'interroger MariaDB comme un MySQL.

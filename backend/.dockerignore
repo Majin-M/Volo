@@ -1,9 +1,27 @@
 var/
 vendor/
-.env.local
-.env.*.local
-config/jwt/*.pem
 .phpunit.cache/
 phpunit.xml
 docker-compose.yml
 compose.yaml
+
+# --- Secrets et configuration du poste : JAMAIS dans l'image ---------------
+#
+# Cette liste excluait `.env.local` mais ni `.env` ni `.env.dev`. Les deux
+# etaient donc copies par `COPY . .` et scelles dans l'image — y compris
+# `.env.dev`, le fichier ou une cle Stripe avait deja ete commitee par le
+# passe. Une image poussee sur un registre aurait emporte les secrets du poste
+# de developpement.
+#
+# L'image reconstitue `.env` depuis `.env.example` (voir Dockerfile) ; les
+# vraies valeurs arrivent a l'execution par docker-compose.yml.
+#
+# ATTENTION : ne pas remplacer ces lignes par `.env.*` — le motif exclurait
+# aussi `.env.example`, dont l'image a besoin.
+.env
+.env.local
+.env.*.local
+.env.dev
+.env.test
+.env.prod
+config/jwt/*.pem

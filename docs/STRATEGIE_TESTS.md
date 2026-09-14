@@ -190,9 +190,13 @@ Pas d'objectif de couverture globale : la priorité va à ce qui touche l'argent
 
 Viser 100% partout produit un faux sentiment de sécurité : on finit par tester des getters. Viser 100% **des branches sur trois classes précises** est vérifiable et défendable.
 
+> ⚠️ **Ce sont des cibles, et rien ne les mesure aujourd'hui.** Aucun taux de couverture n'a jamais été relevé sur ce projet : la CI tourne avec `coverage: none` (`.github/workflows/ci.yml`), et aucune exécution locale n'a produit de rapport. Ce tableau dit donc où l'on veut aller, **pas où l'on est**. Le lire comme un résultat serait exactement l'erreur que ce document reproche à la version qui annonçait « 20 assertions, toutes vertes » pour un fichier qui n'existait pas.
+>
+> Mesurer suppose d'activer Xdebug ou PCOV — d'où le coût, et d'où le report assumé.
+
 ---
 
-## 9. Pipeline CI (à créer)
+## 9. Pipeline CI
 
 ✅ **La CI est en place depuis le 14/09/2026** — `.github/workflows/ci.yml`.
 
@@ -213,7 +217,31 @@ Elle existe pour une raison précise : les affirmations de ce document (« les t
 - Le workflow React Doctor existait mais n'avait **jamais tourné** : il était placé dans `frontend/.github/workflows/`, alors que GitHub ne lit que `<racine>/.github/workflows/`. Il ciblait en outre la branche `main` quand le dépôt est sur `master`. Deux raisons indépendantes pour un même silence.
 - La CI part de `.env.example` pour reconstituer `.env`, comme le ferait quelqu'un qui clone. Effet de bord voulu : **si le modèle devient incomplet, la CI casse**. Le modèle est ainsi vérifié, pas seulement promis. C'est d'ailleurs ce mécanisme qui a révélé l'absence de `DEFAULT_URI` dans la première version du modèle.
 
-**Note sur la version de PHP** : la CI cible **8.4**, pas 8.2. Le projet déclare `>=8.2` et son image Docker de production utilise 8.2 — ce qui fonctionne, celle-ci installant avec `--no-dev`. Mais PHPUnit 13.3.2 exige `>= 8.4.1` : **la suite de tests ne peut pas tourner sous 8.2**. « PHP 8.2+ » vaut pour exécuter l'application, pas pour la développer.
+### Ce qu'il a fallu pour qu'elle passe au vert
+
+Elle n'est pas passée du premier coup, et le dire vaut mieux que de laisser croire le contraire. Trois exécutions :
+
+| Exécution | Backend | Frontend | Cause |
+|---|---|---|---|
+| 1 | ❌ | ❌ | Création de la base de test ; lock npm |
+| 2 | ✅ | ❌ | Lock npm |
+| 3 | ✅ | ✅ | — |
+
+**Panne 1 — `doctrine:database:create`.** L'étape échouait (exit 255) pour la raison que ce document consignait déjà en tête : la commande se connecte à la base avant de la créer. Elle *semblait* passer en local uniquement parce que `volo_test` existait déjà et que `--if-not-exists` n'avait rien à faire — **la validation locale de cette étape ne valait donc rien**. Remplacée par un `CREATE DATABASE IF NOT EXISTS` via le client `mysql`, qui n'a pas besoin que la base existe.
+
+**Panne 2 — `npm ci` sous Linux.** `@emnapi/core` et `@emnapi/runtime` étaient présents dans `package-lock.json`, mais **imbriqués** sous `@rolldown/binding-wasm32-wasi/node_modules/`. Sur Linux, npm calcule un arbre qui les attend à la racine : le lock, généré sous Windows, était valide localement et incomplet en CI. Ni une réconciliation du lock existant ni `npm install --os=linux --cpu=x64` n'y changeaient quoi que ce soit — npm considère le lock « à jour » et ne recalcule pas. Il a fallu le régénérer entièrement, ce qui a fait bouger 173 paquets **transitifs** (aucune dépendance directe), tous dans les plages semver déjà déclarées.
+
+**La leçon commune aux deux** : une étape validée sur le poste de développement n'est pas une étape validée. La première panne portait précisément sur celle que j'avais annoncée comme vérifiée, et l'étape que j'avais signalée comme non vérifiable en local (`lexik:jwt:generate-keypair`, cassée par une particularité OpenSSL sous Windows) est passée sans incident.
+
+**Note sur la version de PHP — et sur une erreur de raisonnement qu'elle a produite.**
+
+La CI cible **8.4**. La version précédente de ce paragraphe affirmait : « le projet déclare `>=8.2` et son image Docker de production utilise 8.2 — ce qui fonctionne, celle-ci installant avec `--no-dev` ». **C'était faux, et déduit au lieu d'être vérifié.**
+
+`composer why-not php 8.2` répond sans ambiguïté : six paquets de **production** exigent `^8.4`, dont `doctrine/doctrine-bundle` et `doctrine/doctrine-migrations-bundle`. `--no-dev` n'y change rien — ce sont des dépendances de production. **L'image `php:8.2-fpm-alpine` ne pouvait donc pas se construire**, l'étape `composer install --no-dev` échouant. Personne ne l'avait constaté parce qu'aucun déploiement n'a jamais eu lieu.
+
+Corrigé le 14/09/2026 : `Dockerfile` passé en `php:8.4-fpm-alpine`, `composer.json` déclare `>=8.4`. Le lock n'a bougé que sur son empreinte — aucune version de paquet modifiée.
+
+La leçon est la même que pour la création de la base de test : **« ça devrait fonctionner » n'est pas une vérification.** Une commande d'une seconde départageait, et il a fallu une question sur la solidité du projet pour la taper.
 
 Étapes restant à ajouter :
 

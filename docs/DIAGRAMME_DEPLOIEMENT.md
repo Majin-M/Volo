@@ -5,7 +5,7 @@ Schématise l'infrastructure décrite en prose dans [architecture.md](architectu
 > **Révisé le 13/09/2026.** L'écart entre conception et réalité, longtemps béant, s'est en grande partie refermé :
 >
 > - **La pile Docker complète existe** : `docker-compose.yml` à la racine déclare les 5 services (`nginx`, `backend`, `frontend`, `db`, `mailer`), avec `backend/Dockerfile`, `frontend/Dockerfile` et `docker/nginx/default.conf`. `backend/compose.yaml` subsiste à côté, réduit à `db` + `mailer`, pour développer le back sur XAMPP sans monter toute la pile.
-> - **Le SGBD n'est unifié que côté Compose.** Les deux fichiers épinglent `mysql:8.0`, mais le développement tourne toujours sur le MariaDB de XAMPP : `SELECT VERSION()` répond `10.4.32-MariaDB` (vérifié le 14/09/2026). `DATABASE_URL` déclare pourtant `serverVersion=8.0`, ce qui fait générer à Doctrine du SQL MySQL 8 contre MariaDB — c'est ce qui avait fait échouer une migration sur `RENAME INDEX`, absent de MariaDB avant 10.5.2. **L'écart dev/prod subsiste.**
+> - **Le SGBD n'est unifié que côté Compose.** Les deux fichiers épinglent `mysql:8.0`, mais le développement tourne toujours sur le MariaDB de XAMPP : `SELECT VERSION()` répond `10.4.32-MariaDB` (vérifié le 14/09/2026). `DATABASE_URL` déclarait pourtant `serverVersion=8.0` — valeur que DBAL juge inférieure à `8.0.0`, et qui sélectionnait donc la plateforme MySQL **générique**, pas même MySQL 8 (vérifié le 14/09/2026, corrigé en `8.0.0` côté Docker). Déclarer une plateforme MySQL face à MariaDB avait fait échouer une migration sur `RENAME INDEX`, absent de MariaDB avant 10.5.2. En développement, la valeur juste est `mariadb-10.4.32`. **L'écart dev/prod subsiste**, mais les schémas convergent désormais : MySQL 8 vierge, Docker et développement passent `doctrine:schema:validate`.
 > - **Les sauvegardes existent** : `scripts/backup-db.sh` (mysqldump compressé, rétention 30 jours, mode Docker ou XAMPP).
 >
 > **Ce qui reste vrai** : aucun déploiement n'a eu lieu sur un serveur réel. La configuration Nginx est écrite et cohérente, mais elle n'a tourné qu'en local. Il n'existe ni environnement de staging, ni secrets de production, ni activation du cron de sauvegarde.
@@ -126,6 +126,17 @@ Google, lui, exécute le JS — le référencement pur fonctionne sans ce dispos
 > Les cookies `volo_token` et `volo_csrf` portent le drapeau `Secure`. Un navigateur **n'envoie jamais** un cookie `Secure` sur une connexion HTTP. Un déploiement en HTTP produirait donc une connexion qui « réussit » (200 sur `/api/auth/login`) suivie d'un `GET /api/auth/me` en 401, sans aucun message d'erreur explicite.
 >
 > C'est la conséquence directe et non négociable du choix de §1 de [CONTRAT_API.md](CONTRAT_API.md). La tâche 5.4 de la roadmap est marquée 🟠 Haute ; elle est en réalité **🔴 bloquante**.
+>
+> **✅ Reproduit le 14/09/2026 sur la pile Docker — avec un piège de plus que prévu.** La pile, servie en HTTP simple sur le port 80 :
+>
+> | Hôte appelé | `POST /api/auth/register` | `GET /api/auth/me` |
+> |---|---|---|
+> | `localhost` | 201 | **200** |
+> | `volo.test` (résolu vers la même machine) | 201 | **401** |
+>
+> **Le bloquant est invisible en local.** `localhost` est traité comme une origine de confiance : le cookie `Secure` y est renvoyé même sans TLS. Constaté avec curl ; Chrome et Firefox appliquent la même exception à `localhost`. Dès que l'hôte est un vrai nom, le cookie n'est plus renvoyé et la session disparaît.
+>
+> Conséquence pratique : **tous les tests faits sur le poste de développement passeront**, et la première mise en ligne en HTTP cassera la connexion sans aucun message. Pour éprouver ce comportement avant un déploiement, il faut appeler la pile par un autre nom que `localhost` — `curl --resolve volo.test:80:127.0.0.1 http://volo.test/...` suffit.
 
 ---
 
@@ -133,7 +144,7 @@ Google, lui, exécute le JS — le référencement pur fonctionne sans ce dispos
 
 | Élément | État | Conséquence |
 |---|---|---|
-| `docker-compose.yml` complet | ✅ Présent (5 services) | L'environnement devient reproductible ; reste à l'éprouver sur une machine autre que le poste de développement |
+| `docker-compose.yml` complet | ✅ **Démarré et éprouvé en local le 14/09/2026** (5 services sains) | Avant cette date, la pile **n'avait jamais démarré** — et ne le pouvait pas. Six défauts levés pour y parvenir : image en PHP 8.2 alors que `doctrine/doctrine-bundle` exige `^8.4` ; aucune migration jouée (base vide) ; clés JWT scellées au build avec une passphrase toujours vide ; `APP_ENV` absent au build (`cache:clear` en échec) ; `.env` et `.env.dev` du poste copiés dans l'image ; MySQL publié sur le port 3306 de l'hôte. Vérifié : routes SPA, API, admin et sitemap à travers Nginx ; inscription puis session ; clés et sessions conservées après recréation du conteneur. **Reste non éprouvé : toute machine autre que le poste de développement** |
 | Déploiement réel | Inexistant | La configuration Nginx n'a jamais tourné ailleurs qu'en local : pour de l'infrastructure, elle est donc à considérer comme non éprouvée |
 | Environnement de staging | Inexistant | Rien n'est testé dans des conditions proches de la production avant d'y arriver |
 | CI/CD | ✅ En place (14/09/2026) | `.github/workflows/ci.yml` : PHPUnit sur MySQL 8, PHPStan `level: max`, Vitest, build. ESLint signalant mais non bloquant (4 erreurs préexistantes). Déploiement toujours manuel |

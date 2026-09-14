@@ -79,7 +79,7 @@ Offrir un espace de pilotage pour gérer le catalogue, les commandes et les util
 ```
 volo/
 │
-├── backend/                         # API Symfony (PHP 8.2+, Symfony 7.4)
+├── backend/                         # API Symfony (PHP 8.4+, Symfony 7.4)
 │   ├── src/
 │   │   ├── Controller/               # Endpoints API (Auth, Product, Order, Payment, Contact, Webhook, Sitemap…)
 │   │   │   └── Admin/                # Back-office EasyAdmin (Dashboard + CRUD)
@@ -148,22 +148,30 @@ La pile complète (Nginx + backend Symfony + frontend React + MySQL + Mailpit) e
 git clone <url-du-repo>
 cd Volo
 
-# Variables d'environnement (à adapter : APP_SECRET, clés Stripe, etc.)
-cp backend/.env.example backend/.env.local     # puis renseigner les valeurs
-cp frontend/.env.example frontend/.env.local   # clé publique Stripe
+# Variables d'environnement : le fichier .env A LA RACINE, et lui seul.
+cp .env.example .env
+# puis y remplacer au minimum APP_SECRET et JWT_PASSPHRASE :
+#   php -r "echo bin2hex(random_bytes(16));"
 
 docker compose up -d --build
 ```
 
-- Application : http://localhost (proxy Nginx)
-- Interface Mailpit (emails capturés en dev) : http://localhost:8025
-- Base de données MySQL : `localhost:3306` (`volo_user` / `volo_password`)
+> ⚠️ **C'est le `.env` racine que Compose lit, pas `backend/.env.local` ni `frontend/.env.local`.** Ces deux derniers sont exclus des images (`.dockerignore`) et n'ont aucun effet sur la pile Docker. Si le `.env` racine manque ou reste vide, la pile **démarre quand même**, avec les valeurs par défaut publiques du dépôt (`APP_SECRET=change-me-in-production`, passphrase JWT connue) et une clé Stripe vide.
 
-Appliquer les migrations et charger les fixtures :
+Au démarrage, le conteneur `backend` **attend la base, génère les clés JWT et joue les migrations tout seul** : rien à lancer à la main. Suivre sa progression avec `docker compose logs -f backend` (lignes préfixées `[volo]`).
+
+- Application : http://localhost (proxy Nginx)
+- Interface Mailpit (emails capturés) : http://localhost:8025
+- Base de données : **non exposée sur l'hôte**, volontairement. Pour l'inspecter : `docker compose exec db mysql -u root -p`
+
+Créer un compte administrateur pour accéder à `/admin` :
 ```bash
-docker compose exec backend php bin/console doctrine:migrations:migrate
-docker compose exec backend php bin/console doctrine:fixtures:load
+docker compose exec backend php bin/console app:create-admin admin@exemple.fr 'MotDePasseSolide!'
 ```
+
+> **Pas de données de démonstration dans la pile Docker.** L'image est construite comme en production (`composer install --no-dev`) : `doctrine:fixtures:load` n'y existe pas. Le catalogue démarre vide ; le remplir depuis `/admin`, ou charger les fixtures via l'option B.
+>
+> **Sessions et HTTPS** : en local sur `localhost`, la connexion fonctionne en HTTP. Sur tout autre nom d'hôte, elle échoue sans HTTPS, les cookies étant `Secure` en production. Voir [DIAGRAMME_DEPLOIEMENT.md](docs/DIAGRAMME_DEPLOIEMENT.md) §2.
 
 Arrêter la pile :
 ```bash
@@ -172,7 +180,7 @@ docker compose down       # -v pour supprimer aussi les volumes (données)
 
 ### Option B — En local, sans Docker
 
-#### Backend (Symfony, PHP 8.2+)
+#### Backend (Symfony, PHP 8.4+)
 ```bash
 cd backend
 composer install
@@ -190,7 +198,7 @@ php -S localhost:8000 -t public
 
 Variables clés à renseigner (`backend/.env.local`) :
 - `APP_SECRET`
-- `DATABASE_URL` — attention, `serverVersion` doit décrire le **vrai** serveur (`mariadb-10.4.32` sous XAMPP, `8.0` sous Docker)
+- `DATABASE_URL` — attention, `serverVersion` doit décrire le **vrai** serveur (`mariadb-10.4.32` sous XAMPP, `8.0.0` sous Docker — **trois chiffres** : Doctrine juge `8.0` inférieur à `8.0.0` et sélectionne alors une plateforme MySQL générique, pas MySQL 8)
 - `MAILER_DSN`
 - `JWT_PASSPHRASE` (celle utilisée pour générer la paire de clés ci-dessus)
 - `STRIPE_SECRET_KEY` / `STRIPE_PUBLIC_KEY` / `STRIPE_WEBHOOK_SECRET`

@@ -29,6 +29,7 @@ use App\Entity\User;
 use App\Repository\OrderRepository;
 use App\Security\OrderVoter;
 use App\Service\OrderService;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -37,14 +38,17 @@ use Symfony\Component\Routing\Attribute\Route;
 class OrderController extends AbstractController
 {
     private OrderService $orderService;
-    private OrderRepository $orderRepository; 
+    private OrderRepository $orderRepository;
+    private LoggerInterface $logger;
 
     public function __construct(
         OrderService $orderService,
-        OrderRepository $orderRepository 
+        OrderRepository $orderRepository,
+        LoggerInterface $logger,
     ) {
         $this->orderService = $orderService;
         $this->orderRepository = $orderRepository;
+        $this->logger = $logger;
     }
 
     /**
@@ -109,6 +113,18 @@ class OrderController extends AbstractController
         } catch (\InvalidArgumentException $e) {
             return ApiError::response($e->getMessage(), 400);
         } catch (\Exception $e) {
+            // On masque la cause au client — un message d'exception peut
+            // divulguer la structure interne — mais on la JOURNALISE.
+            //
+            // Sans cette ligne, $e etait capture puis jamais lu : une creation
+            // de commande qui echoue ne laissait aucune trace. Sur le chemin
+            // de l'argent, c'est le pire endroit ou perdre l'information :
+            // le client voit une erreur, et personne ne peut dire laquelle.
+            $this->logger->error('Echec de creation de commande.', [
+                'exception' => $e,
+                'user' => $this->getUser()?->getUserIdentifier(),
+            ]);
+
             return ApiError::response('Erreur interne du serveur.', 500);
         }
     }

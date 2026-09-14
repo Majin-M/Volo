@@ -34,7 +34,7 @@ VOLO est une application e-commerce skincare construite sur une architecture **d
 >
 > ⚠️ **Le SGBD n'est PAS unifié, contrairement à ce que TECHNOLOGIES.md §2 a longtemps affirmé.** Vérifié le 14/09/2026 en interrogeant le serveur : `SELECT VERSION()` répond **`10.4.32-MariaDB`**. Le développement se fait donc toujours sur le MariaDB de XAMPP, tandis que les deux fichiers Compose épinglent `mysql:8.0`.
 >
-> Pire, `DATABASE_URL` déclare `?serverVersion=8.0`. Ce paramètre ne change pas le serveur : il indique à Doctrine quelle plateforme SQL cibler. On lui fait donc générer du SQL MySQL 8 **contre un serveur MariaDB 10.4**, ce qui rend la panne plus probable, pas moins : `RENAME INDEX` existe depuis MySQL 5.7 mais seulement depuis MariaDB 10.5.2 — une migration l'a déjà appris en échouant en erreur 1064.
+> Pire, `DATABASE_URL` déclarait `?serverVersion=8.0`. Ce paramètre ne change pas le serveur : il indique à Doctrine quelle plateforme SQL cibler. **Et `8.0` ne désigne même pas MySQL 8** : DBAL le juge inférieur à `8.0.0` et retombe sur `MySQLPlatform`, la plateforme générique (vérifié le 14/09/2026). Il est désormais `8.0.0` pour Docker. Face à un MariaDB 10.4, déclarer une plateforme MySQL reste un piège : `RENAME INDEX` n'existe dans MariaDB qu'à partir de 10.5.2, et une migration l'a déjà appris en échouant en erreur 1064. En développement, la valeur juste est `serverVersion=mariadb-10.4.32`.
 >
 > Ce qui a réellement été fait le 01/09/2026, c'est l'alignement des **fichiers Compose** entre eux. L'écart dev/prod, lui, subsiste. Deux issues honnêtes : faire tourner le dev sur le conteneur `mysql:8.0` plutôt que sur XAMPP, ou déclarer la vraie plateforme en dev via un `.env.local` (`serverVersion=mariadb-10.4.32`). Tant que ni l'une ni l'autre n'est faite, **c'est un écart à énoncer en soutenance, pas à masquer**.
 
@@ -300,7 +300,7 @@ Deux fichiers Compose coexistent, avec des rôles distincts :
 
 | Fichier | Services | Conteneurs | Usage |
 |---|---|---|---|
-| `docker-compose.yml` (racine) | `nginx`, `backend`, `frontend`, `db`, `mailer` | `volo-nginx`, `volo-backend`, `volo-frontend`, `volo-db`, `volo-mailer` | Pile complète, cible de production |
+| `docker-compose.yml` (racine) | `nginx`, `backend`, `frontend`, `db`, `mailer` | `volo-nginx`, `volo-backend`, `volo-frontend`, `volo-db`, et `volo-mailer-1` nommé par Compose (voir ci-dessous) | Pile complète, cible de production |
 | `backend/compose.yaml` | `volo-db`, `mailer` | `volo-mysql`, `volo-mailer` | Dépendances d'appoint quand on développe le back sur XAMPP |
 
 > ⚠️ **Les deux fichiers ne nomment pas leurs services de la même façon** : à la racine les services sont génériques (`db`) et seuls les `container_name` portent le préfixe ; dans `backend/compose.yaml` le service lui-même s'appelle `volo-db`, mais son conteneur `volo-mysql`. Il n'existe en revanche ni service ni conteneur nommé `volo-api` ou `volo-react`, contrairement à ce qu'annoncent [convention_de_nommage.md](convention_de_nommage.md) §7 et [roadmap.md](roadmap.md) 1.1.

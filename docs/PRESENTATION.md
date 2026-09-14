@@ -412,7 +412,7 @@ Plus un lien « Retour au site » vers la SPA.
 | Front-end | React | 19 | SPA pour un panier réactif, filtres sans rechargement. Context API suffit (pas Redux) |
 | Build tool | Vite | 8 | HMR instantané + proxy `/api` (pièce d'architecture pour les cookies HttpOnly) |
 | Back-end | Symfony | 7.4 | Écosystème sécurité (firewalls, voters, rate limiter), EasyAdmin, Mailer |
-| ORM | Doctrine | — | Paramétrage systématique des requêtes → injection SQL structurellement impossible |
+| ORM | Doctrine | — | Requêtes construites via QueryBuilder et `setParameter()` — **aucune requête SQL brute ni concaténation dans `src/`** (vérifiable par `grep -rE "executeQuery\|createNativeQuery" src/`). L'injection SQL est écartée par cette pratique, pas rendue impossible par l'outil : une future requête native concaténée rouvrirait la porte |
 | BDD | MySQL 8.0 (Docker, CI) / MariaDB 10.4 (XAMPP, dev) | — | **Non unifié** : les deux fichiers Compose épinglent `mysql:8.0`, le poste de développement tourne sur le MariaDB de XAMPP. L'écart est connu et documenté ([DIAGRAMME_DEPLOIEMENT.md](DIAGRAMME_DEPLOIEMENT.md)) |
 | Auth | LexikJWTBundle | — | JWT RSA signé, stocké en cookie HttpOnly (jamais en localStorage) |
 | Paiement | Stripe (SDK PHP + React Elements) | — | Le numéro de carte ne transite jamais par VOLO (conformité PCI-DSS légère) |
@@ -509,7 +509,7 @@ Développement itératif en **5 phases** inspiré du Kanban.
 | Tiers | Composant | Technologie |
 |---|---|---|
 | **Présentation** | SPA React (navigateur) | React 19 + Vite + CSS Modules |
-| **Logique métier** | API REST Symfony | PHP 8.2 + Symfony 7.4 |
+| **Logique métier** | API REST Symfony | PHP 8.4 + Symfony 7.4 |
 | **Données** | Base de données relationnelle | MySQL 8.0 + Doctrine ORM |
 
 ### Architecture multicouches Symfony
@@ -709,7 +709,7 @@ docker-compose.yml — 5 services :
 └───────────────────────────────────────────────────┘
 ```
 
-**Dockerfile backend** : PHP 8.2-fpm-alpine, extensions `intl`, `pdo_mysql`, `zip`, `opcache`, `mbstring`. Composer 2. Génération automatique des clés RSA JWT si absentes.
+**Dockerfile backend** : PHP 8.4-fpm-alpine (8.2 auparavant — l'image ne se construisait pas, `doctrine/doctrine-bundle` exigeant `^8.4`), extensions `intl`, `pdo_mysql`, `zip`, `opcache`, `mbstring`. Composer 2. Génération automatique des clés RSA JWT si absentes.
 
 **Dockerfile frontend** : multi-stage. Stage 1 (node:22-alpine) : `npm ci` + `vite build`. Stage 2 (nginx:alpine) : copie du `dist/` dans nginx.
 
@@ -1039,6 +1039,6 @@ Dependencies:
 | ~~**Permissions-Policy**~~ | ✅ **Implémenté** — Header `Permissions-Policy: camera=(), microphone=(), geolocation=()` ajouté dans `SecurityHeadersSubscriber` |
 | ~~**Sauvegardes automatisées**~~ | ✅ **Implémenté** — Script `scripts/backup-db.sh` : `mysqldump` compressé (gzip), rétention 30 jours avec purge automatique, mode Docker (`volo-db`) ou local XAMPP (`--local`). Prêt pour cron (`0 3 * * *`). Axe restant : monitoring et alerting conteneurs |
 | ~~**Composant PrivateRoute**~~ | ✅ **Implémenté** — `PrivateRoute.jsx` wraps les routes protégées (`/commande`, `/confirmation`, `/mes-commandes`, `/mon-compte`) dans `App.jsx`. Utilise `useAuth()` : redirige vers `/connexion` si non authentifié, affiche un loader pendant la restauration de session. Suppression du guard ad hoc dans `AccountPage` |
-| **Unifier le SGBD** | 🟠 **Partiel.** Les deux `compose.yaml` utilisent `mysql:8.0`, mais le développement tourne toujours sur le MariaDB 10.4.32 de XAMPP — `SELECT VERSION()` fait foi. `DATABASE_URL` déclare `serverVersion=8.0` : Doctrine génère donc du SQL MySQL 8 contre MariaDB, ce qui rend la panne `RENAME INDEX` plus probable, pas moins. À trancher : développer sur le conteneur, ou déclarer `serverVersion=mariadb-10.4.32` en `.env.local` |
+| **Unifier le SGBD** | 🟠 **Partiel.** Les deux `compose.yaml` utilisent `mysql:8.0`, mais le développement tourne toujours sur le MariaDB 10.4.32 de XAMPP — `SELECT VERSION()` fait foi. `DATABASE_URL` déclarait `serverVersion=8.0`, que DBAL juge inférieur à `8.0.0` : Doctrine retombait sur la plateforme MySQL **générique**, pas même MySQL 8 (vérifié le 14/09/2026, corrigé en `8.0.0` côté Docker). Les schémas, eux, convergent désormais : une migration de convergence a aligné le nom d'un index et un défaut de colonne, et MySQL 8 vierge, Docker et développement passent `doctrine:schema:validate`. Reste à trancher : développer sur le conteneur, ou déclarer `serverVersion=mariadb-10.4.32` en `.env.local` |
 | ~~**Issues React Doctor**~~ | 🟠 **En grande partie corrigé** — score 94/100 au 14/09/2026, 2 avertissements subsistants (voir §13, non corrigés à dessein). 6 issues identifiées et résolues : `ConfirmDialog` migré vers `<dialog>` natif (accessibilité + suppression de la gestion manuelle d'Escape/focus), `ToastContext` stabilisé avec `useMemo` (évite les re-renders inutiles des consommateurs), `AccountPage` refactoré avec `useReducer` (9 `useState` liés consolidés), `HomePage` clés stables sans index de tableau, `ProductDetailPage` pattern `AbortController` + `.then()` au lieu de `async/await` dans `useEffect` |
 | **Backlog v2** | Programme de fidélité, diagnostic peau (questionnaire → routine personnalisée), blog skincare, avis produits, wishlist, application mobile (React Native sur la même API), multi-langue |
