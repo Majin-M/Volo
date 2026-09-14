@@ -11,14 +11,30 @@ use App\Entity\User;
 use App\Enum\OrderStatus;
 use App\Enum\PaymentMethod;
 use App\Enum\PaymentStatus;
+use App\Service\PaymentGateway\PaymentGatewayInterface;
+use App\Service\PaymentGateway\PaymentIntentResult;
+use App\Service\PaymentGateway\StripePaymentGateway;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
+/*
+===============================================================================
+Test fonctionnel : webhook Stripe
+===============================================================================
+Revise le 14/09/2026. Deux tests de la version precedente FIGEAIENT LE BUG :
+`testPaymentIntentFailedMarqueEchec` exigeait qu'un refus de carte fasse passer
+le paiement a `failed`. Or chez Stripe, un refus laisse le paiement ouvert ;
+le client reessaie et reussit. Le succes suivant etait alors ignore — client
+debite, commande jamais payee. La CI etait verte parce qu'elle verifiait
+l'erreur elle-meme.
+===============================================================================
+*/
 class WebhookStripeTest extends WebTestCase
 {
     private const WEBHOOK_SECRET = 'whsec_test_secret';
     private const INTENT_ID = 'pi_test_abc123';
+    private const STOCK_INITIAL = 5;
 
     private KernelBrowser $client;
     private EntityManagerInterface $em;
@@ -32,7 +48,7 @@ class WebhookStripeTest extends WebTestCase
 
         $connection = $this->em->getConnection();
         $connection->executeStatement('SET FOREIGN_KEY_CHECKS = 0');
-        foreach (['payment', 'order_item', 'shop_order', 'product', 'brand', 'user'] as $table) {
+        foreach (['audit_log', 'payment', 'order_item', 'shop_order', 'product', 'brand', 'user'] as $table) {
             $connection->executeStatement('TRUNCATE TABLE ' . $table);
         }
         $connection->executeStatement('SET FOREIGN_KEY_CHECKS = 1');
@@ -58,6 +74,7 @@ class WebhookStripeTest extends WebTestCase
         $product->setName('Serum Test')
             ->setPrice('29.90')
             ->setDescription('Un serum de test')
+            ->setStock(self::STOCK_INITIAL)
             ->setBrand($brand);
         $this->em->persist($product);
 
@@ -129,7 +146,63 @@ class WebhookStripeTest extends WebTestCase
         $this->client->request('POST', '/api/webhooks/stripe', [], [], $headers, $payload);
     }
 
-    // --- Tests ---
+    private function envoyerEvenement(string $type): void
+    {
+        $payload = $this->construirePayload($type, self::INTENT_ID);
+        $this->envoyerWebhook($payload, $this->construireSignature($payload));
+    }
+
+    private function recharger(Payment $payment): Payment
+    {
+        $this->em->clear();
+
+        return $this->em->find(Payment::class, $payment->getId());
+    }
+
+    private function stockDuProduit(Payment $payment): int
+    {
+        return $payment->getOrderEntity()->getItems()->first()->getProduct()->getStock();
+    }
+
+    /**
+     * Remplace la passerelle Stripe par un double qui enregistre les appels.
+     * Aucun test ne doit contacter Stripe : la cle de .env.test est factice.
+     */
+    private function passerelleFactice(): object
+    {
+        $factice = new class implements PaymentGatewayInterface {
+            /** @var string[] */
+            public array $remboursements = [];
+            /** @var string[] */
+            public array $annulations = [];
+
+            public function supports(PaymentMethod $method): bool
+            {
+                return $method === PaymentMethod::CARD;
+            }
+
+            public function createIntent(Order $order): PaymentIntentResult
+            {
+                throw new \LogicException('Non utilise dans ce test.');
+            }
+
+            public function cancelIntent(string $externalId): void
+            {
+                $this->annulations[] = $externalId;
+            }
+
+            public function refund(string $externalId): void
+            {
+                $this->remboursements[] = $externalId;
+            }
+        };
+
+        static::getContainer()->set(StripePaymentGateway::class, $factice);
+
+        return $factice;
+    }
+
+    // --- Signature et routage ---
 
     public function testWebhookSansSignatureRetourne400(): void
     {
@@ -147,70 +220,10 @@ class WebhookStripeTest extends WebTestCase
         $this->assertResponseStatusCodeSame(400);
     }
 
-    public function testPaymentIntentSucceededCaptureLePaiement(): void
-    {
-        $payment = $this->creerCommandeAvecPaiement();
-        $payload = $this->construirePayload('payment_intent.succeeded', self::INTENT_ID);
-        $signature = $this->construireSignature($payload);
-
-        $this->envoyerWebhook($payload, $signature);
-
-        $this->assertResponseStatusCodeSame(200);
-
-        $this->em->clear();
-        $updated = $this->em->find(Payment::class, $payment->getId());
-        $this->assertSame(PaymentStatus::CAPTURED, $updated->getStatus());
-        $this->assertSame(OrderStatus::PAID, $updated->getOrderEntity()->getStatus());
-    }
-
-    public function testPaymentIntentSucceededEstIdempotent(): void
-    {
-        $this->creerCommandeAvecPaiement(PaymentStatus::CAPTURED, OrderStatus::PAID);
-        $payload = $this->construirePayload('payment_intent.succeeded', self::INTENT_ID);
-        $signature = $this->construireSignature($payload);
-
-        $this->envoyerWebhook($payload, $signature);
-
-        $this->assertResponseStatusCodeSame(200);
-        $response = json_decode($this->client->getResponse()->getContent(), true);
-        $this->assertSame('Deja traite.', $response['message']);
-    }
-
-    public function testPaymentIntentFailedMarqueEchec(): void
-    {
-        $payment = $this->creerCommandeAvecPaiement();
-        $payload = $this->construirePayload('payment_intent.payment_failed', self::INTENT_ID);
-        $signature = $this->construireSignature($payload);
-
-        $this->envoyerWebhook($payload, $signature);
-
-        $this->assertResponseStatusCodeSame(200);
-
-        $this->em->clear();
-        $updated = $this->em->find(Payment::class, $payment->getId());
-        $this->assertSame(PaymentStatus::FAILED, $updated->getStatus());
-        $this->assertSame(OrderStatus::PENDING, $updated->getOrderEntity()->getStatus());
-    }
-
-    public function testPaymentIntentFailedEstIdempotent(): void
-    {
-        $this->creerCommandeAvecPaiement(PaymentStatus::FAILED);
-        $payload = $this->construirePayload('payment_intent.payment_failed', self::INTENT_ID);
-        $signature = $this->construireSignature($payload);
-
-        $this->envoyerWebhook($payload, $signature);
-
-        $this->assertResponseStatusCodeSame(200);
-        $response = json_decode($this->client->getResponse()->getContent(), true);
-        $this->assertSame('Deja traite.', $response['message']);
-    }
-
     public function testEvenementInconnuRetourne200(): void
     {
         $payload = $this->construirePayload('charge.refunded', self::INTENT_ID);
-        $signature = $this->construireSignature($payload);
-
-        $this->envoyerWebhook($payload, $signature);
+        $this->envoyerWebhook($payload, $this->construireSignature($payload));
 
         $this->assertResponseStatusCodeSame(200);
         $response = json_decode($this->client->getResponse()->getContent(), true);
@@ -220,9 +233,7 @@ class WebhookStripeTest extends WebTestCase
     public function testIntentIdInconnuRetourne200(): void
     {
         $payload = $this->construirePayload('payment_intent.succeeded', 'pi_inexistant');
-        $signature = $this->construireSignature($payload);
-
-        $this->envoyerWebhook($payload, $signature);
+        $this->envoyerWebhook($payload, $this->construireSignature($payload));
 
         $this->assertResponseStatusCodeSame(200);
         $response = json_decode($this->client->getResponse()->getContent(), true);
@@ -240,22 +251,126 @@ class WebhookStripeTest extends WebTestCase
         $this->assertResponseStatusCodeSame(400);
     }
 
-    public function testNeTransitePasCommandeDejaExpediee(): void
-    {
-        $payment = $this->creerCommandeAvecPaiement(
-            PaymentStatus::PENDING,
-            OrderStatus::SHIPPED,
-        );
-        $payload = $this->construirePayload('payment_intent.succeeded', self::INTENT_ID);
-        $signature = $this->construireSignature($payload);
+    // --- Paiement reussi ---
 
-        $this->envoyerWebhook($payload, $signature);
+    public function testPaymentIntentSucceededCaptureLePaiement(): void
+    {
+        $payment = $this->creerCommandeAvecPaiement();
+
+        $this->envoyerEvenement('payment_intent.succeeded');
 
         $this->assertResponseStatusCodeSame(200);
+        $updated = $this->recharger($payment);
+        $this->assertSame(PaymentStatus::CAPTURED, $updated->getStatus());
+        $this->assertSame(OrderStatus::PAID, $updated->getOrderEntity()->getStatus());
+    }
 
-        $this->em->clear();
-        $updated = $this->em->find(Payment::class, $payment->getId());
+    public function testPaymentIntentSucceededEstIdempotent(): void
+    {
+        $this->creerCommandeAvecPaiement(PaymentStatus::CAPTURED, OrderStatus::PAID);
+
+        $this->envoyerEvenement('payment_intent.succeeded');
+
+        $this->assertResponseStatusCodeSame(200);
+        $response = json_decode($this->client->getResponse()->getContent(), true);
+        $this->assertSame('Deja traite.', $response['message']);
+    }
+
+    public function testNeTransitePasCommandeDejaExpediee(): void
+    {
+        $payment = $this->creerCommandeAvecPaiement(PaymentStatus::PENDING, OrderStatus::SHIPPED);
+
+        $this->envoyerEvenement('payment_intent.succeeded');
+
+        $this->assertResponseStatusCodeSame(200);
+        $updated = $this->recharger($payment);
         $this->assertSame(PaymentStatus::CAPTURED, $updated->getStatus());
         $this->assertSame(OrderStatus::SHIPPED, $updated->getOrderEntity()->getStatus());
+    }
+
+    // --- Refus de carte : le paiement reste ouvert ---
+
+    public function testRefusDeCarteLaisseLePaiementOuvertEtLeStockReserve(): void
+    {
+        $payment = $this->creerCommandeAvecPaiement();
+
+        $this->envoyerEvenement('payment_intent.payment_failed');
+
+        $this->assertResponseStatusCodeSame(200);
+        $updated = $this->recharger($payment);
+        // Le coeur du correctif : un refus n'est PAS definitif chez Stripe.
+        $this->assertSame(PaymentStatus::PENDING, $updated->getStatus(), 'Un refus ne doit pas fermer le paiement.');
+        $this->assertSame(OrderStatus::PENDING, $updated->getOrderEntity()->getStatus());
+        $this->assertSame(self::STOCK_INITIAL, $this->stockDuProduit($updated), 'Le stock reste reserve pendant que le client reessaie.');
+    }
+
+    /**
+     * Le scenario exact constate avec de vrais paiements Stripe : le client
+     * voit sa carte refusee, la corrige, et reessaie sur le MEME PaymentIntent
+     * (ce que fait PaymentForm.jsx). Avant correction : debite, commande
+     * jamais payee, stock restitue.
+     */
+    public function testSuccesApresRefusSurLeMemePaiementPayeLaCommande(): void
+    {
+        $payment = $this->creerCommandeAvecPaiement();
+
+        $this->envoyerEvenement('payment_intent.payment_failed');
+        $this->envoyerEvenement('payment_intent.succeeded');
+
+        $this->assertResponseStatusCodeSame(200);
+        $updated = $this->recharger($payment);
+        $this->assertSame(PaymentStatus::CAPTURED, $updated->getStatus());
+        $this->assertSame(OrderStatus::PAID, $updated->getOrderEntity()->getStatus());
+        $this->assertSame(self::STOCK_INITIAL, $this->stockDuProduit($updated), 'Article vendu : le stock ne doit pas avoir ete restitue.');
+    }
+
+    /**
+     * Des paiements ont ete marques `failed` par l'ancien traitement du refus
+     * alors qu'ils restaient payables. Un succes ulterieur doit les capturer.
+     */
+    public function testUnPaiementMarqueEchoueParLAncienCodeResteCapturable(): void
+    {
+        $payment = $this->creerCommandeAvecPaiement(PaymentStatus::FAILED, OrderStatus::PENDING);
+
+        $this->envoyerEvenement('payment_intent.succeeded');
+
+        $updated = $this->recharger($payment);
+        $this->assertSame(PaymentStatus::CAPTURED, $updated->getStatus());
+        $this->assertSame(OrderStatus::PAID, $updated->getOrderEntity()->getStatus());
+    }
+
+    // --- Paiement recu pour une commande annulee : remboursement ---
+
+    public function testPaiementSurCommandeAnnuleeEstRembourseEtLAdministrateurPrevenu(): void
+    {
+        $passerelle = $this->passerelleFactice();
+        $payment = $this->creerCommandeAvecPaiement(PaymentStatus::FAILED, OrderStatus::CANCELLED);
+
+        $this->envoyerEvenement('payment_intent.succeeded');
+
+        $this->assertResponseStatusCodeSame(200);
+        $this->assertSame([self::INTENT_ID], $passerelle->remboursements, 'Le paiement doit etre rembourse chez le prestataire.');
+
+        $this->assertEmailCount(1);
+        $email = $this->getMailerMessage();
+        $this->assertEmailHeaderSame($email, 'To', 'contact@volo.fr');
+        $this->assertEmailSubjectContains($email, 'Remboursement automatique');
+
+        $updated = $this->recharger($payment);
+        $this->assertSame(PaymentStatus::REFUNDED, $updated->getStatus());
+        $this->assertSame(OrderStatus::CANCELLED, $updated->getOrderEntity()->getStatus(), 'La commande reste annulee.');
+    }
+
+    public function testUnSuccesRejoueApresRemboursementNeRembourseQuUneFois(): void
+    {
+        $passerelle = $this->passerelleFactice();
+        $this->creerCommandeAvecPaiement(PaymentStatus::REFUNDED, OrderStatus::CANCELLED);
+
+        $this->envoyerEvenement('payment_intent.succeeded');
+
+        $this->assertResponseStatusCodeSame(200);
+        $response = json_decode($this->client->getResponse()->getContent(), true);
+        $this->assertSame('Deja traite.', $response['message']);
+        $this->assertSame([], $passerelle->remboursements, 'Stripe rejoue ses webhooks : aucun second remboursement.');
     }
 }

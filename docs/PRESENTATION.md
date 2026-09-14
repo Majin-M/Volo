@@ -142,7 +142,7 @@ VOLO (/)
 | Client | Se connecter, Ajouter au panier, Modifier le panier, Passer commande, Payer par carte, Consulter historique, Modifier profil, Se déconnecter |
 | Admin | CRUD Produits, CRUD Marques, CRUD Problématiques, Gérer commandes, Gérer paiements, Gérer utilisateurs |
 | Stripe | Webhook `payment_intent.succeeded` → Payment CAPTURED + Order PAID |
-| Stripe | Webhook `payment_intent.payment_failed` → Payment FAILED |
+| Stripe | Webhook `payment_intent.succeeded` → Payment CAPTURED ; sur commande annulée → **remboursement automatique** + email administrateur. Un refus (`payment_failed`) ne clôt plus le paiement |
 
 ### 5.2 Diagramme de séquence — Parcours d'achat
 
@@ -626,7 +626,7 @@ Suite backend PHPUnit 13 verte, suite frontend Vitest verte, vérifiées à chaq
 | `CsrfProtectionTest` | Fonctionnel (WebTestCase) | POST sans header → 403, mauvais token → 403, bon token → passe, GET non bloqué, login/register exemptés, contact public exempt |
 | `OrderPaymentTest` | Intégration (KernelTestCase) | Dérivation du statut Payment→Order, contrat d'API préservé (clés JSON), clientSecret non exposé, ON DELETE CASCADE, suppression paiement ≠ suppression commande |
 | `ContactNotificationTest` | Fonctionnel (WebTestCase) | Message persisté en BDD, email admin envoyé, From ≠ visiteur, Reply-To = visiteur, échec SMTP ne perd pas le message, données invalides → rien persisté, HTML strippé |
-| `WebhookStripeTest` | Fonctionnel (WebTestCase) | Sans signature → 400, signature invalide → 400, `payment_intent.succeeded` capture le paiement, `payment_intent.payment_failed` marque l'échec, **idempotence des deux événements** (rejeu sans double effet), événement inconnu → 200, `intentId` inconnu → 200, webhook exempt du contrôle CSRF, refus de transiter une commande déjà expédiée |
+| `WebhookStripeTest` | Fonctionnel (WebTestCase) | Sans signature → 400, signature invalide → 400, `payment_intent.succeeded` capture le paiement, un refus de carte **laisse le paiement ouvert et le stock réservé**, un succès après refus sur le même paiement paie la commande, un paiement reçu sur commande annulée est **remboursé** avec alerte administrateur, idempotence (rejeu sans double effet ni double remboursement), événement inconnu → 200, `intentId` inconnu → 200, webhook exempt du contrôle CSRF, refus de transiter une commande déjà expédiée |
 
 ### Tests frontend (Vitest + Testing Library)
 

@@ -150,13 +150,20 @@ cd Volo
 
 # Variables d'environnement : le fichier .env A LA RACINE, et lui seul.
 cp .env.example .env
-# puis y remplacer au minimum APP_SECRET et JWT_PASSPHRASE :
-#   php -r "echo bin2hex(random_bytes(16));"
+# puis REMPLIR les valeurs vides : APP_SECRET, JWT_PASSPHRASE, MYSQL_PASSWORD,
+# MYSQL_ROOT_PASSWORD, et les cles Stripe (de test en local). Generer :
+#   openssl rand -hex 24
 
 docker compose up -d --build
 ```
 
-> ⚠️ **C'est le `.env` racine que Compose lit, pas `backend/.env.local` ni `frontend/.env.local`.** Ces deux derniers sont exclus des images (`.dockerignore`) et n'ont aucun effet sur la pile Docker. Si le `.env` racine manque ou reste vide, la pile **démarre quand même**, avec les valeurs par défaut publiques du dépôt (`APP_SECRET=change-me-in-production`, passphrase JWT connue) et une clé Stripe vide.
+> ⚠️ **C'est le `.env` racine que Compose lit, pas `backend/.env.local` ni `frontend/.env.local`.** Ces deux derniers sont exclus des images (`.dockerignore`) et n'ont aucun effet sur la pile Docker.
+>
+> **Les secrets sont obligatoires.** Tant qu'une valeur requise est absente ou vide, `docker compose` refuse de démarrer et nomme la variable : `required variable APP_SECRET is missing a value`. C'est voulu. Limite à connaître : le contrôle détecte une valeur **manquante**, pas une valeur laissée à son exemple — `MAILER_DSN=smtp://mailer:1025` passe le contrôle mais ne délivre rien en production.
+>
+> **Mots de passe de base : uniquement de l'hexadécimal** (`openssl rand -hex`). Ils sont insérés dans `DATABASE_URL`, où un `@`, `:`, `/` ou `#` casserait l'URL. Et ils ne sont appliqués qu'à la **première** création du volume : les changer ensuite dans `.env` ne modifie pas les comptes MySQL existants.
+>
+> **Deux fichiers Compose.** `docker-compose.yml` décrit la production ; `docker-compose.override.yml`, chargé automatiquement en local, y ajoute Mailpit. **Sur un serveur**, l'ignorer : `docker compose -f docker-compose.yml up -d`, ou `COMPOSE_FILE=docker-compose.yml` dans le `.env` du serveur.
 
 Au démarrage, le conteneur `backend` **attend la base, génère les clés JWT et joue les migrations tout seul** : rien à lancer à la main. Suivre sa progression avec `docker compose logs -f backend` (lignes préfixées `[volo]`).
 

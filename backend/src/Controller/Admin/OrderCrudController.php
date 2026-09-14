@@ -32,6 +32,8 @@ use App\Entity\User;
 use App\Enum\OrderStatus;
 use App\Enum\PaymentMethod;
 use App\Enum\PaymentStatus;
+use App\Service\PaymentCancellationService;
+use Doctrine\ORM\EntityManagerInterface;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
@@ -74,9 +76,42 @@ final class OrderCrudController extends AbstractCrudController
         'paypal' => 'info',
     ];
 
+    public function __construct(
+        private PaymentCancellationService $paymentCancellationService,
+    ) {
+    }
+
     public static function getEntityFqcn(): string
     {
         return Order::class;
+    }
+
+    /**
+     * Ferme le paiement chez le prestataire quand l'administrateur annule une
+     * commande.
+     *
+     * EasyAdmin ecrit le statut directement, sans passer par la machine a
+     * etats : c'est donc ici, avant l'enregistrement, qu'il faut intervenir.
+     * Sans cela, annuler une commande en back-office laissait son paiement
+     * ouvert chez Stripe (le client pouvait encore payer), et une commande
+     * deja PAYEE etait annulee sans que le client soit rembourse.
+     *
+     * Une erreur du prestataire est propagee : rien n'est enregistre, et
+     * l'administrateur voit l'echec plutot qu'une annulation silencieusement
+     * incomplete.
+     */
+    public function updateEntity(EntityManagerInterface $entityManager, $entityInstance): void
+    {
+        if ($entityInstance instanceof Order && $entityInstance->getStatus() === OrderStatus::CANCELLED) {
+            $original = $entityManager->getUnitOfWork()->getOriginalEntityData($entityInstance);
+            $statutAvant = $original['status'] ?? null;
+
+            if ($statutAvant !== OrderStatus::CANCELLED) {
+                $this->paymentCancellationService->settleForCancelledOrder($entityInstance);
+            }
+        }
+
+        parent::updateEntity($entityManager, $entityInstance);
     }
 
     public function configureCrud(Crud $crud): Crud

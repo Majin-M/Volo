@@ -387,10 +387,10 @@ En production, chaque panier abandonné aurait retiré des unités vendables **d
 
 - `Product::incrementStock()` — contrepartie de `decrementStock()`. Volontairement sans plafond : le stock d'origine n'est pas connu, et refuser une restitution laisserait le compteur durablement faux.
 - `OrderService::releaseStock(Order)` — restitue les unités d'une commande. **Ne flushe pas** : l'appelant maîtrise sa transaction, ce qui permet de traiter plusieurs commandes en un seul flush. Ignore sans échouer une ligne dont le produit a été supprimé depuis.
-- Branchement sur `payment_intent.payment_failed` dans `WebhookController`.
+- ~~Branchement sur `payment_intent.payment_failed` dans `WebhookController`.~~ **Retiré le 14/09/2026 : c'était une erreur.** Un refus de carte n'est pas définitif chez Stripe ; restituer le stock à ce moment le rendait pendant que le client réessayait. Voir « Paiement : client débité, commande jamais payée » plus bas.
 - `app:release-stale-orders` — commande planifiable qui annule les commandes impayées au-delà d'un délai et restitue leur stock. Options `--minutes` (défaut 60) et `--dry-run`.
 
-**Comment l'idempotence est garantie** — c'est le point délicat, car Stripe rejoue ses webhooks. `releaseStock()` ne se protège pas lui-même ; ce sont les appelants qui s'appuient sur la **machine à états**. La garde `can($payment, 'fail')` ne laisse passer la transition qu'une seule fois : un rejeu du même événement n'atteint jamais la restitution. Même principe dans la commande, via `can($order, 'cancel_pending')`. Sans cette barrière, chaque nouvelle tentative gonflerait le stock.
+**Comment l'idempotence est garantie** — c'est le point délicat, car Stripe rejoue ses webhooks. `releaseStock()` ne se protège pas lui-même ; ce sont les appelants qui s'appuient sur la **machine à états**. Depuis le 14/09/2026, la restitution n'a plus lieu que sur le passage d'une commande à `cancelled` (`StockReleaseSubscriber`), et `cancelled` est un état terminal : on n'y entre qu'une fois. La garde `can($payment, 'fail')` décrite ici à l'origine protégeait une restitution sur refus de carte qui a été retirée.
 
 **Vérifié de bout en bout** : commande de 4 unités → stock 49 → 45 ; exécution de la commande → commande `cancelled`, stock revenu à **49** ; relance immédiate → « rien à faire », stock inchangé. La base a été restaurée à son état initial après le test.
 
@@ -574,3 +574,101 @@ La suite PHPUnit (64 tests) et PHPStan sont restés verts.
 > ⚠️ **Incident pendant la vérification, à consigner tel quel.** Pour lire le SQL que la migration produirait sur la base de développement, `doctrine:migrations:migrate --write-sql=<fichier>` a été lancé en croyant que l'option se contentait d'écrire le fichier. **Elle exécute aussi la migration**, sauf combinée à `--dry-run`. La migration a donc été appliquée à la base de développement sans décision préalable. L'effet a été vérifié : une seule instruction (`SET DEFAULT 0`), non destructive, index intact grâce à la condition, version enregistrée cohérente avec le SQL appliqué. C'était la convergence visée — mais l'appliquer devait rester une décision. **Pour prévisualiser sans exécuter : `--dry-run --write-sql`, jamais `--write-sql` seul.**
 
 **Reste à faire en développement** : déclarer `serverVersion=mariadb-10.4.32` dans `backend/.env.local`, pour que Doctrine cesse d'interroger MariaDB comme un MySQL.
+
+---
+
+## ✅ Configuration de production : secrets obligatoires, dev et prod séparés
+
+> **Corrigé et vérifié le 14/09/2026.** Étape 1 du déploiement.
+
+**Constat** : la pile démarrait, mais sa configuration n'était pas déployable.
+
+| Défaut | Conséquence |
+|---|---|
+| Valeurs de repli `${APP_SECRET:-change-me-in-production}`, `${JWT_PASSPHRASE:-VoLoJwT2026!}`… | Un `.env` oublié ou vide laissait démarrer la pile avec des secrets **publiés dans le dépôt** |
+| `volo_user:volo_password` écrit en dur dans `docker-compose.yml` | Identifiants de production versionnés |
+| `MAILER_DSN: smtp://mailer:1025` et Mailpit dans la pile unique | En production, tous les emails auraient été capturés, aucun envoyé |
+| Ports Mailpit ouverts sur toutes les interfaces | Interface sans authentification, contenu de tous les emails lisible depuis le réseau |
+| `scripts/backup-db.sh` détectait le conteneur **par son nom** | Un autre projet de la machine avait un `volo-mysql` en marche : le script aurait pu sauvegarder **la base d'un autre projet** |
+| Même script : mot de passe en dur, passé en argument | Cassé dès que les identifiants changent, et visible dans la liste des processus |
+| Même script : archive écrite directement sous son nom final | Un `mysqldump` en échec laissait une archive tronquée comptée comme sauvegarde ; la purge à 30 jours aurait fini par supprimer les bonnes |
+
+**Correction** :
+
+- `docker-compose.yml` devient la **base de production** : aucun secret, toutes les variables sensibles en `${VAR:?message}`, `DATABASE_URL` construite depuis `MYSQL_USER` / `MYSQL_PASSWORD` / `MYSQL_DATABASE`, `DEFAULT_URI` et `MAILER_DSN` lus depuis `.env`.
+- `docker-compose.override.yml` (nouveau), chargé automatiquement en local, ajoute Mailpit sur `127.0.0.1` uniquement. En production : `-f docker-compose.yml` ou `COMPOSE_FILE=docker-compose.yml`.
+- `.env.example` : secrets **vides**, pour qu'une copie non remplie soit refusée.
+- `scripts/backup-db.sh` : conteneur trouvé par `docker compose ps` (limité à ce dépôt), identifiants lus dans l'environnement du conteneur, mot de passe via `MYSQL_PWD`, écriture dans un fichier temporaire renommé seulement après contrôle d'intégrité.
+
+**Vérifié** — pile repartie de zéro (`down -v`) avec des secrets générés :
+
+| Vérification | Résultat |
+|---|---|
+| `.env` copié du modèle sans remplissage | Refusé : `required variable MYSQL_PASSWORD is missing a value` |
+| `.env` totalement vide | Refusé |
+| Services en local / en production | `mailer` présent / **absent** |
+| Premier démarrage | Clés JWT générées, 12 migrations jouées, 5 services sains |
+| Routes, inscription, session | 200 / 201 / 200 |
+| Email de bienvenue | Reçu par Mailpit — `MAILER_DSN` effectivement lu depuis `.env` |
+| Ports Mailpit | `127.0.0.1:8025` et `127.0.0.1:1025` uniquement |
+| Connexion administrateur | Back-office « Produits », HTTP 200 |
+| Sauvegarde | Archive valide, 14 tables, base `volo` |
+| Sauvegarde en échec simulé | Code de sortie 1, **aucune** archive laissée |
+
+**Limite assumée** : `${VAR:?}` détecte une variable **manquante**, pas une valeur laissée à son exemple. `MAILER_DSN=smtp://mailer:1025` passe le contrôle et ne délivrerait rien sur un serveur : la procédure de déploiement devra le vérifier explicitement.
+
+**Piège documenté** : l'image `mysql` n'applique `MYSQL_USER` / `MYSQL_PASSWORD` qu'à la **première** initialisation du volume. Changer ces valeurs dans `.env` ensuite ne modifie pas les comptes existants.
+
+
+---
+
+## ✅ Paiement : client débité, commande jamais payée
+
+> **Corrigé et vérifié avec de vrais paiements Stripe le 14/09/2026.**
+
+**Comment c'est apparu** : aucun test automatique ne le montrait, et la CI était verte. Un test **figeait même le défaut** : `testPaymentIntentFailedMarqueEchec` exigeait qu'un refus de carte fasse passer le paiement à `failed`. Le parcours d'achat a été rejoué de bout en bout sur la pile Docker, avec des clés Stripe de test, de vraies confirmations et le relais `stripe listen`.
+
+**Constat, sur de vrais paiements** :
+
+| Scénario | Avant correction |
+|---|---|
+| Carte refusée, le client la corrige et réessaie — **le parcours normal de `PaymentForm.jsx`**, qui garde le même `clientSecret` | **Client débité de 30 €.** Commande restée `pending`, paiement `failed`, stock restitué comme si rien n'était vendu |
+| La même commande, une heure plus tard | Le balayage **annule la commande payée** et restitue le stock **une seconde fois** : 11 unités affichées pour 9 réelles |
+| Client qui recharge la page après un refus | `POST /api/payments` → **500** : `payment.order_id` est unique, le second paiement viole la contrainte. Impossible de payer |
+
+**Causes** :
+
+1. Chez Stripe, `payment_intent.payment_failed` n'est **pas** définitif : le PaymentIntent reste ouvert et peut réussir. VOLO passait le paiement à `failed`, et `capture` n'était autorisé que depuis `pending` : le succès suivant était ignoré.
+2. La restitution du stock sur ce même événement — **ajoutée dans ce même journal le même mois, par erreur** — rendait le stock pendant que le client payait.
+3. `PaymentService` créait un paiement à chaque appel, sans chercher celui déjà ouvert.
+4. Annuler une commande laissait son PaymentIntent ouvert chez Stripe, et rien ne remboursait un paiement reçu ensuite.
+
+**Décision prise** : tout paiement reçu pour une commande annulée est **remboursé automatiquement**, et l'administrateur est prévenu par email.
+
+**Correction** :
+
+- `WebhookController` : un refus **ne modifie plus rien** (journalisé seulement). Un succès sur une commande `cancelled` déclenche le remboursement.
+- `PaymentService` : **idempotent** — renvoie le paiement ouvert de la commande ; `\DomainException` → **409** si la commande n'est plus payable.
+- `PaymentGatewayInterface` : `cancelIntent()` et `refund()` ; Stripe les implémente (remboursement avec clé d'idempotence, contre les webhooks rejoués).
+- `PaymentCancellationService` (nouveau) : ferme le paiement ouvert d'une commande annulée, rembourse un paiement encaissé, prévient l'administrateur.
+- Branché sur les **trois** chemins d'annulation : balayage `app:release-stale-orders`, back-office (`OrderCrudController::updateEntity`), et le webhook.
+- `workflow.yaml` : `capture` depuis `pending` ou `failed` (paiements marqués à tort par l'ancien code) ; `refund` depuis `captured`, `pending` ou `failed`.
+
+**Vérifié avec de vrais paiements Stripe** (mode test) :
+
+| Scénario | Résultat |
+|---|---|
+| Paiement réussi | Commande `paid`, paiement `captured`, stock juste |
+| Refus puis bonne carte, même paiement | Paiement resté `pending` après le refus, stock réservé ; second `POST /api/payments` → **201, même PaymentIntent** ; puis `paid` / `captured`, stock juste, un seul paiement en base |
+| Balayage d'une commande abandonnée | `cancelled` / `failed`, stock restitué ; PaymentIntent **`canceled` chez Stripe** ; la tentative du client est **refusée par Stripe** ; `POST /api/payments` → 409 |
+| Paiement abouti sur une commande déjà annulée | Paiement `refunded` ; **remboursement de 42 € `succeeded` chez Stripe** ; email « Remboursement automatique » reçu par l'administrateur |
+| Annulation d'une commande payée depuis EasyAdmin, par le vrai formulaire | `cancelled` / `refunded`, stock restitué ; **remboursement de 35 € chez Stripe** ; alerte administrateur reçue |
+
+**Tests** : `WebhookStripeTest` réécrit (le test qui figeait le défaut est remplacé), `PaymentSettlementTest` (nouveau). Suite complète verte, PHPStan à 0 erreur. **Éprouvés par mutation** : le refus redevenu définitif, la suppression du remboursement et la suppression de l'idempotence font chacun échouer au moins un test.
+
+**Deux pièges rencontrés pendant la vérification** :
+
+- **La CLI Stripe était connectée à un autre compte que les clés de l'application.** Un `stripe listen` lancé normalement n'aurait reçu aucun événement, sans erreur. D'où `--api-key` avec la clé du `.env`.
+- **Un premier essai EasyAdmin a rendu 422.** C'était le script de test, pas l'application : les boutons d'enregistrement sont hors de la balise `<form>` (attribut `form="…"`), et le jeton CSRF sans état attend soit le script `csrf-protection` du navigateur, soit un en-tête `Origin`. En imitant un navigateur, l'annulation passe.
+
+**Limite restante** : si Stripe est injoignable au moment où le balayage annule une commande, le paiement n'est pas fermé chez Stripe. La commande est annulée quand même, et un paiement tardif est remboursé par le webhook — mais le client aura été débité puis remboursé.

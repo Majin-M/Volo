@@ -10,6 +10,8 @@ Objectif :
 Responsabilites :
     - Creer une intention de paiement (PaymentIntent) aupres de Stripe pour
       une commande donnee.
+    - Fermer une intention encore ouverte (commande annulee).
+    - Rembourser une intention aboutie (paiement recu sur commande annulee).
     - Traduire la reponse Stripe en PaymentIntentResult, independant du SDK.
 
 Dependances :
@@ -29,6 +31,21 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 class StripePaymentGateway implements PaymentGatewayInterface
 {
+    /**
+     * Statuts dans lesquels Stripe accepte d'annuler un PaymentIntent.
+     *
+     * `requires_payment_method` en fait partie, et c'est le cas qui compte :
+     * c'est l'etat d'un paiement apres un REFUS de carte. Stripe le laisse
+     * ouvert, le client peut reessayer — d'ou la necessite de le fermer
+     * explicitement quand la commande est annulee.
+     */
+    private const STATUTS_ANNULABLES = [
+        'requires_payment_method',
+        'requires_confirmation',
+        'requires_action',
+        'requires_capture',
+    ];
+
     private StripeClient $stripe;
 
     /**
@@ -71,6 +88,39 @@ class StripePaymentGateway implements PaymentGatewayInterface
             externalId: $paymentIntent->id,
             clientSecret: $paymentIntent->client_secret,
             amount: $order->getTotal(),
+        );
+    }
+
+    /**
+     * Ferme le PaymentIntent s'il est encore ouvert.
+     *
+     * `succeeded` n'est volontairement pas annule ici : Stripe le refuserait,
+     * et l'argent est deja encaisse. Le webhook de succes, en constatant que
+     * la commande est annulee, emettra le remboursement.
+     */
+    public function cancelIntent(string $externalId): void
+    {
+        $intent = $this->stripe->paymentIntents->retrieve($externalId);
+
+        if (!\in_array($intent->status, self::STATUTS_ANNULABLES, true)) {
+            return;
+        }
+
+        $this->stripe->paymentIntents->cancel($externalId);
+    }
+
+    /**
+     * Rembourse integralement le PaymentIntent.
+     *
+     * La cle d'idempotence garantit qu'un webhook rejoue par Stripe — ce qui
+     * arrive — ne produit pas un second remboursement : Stripe renvoie le
+     * premier au lieu d'en creer un autre.
+     */
+    public function refund(string $externalId): void
+    {
+        $this->stripe->refunds->create(
+            ['payment_intent' => $externalId],
+            ['idempotency_key' => 'volo-refund-' . $externalId],
         );
     }
 }

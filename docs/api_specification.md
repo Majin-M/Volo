@@ -565,7 +565,9 @@ Modification partielle du statut d'une commande.
 
 ### POST /api/payments
 
-Initiation d'un paiement pour une commande.
+Initiation d'un paiement pour une commande — ou reprise du paiement déjà ouvert.
+
+> **Idempotent depuis le 14/09/2026.** Si la commande a déjà un paiement `pending`, la route **renvoie ce même paiement** (même `clientSecret`, même PaymentIntent Stripe) au lieu d'en créer un second. Auparavant, un second appel — un client qui recharge la page après un refus de carte — violait l'unicité de `payment.order_id` et rendait **500** : le client ne pouvait plus payer, et chaque tentative laissait un PaymentIntent orphelin chez Stripe.
 
 **Accès :** `ROLE_USER`
 
@@ -587,6 +589,15 @@ Initiation d'un paiement pour une commande.
   }
 }
 ```
+
+**Réponse 409** — la commande n'est plus payable (déjà payée, annulée) ou son paiement est déjà finalisé :
+```json
+{
+  "error": { "code": 409, "message": "Cette commande ne peut plus etre payee." }
+}
+```
+
+> Un refus de carte **ne ferme pas** le paiement : Stripe laisse le PaymentIntent ouvert, et le client réessaie avec le même `clientSecret`. Seule l'annulation de la commande le ferme — voir `POST /api/webhooks/stripe`.
 
 ---
 

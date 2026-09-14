@@ -44,8 +44,15 @@ Note Technique — CASCADE :
 
     Le cascade était à l'envers : un paiement est un détail d'une commande,
     jamais son propriétaire. Un enregistrement financier ne doit de toute façon
-    jamais être supprimé (cf. docs/DIAGRAMME_ETATS.md section 2) : un échec
-    crée un nouveau Payment, il n'écrase pas le précédent.
+    jamais être supprimé (cf. docs/DIAGRAMME_ETATS.md section 2).
+
+Note Technique — UN SEUL PAIEMENT PAR COMMANDE :
+    `order_id` est unique : une commande a au plus un Payment. Un refus de
+    carte ne le ferme pas — Stripe laisse le PaymentIntent ouvert, et le client
+    réessaie sur ce MEME paiement (PaymentService::initiatePayment() le renvoie
+    au lieu d'en créer un autre). Ce commentaire affirmait auparavant qu'« un
+    échec crée un nouveau Payment » : c'était faux, et un second paiement
+    faisait échouer l'API en 500 sur cette contrainte d'unicité.
 ===============================================================================
 */
 

@@ -54,34 +54,41 @@ Ce que le diagramme rend visible et qu'une simple liste d'énumération cachait 
 
 ```mermaid
 stateDiagram-v2
-    [*] --> pending : PaymentService crée l'intention (POST /api/payments/intent)
+    [*] --> pending : PaymentService crée l'intention (POST /api/payments)
 
+    pending --> pending : Webhook payment_intent.payment_failed (refus de carte — AUCUN changement)
     pending --> captured : Webhook payment_intent.succeeded
-    pending --> failed : Webhook payment_intent.payment_failed / abandon / expiration
+    pending --> failed : Annulation de la commande (paiement fermé chez Stripe)
 
-    captured --> refunded : Remboursement (annulation, retour, litige)
+    failed --> captured : Webhook succeeded, commande non annulée (paiements marqués par l'ancien code)
+    captured --> refunded : Annulation d'une commande payée
+    pending --> refunded : Webhook succeeded sur commande annulée
+    failed --> refunded : Webhook succeeded sur commande annulée
 
     captured --> [*]
-    failed --> [*]
     refunded --> [*]
 
-    note right of failed
-        Terminal pour CET enregistrement.
-        Un client qui réessaie génère un NOUVEAU
-        Payment, jamais une réécriture du précédent —
-        sinon l'historique ment sur ce qui s'est passé.
+    note right of pending
+        Un refus de carte ne ferme PAS le paiement :
+        Stripe laisse le PaymentIntent ouvert et le
+        client réessaie avec le même clientSecret.
+        POST /api/payments renvoie ce même paiement.
     end note
 ```
 
-Un enregistrement financier n'est **jamais remis à `pending`** après avoir atteint un état terminal. C'est ce qui garantit que l'historique affiché au client et le back-office restent une trace fidèle des tentatives réelles.
+> **Révisé le 14/09/2026, après des tests avec de vrais paiements Stripe.** La version précédente de ce diagramme faisait passer un paiement à `failed` sur `payment_intent.payment_failed`, et affirmait qu'« un client qui réessaie génère un NOUVEAU Payment ». **Les deux étaient faux, et le premier était la cause d'un défaut grave** : chez Stripe, un refus n'est pas définitif. Le client corrigeait sa carte et réessayait sur le même PaymentIntent ; le succès suivant était ignoré, puisque `failed` ne pouvait plus être capturé. Résultat constaté : **client débité, commande restée impayée**. Quant au « nouveau Payment », il n'a jamais existé : `payment.order_id` étant unique, un second paiement faisait échouer l'API en 500.
+>
+> **`failed` désigne désormais un paiement fermé par l'annulation de sa commande**, pas un refus bancaire.
 
-> ✅ **Résolu.** `WebhookController` (`src/Controller/WebhookController.php`) écoute `POST /api/webhooks/stripe`. Il vérifie la signature HMAC via `Stripe\Webhook::constructEvent()` et traite :
-> - `payment_intent.succeeded` → `Payment` passe à `CAPTURED`, `Order` passe à `PAID` (si encore `PENDING`)
-> - `payment_intent.payment_failed` → `Payment` passe à `FAILED`
+Un enregistrement financier n'est **jamais remis à `pending`** après avoir quitté cet état. C'est ce qui garantit que l'historique affiché au client et le back-office restent une trace fidèle.
+
+> ✅ **Webhook.** `WebhookController` (`src/Controller/WebhookController.php`) écoute `POST /api/webhooks/stripe`. Il vérifie la signature HMAC via `Stripe\Webhook::constructEvent()` et traite :
+> - `payment_intent.succeeded` → `Payment` passe à `CAPTURED`, `Order` passe à `PAID` (si encore `PENDING`). **Si la commande est déjà annulée** : remboursement automatique chez Stripe, `Payment` passe à `REFUNDED`, et l'administrateur est prévenu par email.
+> - `payment_intent.payment_failed` → **journalisé, aucun changement d'état**, stock toujours réservé.
 >
-> Le webhook est idempotent (un événement déjà traité retourne 200 sans modification) et envoie un email de confirmation via `OrderConfirmationService` (best-effort). Il est exempté du firewall (`PUBLIC_ACCESS`) et du CSRF (signature HMAC à la place).
+> Le webhook est idempotent : un succès rejoué sur un paiement déjà capturé ou remboursé ne fait rien, et le remboursement porte une clé d'idempotence Stripe contre les doubles remboursements. Il envoie un email de confirmation via `OrderConfirmationService` (best-effort), et il est exempté du firewall (`PUBLIC_ACCESS`) et du CSRF (signature HMAC à la place).
 >
-> Le parcours d'achat est désormais complet : le client paie chez Stripe, le webhook fait transiter la commande automatiquement.
+> **Fermeture à l'annulation** : quel que soit le chemin — balayage `app:release-stale-orders`, back-office EasyAdmin, ou webhook — `PaymentCancellationService` ferme le PaymentIntent ouvert (`pending` → `failed`) ou rembourse un paiement encaissé (`captured` → `refunded`).
 
 ---
 

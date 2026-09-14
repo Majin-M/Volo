@@ -6,14 +6,14 @@
 >
 > | Ce qui est mesuré | Valeur relevée | Commande |
 > |---|---|---|
-> | Suite backend | 64 tests, 170 assertions, verts | `php bin/phpunit` |
+> | Suite backend | 74 tests, 204 assertions, verts | `php bin/phpunit` |
 > | Suite frontend | 32 tests sur 3 fichiers, verts | `npx vitest run` |
 > | Build frontend | passe | `npm run build` |
 > | PHPStan `level: max` | 0 erreur hors baseline | `vendor/bin/phpstan analyse` |
 > | ESLint | **4 erreurs** — voir réserve ci-dessous | `npx eslint src` |
 > | React Doctor 0.9.12 | **94/100**, 2 avertissements | `npm run doctor` |
 >
-> **Couverture backend, par fichier** : `AuthControllerTest` (inscription, cookies), `CsrfProtectionTest` (double-submit), `OrderPaymentTest` (dérivation du statut, contrat d'API, cascade), `ContactNotificationTest` (persistance + notification email), `WebhookStripeTest` (signature HMAC, idempotence, transitions de statut), `StockReleaseTest` (réservation et restitution du stock, balayage des commandes abandonnées), `AuditSubscriberTest` (traçabilité des modifications), `PaginationBoundsTest` (bornes des paramètres publics). **Frontend** : `LoginPage.test.jsx`, `CartContext.test.jsx`, `validators.test.js`.
+> **Couverture backend, par fichier** : `AuthControllerTest` (inscription, cookies), `CsrfProtectionTest` (double-submit), `OrderPaymentTest` (dérivation du statut, contrat d'API, cascade), `ContactNotificationTest` (persistance + notification email), `WebhookStripeTest` (signature HMAC, idempotence, transitions de statut), `StockReleaseTest` (réservation et restitution du stock, balayage des commandes abandonnées), `AuditSubscriberTest` (traçabilité des modifications), `PaginationBoundsTest` (bornes des paramètres publics), `PaymentSettlementTest` (paiement idempotent, fermeture et remboursement à l'annulation). **Frontend** : `LoginPage.test.jsx`, `CartContext.test.jsx`, `validators.test.js`.
 >
 > **Une réserve à énoncer telle quelle** : ESLint ne sort pas 0 erreur. Les quatre erreurs sont toutes `react-hooks/set-state-in-effect`, dans `api/api.js`, `components/NavBar.jsx`, `contexts/ToastContext.jsx` et `pages/ProductDetailPage.jsx`. Elles sont signalées par la CI sans la faire échouer (§9), le temps qu'elles soient traitées.
 >

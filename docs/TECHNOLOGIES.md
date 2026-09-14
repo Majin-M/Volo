@@ -150,7 +150,11 @@ Paiement par carte. VOLO ne voit **jamais** le numéro de carte : Stripe Element
 
 **Le SDK Stripe n'est appelé que depuis une seule classe** (`StripePaymentGateway`), derrière `PaymentGatewayInterface` — voir [DIAGRAMME_CLASSES.md](DIAGRAMME_CLASSES.md) §3.
 
-> ✅ **Le webhook est implémenté.** `WebhookController` écoute `POST /api/webhooks/stripe`, vérifie la signature HMAC via `Stripe\Webhook::constructEvent()`, et traite `payment_intent.succeeded` (Payment → CAPTURED, Order → PAID) et `payment_intent.payment_failed` (Payment → FAILED). Les métadonnées Stripe incluent l'`order_id` (cast en string) et la `reference` UUID de la commande. L'intégration est fonctionnelle de bout en bout — testée avec `stripe listen --forward-to` en développement local et des clés API en mode test. Le parcours d'achat est complet.
+> ✅ **Le webhook est implémenté.** `WebhookController` écoute `POST /api/webhooks/stripe`, vérifie la signature HMAC via `Stripe\Webhook::constructEvent()`, et traite `payment_intent.succeeded` (Payment → CAPTURED, Order → PAID ; commande déjà annulée → remboursement automatique). Les métadonnées Stripe incluent l'`order_id` (cast en string) et la `reference` UUID de la commande.
+>
+> ⚠️ **Cette entrée affirmait « L'intégration est fonctionnelle de bout en bout ». C'était vrai du seul chemin où la carte passe du premier coup.** Rejoué le 14/09/2026 avec de vrais paiements Stripe, le parcours le plus courant après un refus — le client corrige sa carte et réessaie — **débitait le client sans jamais payer la commande**, parce que `payment_intent.payment_failed` passait le paiement à `FAILED` alors que Stripe le laisse ouvert. Recharger la page après un refus rendait 500. Tout est corrigé et revérifié sur de vrais paiements, remboursements compris ([CORRECTION.md](CORRECTION.md)).
+>
+> La leçon vaut pour la soutenance : **« testé avec `stripe listen` » ne dit pas quels scénarios l'ont été.** Un test du chemin nominal ne prouve rien sur les chemins d'échec, qui sont justement ceux où l'argent se perd.
 
 ---
 

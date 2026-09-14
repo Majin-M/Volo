@@ -47,13 +47,26 @@ framework:
                 - captured
                 - failed
                 - refunded
+            # `failed` NE signifie PLUS « carte refusee ». Chez Stripe, un refus
+            # (payment_intent.payment_failed) laisse le paiement OUVERT : le
+            # client peut reessayer et reussir. Le traiter comme definitif
+            # faisait ignorer ce succes — client debite, commande jamais payee.
+            # `failed` designe desormais un paiement FERME par l'annulation de
+            # sa commande.
             transitions:
                 capture:
-                    from: pending
+                    # Depuis `failed` aussi : des paiements ont ete marques
+                    # `failed` par l'ancien traitement du refus alors qu'ils
+                    # restaient payables. Une commande annulee n'arrive jamais
+                    # ici — le webhook la rembourse avant.
+                    from: [pending, failed]
                     to: captured
                 fail:
                     from: pending
                     to: failed
                 refund:
-                    from: captured
+                    # Depuis `pending` et `failed` : un paiement peut aboutir
+                    # chez Stripe apres l'annulation de sa commande. Il est
+                    # alors rembourse sans jamais etre passe par `captured`.
+                    from: [captured, pending, failed]
                     to: refunded

@@ -9,6 +9,7 @@ Objectif :
 
 Responsabilites :
     - Creer une intention de paiement aupres de PayPal pour une commande donnee.
+    - Fermer et rembourser une transaction.
 
 Statut :
     Non implementee. L'integration du SDK PayPal (Orders API v2) reste a faire ;
@@ -43,5 +44,21 @@ class PayPalPaymentGateway implements PaymentGatewayInterface
     public function createIntent(Order $order): PaymentIntentResult
     {
         throw new \RuntimeException('Paiement PayPal non encore implemente.');
+    }
+
+    /**
+     * @throws \RuntimeException Tant que l'integration PayPal n'est pas implementee.
+     */
+    public function cancelIntent(string $externalId): void
+    {
+        throw new \RuntimeException('Annulation PayPal non encore implementee.');
+    }
+
+    /**
+     * @throws \RuntimeException Tant que l'integration PayPal n'est pas implementee.
+     */
+    public function refund(string $externalId): void
+    {
+        throw new \RuntimeException('Remboursement PayPal non encore implemente.');
     }
 }

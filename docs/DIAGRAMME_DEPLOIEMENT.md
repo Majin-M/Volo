@@ -149,7 +149,7 @@ Google, lui, exécute le JS — le référencement pur fonctionne sans ce dispos
 | Environnement de staging | Inexistant | Rien n'est testé dans des conditions proches de la production avant d'y arriver |
 | CI/CD | ✅ En place (14/09/2026) | `.github/workflows/ci.yml` : PHPUnit sur MySQL 8, PHPStan `level: max`, Vitest, build. ESLint signalant mais non bloquant (4 erreurs préexistantes). Déploiement toujours manuel |
 | Sauvegardes | ✅ Script présent, cron non activé | `scripts/backup-db.sh` (mysqldump gzip, rétention 30 j) est prêt et testé ; sa planification sur le serveur cible reste à faire |
-| Variables d'environnement de prod | Inexistantes | Les secrets de prod n'ont jamais été définis |
+| Variables d'environnement de prod | 🟠 **Mécanisme en place (14/09/2026), valeurs à définir** | `docker-compose.yml` ne contient plus aucun secret : tous viennent du `.env` racine et sont **obligatoires** — une valeur manquante fait échouer `docker compose` en nommant la variable. Mailpit est isolé dans `docker-compose.override.yml`, ignoré en production. Restent à créer sur le serveur : les secrets réels, le DSN SMTP du fournisseur, les clés Stripe live, le domaine |
 
 Ce qui coûte le plus cher aujourd'hui n'est plus l'absence de Docker, mais l'**absence de déploiement** : la pile est décrite, elle n'a pas été confrontée à un serveur.
 

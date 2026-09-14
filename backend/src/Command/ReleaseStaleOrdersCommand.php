@@ -5,15 +5,27 @@
 Commande : app:release-stale-orders
 ===============================================================================
 Objectif :
-    Annuler les commandes restees impayees au-dela d'un delai, et restituer
-    le stock qu'elles immobilisaient.
+    Annuler les commandes restees impayees au-dela d'un delai, restituer
+    le stock qu'elles immobilisaient, et fermer leur paiement chez le
+    prestataire.
 
 Le probleme qu'elle resout :
     Le stock est retire des la CREATION de la commande, donc au statut
     'pending', avant tout paiement — c'est une reservation. Quand le client
     abandonne son panier, cette reservation n'est jamais levee : les unites
     restent immobilisees indefiniment. C'est le cas le plus frequent en
-    pratique, bien avant l'echec de paiement (traite, lui, par le webhook).
+    pratique.
+
+    C'est aussi, depuis le 14/09/2026, le SEUL mecanisme qui libere le stock
+    d'une commande dont la carte a ete refusee : un refus ne ferme plus le
+    paiement, le client pouvant reessayer.
+
+Pourquoi fermer le paiement chez Stripe :
+    Sans cela, le client pouvait encore payer une commande que cette commande
+    venait d'annuler. Verifie avec de vrais paiements : client debite,
+    commande annulee, stock restitue. Le paiement est desormais ferme avant
+    l'annulation ; s'il aboutit malgre tout (course entre le client et le
+    balayage), le webhook le rembourse automatiquement.
 
 Pourquoi une commande planifiee et non un declenchement a chaud :
     L'abandon n'est pas un evenement — personne ne previent qu'un panier ne
@@ -33,6 +45,7 @@ namespace App\Command;
 
 use App\Entity\Order;
 use App\Repository\OrderRepository;
+use App\Service\PaymentCancellationService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -45,7 +58,7 @@ use Symfony\Component\Workflow\WorkflowInterface;
 
 #[AsCommand(
     name: 'app:release-stale-orders',
-    description: 'Annule les commandes impayees trop anciennes et restitue leur stock.',
+    description: 'Annule les commandes impayees trop anciennes, ferme leur paiement et restitue leur stock.',
 )]
 class ReleaseStaleOrdersCommand extends Command
 {
@@ -54,6 +67,7 @@ class ReleaseStaleOrdersCommand extends Command
     public function __construct(
         private OrderRepository $orderRepository,
         private EntityManagerInterface $entityManager,
+        private PaymentCancellationService $paymentCancellationService,
         #[Autowire(service: 'state_machine.order')] private WorkflowInterface $orderStateMachine,
     ) {
         parent::__construct();
@@ -112,6 +126,7 @@ class ReleaseStaleOrdersCommand extends Command
         $lignes = [];
         $totalRestitue = 0;
         $ignorees = 0;
+        $paiementsNonFermes = [];
 
         foreach ($commandes as $order) {
             // La machine a etats reste l'autorite : si la transition n'est
@@ -121,14 +136,23 @@ class ReleaseStaleOrdersCommand extends Command
                 continue;
             }
 
-            // La restitution n'est PLUS declenchee ici. Elle est portee par
-            // StockReleaseSubscriber, qui reagit au passage a 'cancelled'
-            // quelle que soit l'origine de l'annulation — y compris EasyAdmin,
-            // qui y echappait. Appeler releaseStock() ici EN PLUS de la
-            // transition restituerait donc deux fois.
+            // La restitution du stock n'est pas declenchee ici : elle est
+            // portee par StockReleaseSubscriber, qui reagit au passage a
+            // 'cancelled' quelle que soit l'origine de l'annulation.
             $unites = $this->compterUnites($order);
 
             if (!$dryRun) {
+                // Fermer le paiement AVANT d'annuler, pour que le client ne
+                // puisse plus payer. Si le prestataire est injoignable, on
+                // annule quand meme : garder la commande ouverte bloquerait
+                // le stock, et un paiement tardif serait rembourse par le
+                // webhook.
+                try {
+                    $this->paymentCancellationService->settleForCancelledOrder($order);
+                } catch (\Throwable $e) {
+                    $paiementsNonFermes[] = sprintf('#%d (%s)', (int) $order->getId(), $e->getMessage());
+                }
+
                 $this->orderStateMachine->apply($order, 'cancel_pending');
             }
 
@@ -159,6 +183,13 @@ class ReleaseStaleOrdersCommand extends Command
             \count($lignes),
             $totalRestitue,
         ));
+
+        if ($paiementsNonFermes !== []) {
+            $io->warning(sprintf(
+                'Paiement non ferme chez le prestataire pour : %s. Les commandes sont annulees ; un paiement tardif sera rembourse automatiquement.',
+                implode(', ', $paiementsNonFermes),
+            ));
+        }
 
         if ($ignorees > 0) {
             $io->warning(sprintf(

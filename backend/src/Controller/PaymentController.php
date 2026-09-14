@@ -90,6 +90,11 @@ class PaymentController extends AbstractController
                     'amount' => $payment->getAmount(),
                 ],
             ], JsonResponse::HTTP_CREATED);
+        } catch (\DomainException $e) {
+            // Commande deja payee, annulee, ou paiement deja finalise : c'est
+            // un etat metier, pas une panne. 409 et un message lisible, plutot
+            // que le 500 generique qui masquait la cause.
+            return ApiError::response($e->getMessage(), 409);
         } catch (\Throwable $e) {
             $this->logger->error('Erreur lors de l\'initiation du paiement.', [
                 'order_id' => $orderId,
