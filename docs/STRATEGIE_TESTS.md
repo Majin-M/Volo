@@ -11,6 +11,7 @@
 > | Build frontend | passe | `npm run build` |
 > | PHPStan `level: max` | 0 erreur hors baseline | `vendor/bin/phpstan analyse` |
 > | ESLint | **4 erreurs** — voir réserve ci-dessous | `npx eslint src` |
+> | React Doctor 0.9.12 | **94/100**, 2 avertissements | `npm run doctor` |
 >
 > **Couverture backend, par fichier** : `AuthControllerTest` (inscription, cookies), `CsrfProtectionTest` (double-submit), `OrderPaymentTest` (dérivation du statut, contrat d'API, cascade), `ContactNotificationTest` (persistance + notification email), `WebhookStripeTest` (signature HMAC, idempotence, transitions de statut), `StockReleaseTest` (réservation et restitution du stock, balayage des commandes abandonnées), `AuditSubscriberTest` (traçabilité des modifications). **Frontend** : `LoginPage.test.jsx`, `CartContext.test.jsx`, `validators.test.js`.
 >
