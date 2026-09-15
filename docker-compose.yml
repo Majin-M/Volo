@@ -2,29 +2,38 @@
 # Les outils de développement (Mailpit) sont dans docker-compose.override.yml.
 # Variables : .env à la racine, modèle .env.example. Mise en route : README.md.
 #
-#   nginx (80) -> frontend (SPA React) | backend (PHP-FPM 9000) -> db (MySQL 8.0)
-#   scheduler  -> tâches planifiées
+#   nginx du VPS (HTTPS, ENV Manager) -> volo-nginx (80)
+#     -> volo-web (SPA React) | volo-api (PHP-FPM 9000) -> volo-db (MySQL 8.0)
+#   volo-scheduler -> tâches planifiées
+#
+# Seul volo-nginx est sur le réseau partagé `web` : le reste du projet
+# n'est visible que sur le réseau privé `default`.
 
 services:
 
-  # Reverse proxy : point d'entrée unique.
- #nginx:
-   # image: nginx:alpine
-    # container_name: volo-nginx
-    # expose:
-    #   - "80"
-    # volumes:
-    #   - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-    #   - backend_public:/app/public:ro
-    # depends_on:
-    #   backend:
-    #     # Attend que PHP-FPM écoute, pour éviter des 502 au démarrage.
-    #     condition: service_healthy
-    #   frontend:
-    #     condition: service_started
-    # restart: unless-stopped
-    # networks:
-    #   - web
+  # Point d'entrée HTTP unique, joint par le nginx du VPS en http://volo-nginx:80.
+  # Indispensable : le nginx du VPS ne fait que du proxy HTTP, alors que le
+  # backend parle FastCGI, et le frontend appelle /api sur son propre domaine.
+  # Nom de service `volo-nginx` et non `nginx` : le conteneur global du VPS
+  # s'appelle déjà `nginx` sur `web`, le nom serait ambigu.
+  volo-nginx:
+    image: nginx:alpine
+    container_name: volo-nginx
+    expose:
+      - "80"
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - backend_public:/app/public:ro
+    depends_on:
+      backend:
+        # Attend que PHP-FPM écoute, pour éviter des 502 au démarrage.
+        condition: service_healthy
+      frontend:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - default
+      - web
 
   # Backend Symfony (PHP-FPM).
   backend:
@@ -44,8 +53,7 @@ services:
       # URL publique, pour les liens générés hors requête (emails, sitemap).
       DEFAULT_URI: ${DEFAULT_URI:?DEFAULT_URI manquant dans .env}
       # 8.0.0 et non 8.0 : Doctrine sélectionnerait sinon une plateforme MySQL générique.
-      # Hôte `volo-db` (nom de conteneur) et non `db` : backend est aussi sur `web`,
-      # où un autre projet peut avoir un service `db` que Docker résoudrait en premier.
+      # Hôte `volo-db` (nom de conteneur, unique sur le VPS) plutôt que `db`, générique.
       DATABASE_URL: mysql://${MYSQL_USER:?MYSQL_USER manquant dans .env}:${MYSQL_PASSWORD:?MYSQL_PASSWORD manquant dans .env}@volo-db:3306/${MYSQL_DATABASE:?MYSQL_DATABASE manquant dans .env}?serverVersion=8.0.0&charset=utf8mb4
       MAILER_DSN: ${MAILER_DSN:?MAILER_DSN manquant dans .env}
       MESSENGER_TRANSPORT_DSN: doctrine://default?auto_setup=0
@@ -56,6 +64,9 @@ services:
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:?STRIPE_SECRET_KEY manquant dans .env}
       STRIPE_PUBLIC_KEY: ${STRIPE_PUBLIC_KEY:?STRIPE_PUBLIC_KEY manquant dans .env}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:?STRIPE_WEBHOOK_SECRET manquant dans .env}
+      # Requêtes relayées par deux proxies (nginx du VPS puis volo-nginx) aux IP privées :
+      # Symfony lit alors X-Forwarded-Proto/For, sinon il se croit en HTTP.
+      SYMFONY_TRUSTED_PROXIES: private_ranges
     depends_on:
       db:
         condition: service_healthy
@@ -70,12 +81,9 @@ services:
     restart: unless-stopped
     expose:
       - "9000"
-    # `default` : réseau privé du projet, pour joindre `db`.
-    # `web` : réseau partagé du VPS, où le nginx global le joint par son nom
-    # de conteneur `volo-api` (unique), jamais par le nom générique `backend`.
+    # Réseau privé seul : joint par volo-nginx, pas par le nginx du VPS.
     networks:
       - default
-      - web
 
   # Tâches planifiées : annule les commandes impayées depuis plus de 60 minutes,
   # ferme leur paiement Stripe et restitue leur stock.
@@ -113,8 +121,9 @@ services:
         VITE_STRIPE_PUBLIC_KEY: ${STRIPE_PUBLIC_KEY:?STRIPE_PUBLIC_KEY manquant dans .env}
     container_name: volo-web
     restart: unless-stopped
+    # Réseau privé seul : joint par volo-nginx, pas par le nginx du VPS.
     networks:
-      - web
+      - default
 
   # Base de données.
   db:
@@ -147,7 +156,8 @@ volumes:
 networks:
   # Réseau privé du projet (volo_default), non partagé.
   default:
-  # Réseau partagé avec le nginx global du VPS (docker network create web).
+  # Réseau partagé avec le nginx global du VPS (docker network create web) :
+  # seul volo-nginx y est.
   web:
     external: true
 
