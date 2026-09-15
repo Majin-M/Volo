@@ -13,6 +13,9 @@
          bloc <style> : la Content-Security-Policy du site interdit les styles
          inline (`default-src 'self'` sans `style-src 'unsafe-inline'`), la
          page s'affichait donc sans aucun style.
+       - volo-login.js (externe pour la meme raison) bloque le double envoi du
+         formulaire : le second POST arrivait apres la connexion, avec un jeton
+         CSRF deja invalide par la regeneration de session.
    ============================================================================== #}
 <!doctype html>
 <html lang="fr">
@@ -23,6 +26,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/svg+xml" href="/admin-theme/favicon.svg">
     <link rel="stylesheet" href="/admin-theme/volo-login.css">
+    <script src="/admin-theme/volo-login.js" defer></script>
 </head>
 <body>
     <div class="login-card">

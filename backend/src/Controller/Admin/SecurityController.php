@@ -44,6 +44,15 @@ class SecurityController extends AbstractController
     #[Route(path: '/admin/login', name: 'admin_login')]
     public function login(AuthenticationUtils $authenticationUtils): Response
     {
+        // Un admin deja connecte n'a rien a faire ici. Sans cette redirection,
+        // un second envoi du formulaire (double-clic, bouton Retour) arrivait
+        // apres la connexion : Symfony avait deja regenere la session et donc
+        // invalide le jeton CSRF du formulaire -> "Invalid CSRF token", puis
+        // retour sur ce formulaire alors que la session etait bien connectee.
+        if ($this->isGranted('ROLE_ADMIN')) {
+            return $this->redirectToRoute('admin');
+        }
+
         $error = $authenticationUtils->getLastAuthenticationError();
         $lastUsername = $authenticationUtils->getLastUsername();
 
