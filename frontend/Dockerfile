@@ -1,4 +1,4 @@
-# --- Etape 1 : build du frontend ---
+ # --- Etape 1 : build du frontend ---
 FROM node:22-alpine AS build
 
 WORKDIR /app
