@@ -68,7 +68,11 @@ services:
     restart: unless-stopped
     expose:
       - "9000"
+    # `default` : réseau privé du projet, pour joindre `db`.
+    # `web` : réseau partagé du VPS, où le nginx global le joint par son nom
+    # de conteneur `volo-api` (unique), jamais par le nom générique `backend`.
     networks:
+      - default
       - web
 
   # Tâches planifiées : annule les commandes impayées depuis plus de 60 minutes,
@@ -93,8 +97,9 @@ services:
       backend:
         condition: service_healthy
     restart: unless-stopped
+    # Réseau privé seul : n'a besoin que de `db`, rien ne l'appelle.
     networks:
-      - web
+      - default
 
   # Frontend React : build Vite servi par Nginx.
   frontend:
@@ -128,8 +133,9 @@ services:
       retries: 5
       start_period: 30s
     restart: unless-stopped
+    # Réseau privé seul : la base n'est pas visible des autres projets du VPS.
     networks:
-      - web
+      - default
 
 volumes:
   db_data:
@@ -137,7 +143,9 @@ volumes:
   jwt_keys:
 
 networks:
-  web: 
+  # Réseau privé du projet (volo_default), non partagé.
+  default:
+  # Réseau partagé avec le nginx global du VPS (docker network create web).
+  web:
     external: true
-
 
