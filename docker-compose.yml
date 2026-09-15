@@ -44,7 +44,9 @@ services:
       # URL publique, pour les liens générés hors requête (emails, sitemap).
       DEFAULT_URI: ${DEFAULT_URI:?DEFAULT_URI manquant dans .env}
       # 8.0.0 et non 8.0 : Doctrine sélectionnerait sinon une plateforme MySQL générique.
-      DATABASE_URL: mysql://${MYSQL_USER:?MYSQL_USER manquant dans .env}:${MYSQL_PASSWORD:?MYSQL_PASSWORD manquant dans .env}@db:3306/${MYSQL_DATABASE:?MYSQL_DATABASE manquant dans .env}?serverVersion=8.0.0&charset=utf8mb4
+      # Hôte `volo-db` (nom de conteneur) et non `db` : backend est aussi sur `web`,
+      # où un autre projet peut avoir un service `db` que Docker résoudrait en premier.
+      DATABASE_URL: mysql://${MYSQL_USER:?MYSQL_USER manquant dans .env}:${MYSQL_PASSWORD:?MYSQL_PASSWORD manquant dans .env}@volo-db:3306/${MYSQL_DATABASE:?MYSQL_DATABASE manquant dans .env}?serverVersion=8.0.0&charset=utf8mb4
       MAILER_DSN: ${MAILER_DSN:?MAILER_DSN manquant dans .env}
       MESSENGER_TRANSPORT_DSN: doctrine://default?auto_setup=0
       ADMIN_EMAIL: ${ADMIN_EMAIL:?ADMIN_EMAIL manquant dans .env}
