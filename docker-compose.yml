@@ -31,7 +31,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: volo-backend
+    container_name: volo-api
     volumes:
       - backend_public:/app/public
       # Clés JWT conservées entre deux builds : les sessions restent valides.
@@ -102,7 +102,7 @@ services:
       args:
         # Clé PUBLIQUE uniquement (pk_...) : Vite l'intègre au bundle au build.
         VITE_STRIPE_PUBLIC_KEY: ${STRIPE_PUBLIC_KEY:?STRIPE_PUBLIC_KEY manquant dans .env}
-    container_name: volo-frontend
+    container_name: volo-web
     restart: unless-stopped
     networks:
       - web
