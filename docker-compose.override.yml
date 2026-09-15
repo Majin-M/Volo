@@ -7,7 +7,7 @@ services:
   mailer:
     image: axllent/mailpit
     # Pas de container_name : évite une collision avec d'autres projets.
-    ports:
+    expose:
       # Liés à 127.0.0.1 : l'interface n'a pas d'authentification.
       - "127.0.0.1:1025:1025"
       - "127.0.0.1:8025:8025"
@@ -15,8 +15,12 @@ services:
       MP_SMTP_AUTH_ACCEPT_ANY: 1
       MP_SMTP_AUTH_ALLOW_INSECURE: 1
     restart: unless-stopped
+    networks:
+      - web
 
   backend:
     depends_on:
       mailer:
         condition: service_started
+    networks:
+      - web

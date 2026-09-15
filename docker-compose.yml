@@ -8,21 +8,23 @@
 services:
 
   # Reverse proxy : point d'entrée unique.
-  nginx:
-    image: nginx:alpine
-    container_name: volo-nginx
-    ports:
-      - "80:80"
-    volumes:
-      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-      - backend_public:/app/public:ro
-    depends_on:
-      backend:
-        # Attend que PHP-FPM écoute, pour éviter des 502 au démarrage.
-        condition: service_healthy
-      frontend:
-        condition: service_started
-    restart: unless-stopped
+ #nginx:
+   # image: nginx:alpine
+    # container_name: volo-nginx
+    # expose:
+    #   - "80"
+    # volumes:
+    #   - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    #   - backend_public:/app/public:ro
+    # depends_on:
+    #   backend:
+    #     # Attend que PHP-FPM écoute, pour éviter des 502 au démarrage.
+    #     condition: service_healthy
+    #   frontend:
+    #     condition: service_started
+    # restart: unless-stopped
+    # networks:
+    #   - web
 
   # Backend Symfony (PHP-FPM).
   backend:
@@ -64,6 +66,8 @@ services:
       retries: 12
       start_period: 60s
     restart: unless-stopped
+    networks:
+      - web
 
   # Tâches planifiées : annule les commandes impayées depuis plus de 60 minutes,
   # ferme leur paiement Stripe et restitue leur stock.
@@ -87,6 +91,8 @@ services:
       backend:
         condition: service_healthy
     restart: unless-stopped
+    networks:
+      - web
 
   # Frontend React : build Vite servi par Nginx.
   frontend:
@@ -98,6 +104,8 @@ services:
         VITE_STRIPE_PUBLIC_KEY: ${STRIPE_PUBLIC_KEY:?STRIPE_PUBLIC_KEY manquant dans .env}
     container_name: volo-frontend
     restart: unless-stopped
+    networks:
+      - web
 
   # Base de données.
   db:
@@ -118,8 +126,16 @@ services:
       retries: 5
       start_period: 30s
     restart: unless-stopped
+    networks:
+      - web
 
 volumes:
   db_data:
   backend_public:
   jwt_keys:
+
+networks:
+  web: 
+    external: true
+
+

@@ -9,8 +9,8 @@ services:
       MYSQL_DATABASE: volo
       MYSQL_USER: volo_user
       MYSQL_PASSWORD: volo_password
-    ports:
-      - "3306:3306" # On force le port MySQL standard
+    expose:
+      - "3306" # On force le port MySQL standard
     volumes:
       - db_data:/var/lib/mysql
     healthcheck:
@@ -22,9 +22,9 @@ services:
   mailer:
     image: axllent/mailpit
     container_name: volo-mailer
-    ports:
-      - "1025:1025" # Port SMTP pour envoyer
-      - "8025:8025" # Port Web pour voir les boîtes (http://localhost:8025)
+    expose:
+      - "1025" # Port SMTP pour envoyer
+      - "8025" # Port Web pour voir les boîtes (http://localhost:8025)
     environment:
       MP_SMTP_AUTH_ACCEPT_ANY: 1
       MP_SMTP_AUTH_ALLOW_INSECURE: 1
