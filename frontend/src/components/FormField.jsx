@@ -9,7 +9,8 @@ Responsabilites :
     - Afficher le label, l'input et le message d'erreur inline.
     - Valider au blur (perte de focus) et au changement apres premier blur.
     - Afficher une bordure rouge + message sous le champ en cas d'erreur.
-    - Afficher une bordure verte + coche si le champ est valide apres edition.
+    - Aucun signal pour un champ valide : l'absence d'erreur suffit, une coche
+      verte sur chaque champ faisait generique et sortait de la charte.
     - Pour type="password" : bouton afficher / masquer la saisie (PasswordInput).
 
 Props :
@@ -47,20 +48,6 @@ const errorMsgStyle = {
     minHeight: '1.2em',
 };
 
-const validIconStyle = {
-    position: 'absolute',
-    right: '12px',
-    top: '50%',
-    transform: 'translateY(-50%)',
-    color: '#4CAF50',
-    fontSize: '1.1em',
-    pointerEvents: 'none',
-};
-
-// Pour un mot de passe, la coche est decalee vers la gauche : a 12px du bord,
-// elle se superposerait au bouton afficher / masquer.
-const validIconStylePassword = { ...validIconStyle, right: '44px' };
-
 const FormField = ({
     label,
     id,
@@ -97,18 +84,10 @@ const FormField = ({
         }
     };
 
-    const isValid = touched && !error && value.length > 0;
     const isInvalid = touched && !!error;
 
-    const borderColor = isInvalid ? '#d9534f' : isValid ? '#4CAF50' : undefined;
-    const boxShadow = isInvalid
-        ? '0 0 0 3px rgba(217,83,79,0.12)'
-        : isValid
-        ? '0 0 0 3px rgba(76,175,80,0.12)'
-        : undefined;
-
-    const inputStyle = borderColor
-        ? { borderColor, boxShadow }
+    const inputStyle = isInvalid
+        ? { borderColor: '#d9534f', boxShadow: '0 0 0 3px rgba(217,83,79,0.12)' }
         : {};
 
     const isPassword = type === 'password';
@@ -143,12 +122,7 @@ const FormField = ({
                     {label}
                 </label>
             )}
-            <div style={{ position: 'relative' }}>
-                {isPassword ? <PasswordInput {...inputProps} /> : <input {...inputProps} type={type} />}
-                {isValid && (
-                    <span style={isPassword ? validIconStylePassword : validIconStyle} aria-hidden="true">&#10003;</span>
-                )}
-            </div>
+            {isPassword ? <PasswordInput {...inputProps} /> : <input {...inputProps} type={type} />}
             <div id={`${id}-error`} style={errorMsgStyle} role={isInvalid ? 'alert' : undefined}>
                 {isInvalid ? error : ''}
             </div>

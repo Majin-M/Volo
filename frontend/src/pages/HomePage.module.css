@@ -249,8 +249,21 @@ Structure :
 }
 
 .tipIcon {
-    font-size: 2.5em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
     margin-bottom: 15px;
+    border-radius: 50%;
+    background-color: #F8F0E8;
+    color: #5F4C42;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.tipCard:hover .tipIcon {
+    background-color: #9CB997;
+    color: #fff;
 }
 
 .tipTitle {

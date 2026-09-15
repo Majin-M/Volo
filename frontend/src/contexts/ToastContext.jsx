@@ -7,10 +7,13 @@ Objectif :
     quel composant via le hook useToast().
 
 Types supportes :
-    - success : Action reussie (vert).
-    - error   : Erreur (rouge).
-    - warning : Avertissement (orange).
+    - success : Action reussie (vert sauge de la charte).
+    - error   : Erreur (rouge attenue).
+    - warning : Avertissement (ocre).
     - info    : Information neutre (brun VOLO).
+
+Tous partagent la meme carte ivoire et le meme texte brun : seule la bande
+laterale et l'icone changent de couleur, pour rester dans l'identite du site.
 
 Utilisation :
     const { addToast } = useToast();
@@ -19,6 +22,7 @@ Utilisation :
 */
 
 import { createContext, useContext, useState, useCallback, useRef, useMemo } from 'react';
+import Icon from '../components/Icon';
 
 const ToastContext = createContext(null);
 
@@ -26,47 +30,12 @@ let toastId = 0;
 
 const TOAST_DURATION = 4000;
 
+// accent : bande laterale, icone et barre de progression.
 const typeConfig = {
-    success: {
-        bg: 'linear-gradient(135deg, #2e7d32, #43a047)',
-        border: '#66bb6a',
-        icon: (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" opacity="0.3" />
-                <path d="M8 12l3 3 5-6" />
-            </svg>
-        ),
-    },
-    error: {
-        bg: 'linear-gradient(135deg, #c62828, #e53935)',
-        border: '#ef5350',
-        icon: (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" opacity="0.3" />
-                <path d="M15 9l-6 6M9 9l6 6" />
-            </svg>
-        ),
-    },
-    warning: {
-        bg: 'linear-gradient(135deg, #e65100, #f57c00)',
-        border: '#ffa726',
-        icon: (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 9v4M12 17h.01" />
-                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" opacity="0.3" />
-            </svg>
-        ),
-    },
-    info: {
-        bg: 'linear-gradient(135deg, #5F4C42, #7a6a60)',
-        border: '#E9D7C3',
-        icon: (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" opacity="0.3" />
-                <path d="M12 16v-4M12 8h.01" />
-            </svg>
-        ),
-    },
+    success: { accent: '#7E9C79', icon: 'check' },
+    error: { accent: '#B5534B', icon: 'alert' },
+    warning: { accent: '#B8863B', icon: 'alert' },
+    info: { accent: '#5F4C42', icon: 'info' },
 };
 
 export const ToastProvider = ({ children }) => {
@@ -100,17 +69,16 @@ export const ToastProvider = ({ children }) => {
             <style>{`
                 @keyframes volo-toast-in {
                     from {
-                        transform: translateX(120%);
+                        transform: translateY(8px);
                         opacity: 0;
                     }
-                    60% {
-                        transform: translateX(-6px);
-                        opacity: 1;
-                    }
                     to {
-                        transform: translateX(0);
+                        transform: translateY(0);
                         opacity: 1;
                     }
+                }
+                @media (prefers-reduced-motion: reduce) {
+                    [data-volo-toast] { animation: none !important; }
                 }
                 @keyframes volo-toast-out {
                     to {
@@ -144,71 +112,60 @@ export const ToastProvider = ({ children }) => {
                             <div
                                 key={toast.id}
                                 role="status"
+                                data-volo-toast=""
                                 style={{
                                     pointerEvents: 'auto',
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '12px',
-                                    padding: '16px 20px',
-                                    borderRadius: '14px',
+                                    padding: '14px 16px 14px 18px',
+                                    borderRadius: '10px',
+                                    borderLeft: `4px solid ${config.accent}`,
                                     fontFamily: "'Lato', sans-serif",
                                     fontSize: '0.95em',
-                                    fontWeight: 500,
-                                    color: '#fff',
-                                    background: config.bg,
-                                    boxShadow: `0 8px 32px rgba(0,0,0,0.18), 0 0 0 1px ${config.border}33`,
+                                    color: '#5F4C42',
+                                    background: '#FFFCF8',
+                                    boxShadow: '0 6px 24px rgba(95,76,66,0.14), 0 0 0 1px #E9D7C3',
                                     maxWidth: '400px',
                                     lineHeight: 1.4,
                                     position: 'relative',
                                     overflow: 'hidden',
-                                    backdropFilter: 'blur(8px)',
                                     animation: toast.exiting
                                         ? 'volo-toast-out 0.3s ease forwards'
-                                        : 'volo-toast-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                                        : 'volo-toast-in 0.35s ease-out',
                                 }}
                             >
-                                <span style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    width: '32px',
-                                    height: '32px',
-                                    borderRadius: '50%',
-                                    backgroundColor: 'rgba(255,255,255,0.15)',
-                                    flexShrink: 0,
-                                }}>
-                                    {config.icon}
+                                <span style={{ display: 'flex', color: config.accent, flexShrink: 0 }}>
+                                    <Icon name={config.icon} size={20} />
                                 </span>
                                 <span style={{ flex: 1 }}>{toast.message}</span>
                                 <button
                                     type="button"
                                     style={{
+                                        display: 'flex',
                                         background: 'none',
                                         border: 'none',
-                                        color: 'rgba(255,255,255,0.6)',
-                                        fontSize: '1.3em',
+                                        color: '#8a7a70',
                                         cursor: 'pointer',
-                                        padding: '0 0 0 8px',
-                                        lineHeight: 1,
-                                        transition: 'color 0.2s',
+                                        padding: '4px',
+                                        marginLeft: '4px',
+                                        borderRadius: '6px',
                                     }}
-                                    onMouseEnter={(e) => { e.target.style.color = '#fff'; }}
-                                    onMouseLeave={(e) => { e.target.style.color = 'rgba(255,255,255,0.6)'; }}
                                     onClick={() => removeToast(toast.id)}
                                     aria-label="Fermer"
                                 >
-                                    &times;
+                                    <Icon name="close" size={16} />
                                 </button>
                                 <div style={{
                                     position: 'absolute',
                                     bottom: 0,
                                     left: 0,
                                     right: 0,
-                                    height: '3px',
-                                    backgroundColor: 'rgba(255,255,255,0.3)',
+                                    height: '2px',
+                                    backgroundColor: config.accent,
+                                    opacity: 0.35,
                                     transformOrigin: 'left',
                                     animation: `volo-toast-progress ${TOAST_DURATION}ms linear forwards`,
-                                    borderRadius: '0 0 14px 14px',
                                 }} />
                             </div>
                         );

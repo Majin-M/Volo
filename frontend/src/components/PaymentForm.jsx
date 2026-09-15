@@ -28,6 +28,7 @@ Exemple d'utilisation :
 
 import { useState } from 'react';
 import { useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
+import Icon from './Icon';
 
 // Styles statiques (ne dependent d'aucune prop/etat) : definis en portee
 // module pour ne pas etre reconstruits a chaque rendu.
@@ -49,7 +50,15 @@ const cardOptions = {
     },
 };
 
-const lockIconStyle = { textAlign: 'center', marginBottom: '10px' };
+const lockIconStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    marginBottom: '12px',
+    color: '#5F4C42',
+    fontSize: '0.9em',
+};
 const errorStyle = { color: 'red', textAlign: 'center', marginTop: '15px' };
 
 const PaymentForm = ({ clientSecret, onSuccess }) => {
@@ -113,7 +122,8 @@ const PaymentForm = ({ clientSecret, onSuccess }) => {
     return (
         <form id="payment-form" onSubmit={handleSubmit}>
             <div style={lockIconStyle}>
-                🔐
+                <Icon name="lock" size={16} />
+                <span>Paiement sécurisé par Stripe</span>
             </div>
 
             <CardElement options={cardOptions} id="card-element" />

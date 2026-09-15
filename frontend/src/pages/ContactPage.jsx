@@ -26,6 +26,7 @@ import { useReducer } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { submitContactMessage } from '../api/contactApi';
 import { validateEmail, isRequired } from '../utils/validators';
+import Icon from '../components/Icon';
 import styles from './ContactPage.module.css';
 import { EDITEUR } from '../config/legalIdentity';
 
@@ -140,17 +141,17 @@ const ContactPage = () => {
                     <h2 className={styles.infoTitle}>Informations</h2>
 
                     <div className={styles.infoRow}>
-                        <span className={styles.infoIcon}>📍</span>
+                        <span className={styles.infoIcon}><Icon name="mapPin" size={18} /></span>
                         <span>{EDITEUR.siege}</span>
                     </div>
                     <div className={styles.infoRow}>
-                        <span className={styles.infoIcon}>✉️</span>
+                        <span className={styles.infoIcon}><Icon name="mail" size={18} /></span>
                         <a href={`mailto:${EDITEUR.email}`} className={styles.infoLink}>
                             {EDITEUR.email}
                         </a>
                     </div>
                     <div className={styles.infoRow}>
-                        <span className={styles.infoIcon}>🕐</span>
+                        <span className={styles.infoIcon}><Icon name="clock" size={18} /></span>
                         <span>Lun-Ven, 9h-18h</span>
                     </div>
                 </div>

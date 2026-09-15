@@ -65,9 +65,7 @@ class AuditSubscriber
      */
     private array $creationsEnAttente = [];
 
-    public function __construct(private Security $security)
-    {
-    }
+    public function __construct(private Security $security) {}
 
     /**
      * Trace les MODIFICATIONS, en les greffant sur le flush en cours.

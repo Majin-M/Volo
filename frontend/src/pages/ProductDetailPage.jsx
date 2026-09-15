@@ -110,7 +110,7 @@ const ProductDetailPage = () => {
                     <h2>Produit introuvable</h2>
                     <p>Ce produit n'existe pas ou n'est plus disponible.</p>
                     <Link to="/soins" className={styles.backLink}>
-                        ← Retour au catalogue
+                        Retour au catalogue
                     </Link>
                 </div>
             </>
@@ -216,7 +216,7 @@ const ProductDetailPage = () => {
                             disabled={!product.isAvailable || product.stock === 0}
                             className={styles.addButton}
                         >
-                            {added ? 'Ajoute ✓' : 'Ajouter au panier'}
+                            {added ? 'Ajouté au panier' : 'Ajouter au panier'}
                         </button>
                     </div>
                 </div>

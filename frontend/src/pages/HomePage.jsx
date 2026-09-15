@@ -20,6 +20,7 @@ Exemple d'utilisation :
 
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
+import Icon from '../components/Icon';
 import styles from './HomePage.module.css';
 
 // Problematiques de peau (image + slug pour filtrer le catalogue)
@@ -74,10 +75,10 @@ const routines = [
 
 // Conseils de bonnes habitudes de vie pour la peau
 const lifestyleTips = [
-    { slug: "hydratation", icon: "💧", title: "Hydratation", desc: "Buvez au moins 1,5L d'eau par jour pour maintenir l'élasticité de la peau." },
-    { slug: "sommeil", icon: "😴", title: "Sommeil réparateur", desc: "7 à 8h de sommeil favorisent la régénération cellulaire nocturne." },
-    { slug: "protection-solaire", icon: "☀️", title: "Protection solaire", desc: "Appliquez un SPF chaque jour, même par temps couvert." },
-    { slug: "alimentation", icon: "🥗", title: "Alimentation équilibrée", desc: "Privilégiez fruits, légumes et oméga-3 pour nourrir la peau de l'intérieur." },
+    { slug: "hydratation", icon: "droplet", title: "Hydratation", desc: "Buvez au moins 1,5L d'eau par jour pour maintenir l'élasticité de la peau." },
+    { slug: "sommeil", icon: "moon", title: "Sommeil réparateur", desc: "7 à 8h de sommeil favorisent la régénération cellulaire nocturne." },
+    { slug: "protection-solaire", icon: "sun", title: "Protection solaire", desc: "Appliquez un SPF chaque jour, même par temps couvert." },
+    { slug: "alimentation", icon: "leaf", title: "Alimentation équilibrée", desc: "Privilégiez fruits, légumes et oméga-3 pour nourrir la peau de l'intérieur." },
 ];
 
 // Reset des styles par defaut du navigateur pour un <button> utilise comme carte cliquable
@@ -204,7 +205,7 @@ export const HomePage = () => {
                 <div className={styles.tipsGrid}>
                     {lifestyleTips.map((tip) => (
                         <div key={tip.slug} className={styles.tipCard}>
-                            <div className={styles.tipIcon}>{tip.icon}</div>
+                            <div className={styles.tipIcon}><Icon name={tip.icon} size={26} /></div>
                             <h3 className={styles.tipTitle}>{tip.title}</h3>
                             <p className={styles.tipDesc}>{tip.desc}</p>
                         </div>

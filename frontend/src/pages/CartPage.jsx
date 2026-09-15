@@ -29,6 +29,7 @@ import { useToast } from '../contexts/ToastContext';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import ConfirmDialog from '../components/ConfirmDialog';
+import Icon from '../components/Icon';
 import styles from './CartPage.module.css';
 
 // JSX statique (ne depend d'aucune prop/etat) : construit une seule fois.
@@ -151,7 +152,7 @@ const CartPage = () => {
                                     onClick={() => setItemToRemove(item)}
                                     aria-label="Supprimer l'article"
                                 >
-                                    ✕
+                                    <Icon name="close" size={18} />
                                 </button>
                             </div>
                         ))}
@@ -179,7 +180,7 @@ const CartPage = () => {
                         </Link>
 
                         <Link to="/soins" className={styles.continueLink}>
-                            ← Continuer mes achats
+                            Continuer mes achats
                         </Link>
                     </div>
                 </div>

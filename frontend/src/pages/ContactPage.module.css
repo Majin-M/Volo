@@ -59,7 +59,15 @@ Design System :
 }
 
 .infoIcon {
-    font-size: 1.1em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background-color: #F8F0E8;
+    color: #5F4C42;
 }
 
 .infoLink {

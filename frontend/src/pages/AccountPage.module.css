@@ -186,8 +186,9 @@
 }
 
 .success {
-    background-color: #e8f5e9;
-    color: #2e7d32;
+    background-color: #F8F0E8;
+    color: #5F4C42;
+    border: 1px solid #9CB997;
 }
 
 .error {
